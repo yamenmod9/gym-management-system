@@ -43,7 +43,9 @@ class ProductionConfig(Config):
     DEBUG = False
     TESTING = False
     # Override with environment variables in production
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///gym_management.db')
+    # Update CORS_ORIGINS for your production frontend
+    # CORS_ORIGINS = ['https://your-frontend-domain.com']
 
 
 class TestingConfig(Config):
