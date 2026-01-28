@@ -12,6 +12,7 @@ from .expenses_routes import expenses_bp
 from .complaints_routes import complaints_bp
 from .fingerprints_routes import fingerprints_bp
 from .dashboards_routes import dashboards_bp
+from .daily_closing_routes import daily_closing_bp
 from .test_routes import test_bp
 
 
@@ -28,4 +29,5 @@ def register_blueprints(app):
     app.register_blueprint(complaints_bp)
     app.register_blueprint(fingerprints_bp)
     app.register_blueprint(dashboards_bp)
+    app.register_blueprint(daily_closing_bp)
     app.register_blueprint(test_bp)
