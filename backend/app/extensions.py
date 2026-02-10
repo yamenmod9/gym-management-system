@@ -21,11 +21,13 @@ def init_extensions(app):
     migrate.init_app(app, db)
     jwt.init_app(app)
     cors.init_app(app, resources={
-        r"/api/*": {
+        r"/*": {
             "origins": app.config['CORS_ORIGINS'],
-            "allow_headers": ["Content-Type", "Authorization"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
             "expose_headers": ["Content-Type", "Authorization"],
-            "supports_credentials": True
+            "supports_credentials": True,
+            "max_age": 3600
         }
     })
     ma.init_app(app)

@@ -28,8 +28,9 @@ class Config:
     # File Upload (for future expansion)
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
     
-    # CORS
-    CORS_ORIGINS = ['*']  # Configure properly in production
+    # CORS Configuration
+    # Allow all origins for development. Restrict in production.
+    CORS_ORIGINS = '*'  # or ['http://localhost:3000', 'http://localhost:5000'] for specific origins
 
 
 class DevelopmentConfig(Config):
@@ -44,8 +45,9 @@ class ProductionConfig(Config):
     TESTING = False
     # Override with environment variables in production
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///gym_management.db')
-    # Update CORS_ORIGINS for your production frontend
-    # CORS_ORIGINS = ['https://your-frontend-domain.com']
+    # CORS: Allow all origins for now, restrict later for security
+    # CORS_ORIGINS = ['https://your-frontend-domain.com', 'https://your-other-domain.com']
+    CORS_ORIGINS = '*'  # Change to specific origins in production for better security
 
 
 class TestingConfig(Config):
