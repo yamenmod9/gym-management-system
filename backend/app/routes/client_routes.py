@@ -84,32 +84,6 @@ def change_password():
     )
 
 
-@client_bp.route('/qr-code', methods=['GET'])
-@client_token_required
-def get_client_profile():
-    """
-    Get current client profile
-    
-    Returns:
-        Customer profile with active subscription
-    """
-    customer = get_current_client()
-    
-    if not customer:
-        return error_response('Customer not found', 404)
-    
-    # Get active subscription
-    active_subscription = Subscription.query.filter_by(
-        customer_id=customer.id,
-        status=SubscriptionStatus.ACTIVE
-    ).first()
-    
-    response_data = customer.to_dict()
-    response_data['active_subscription'] = active_subscription.to_dict() if active_subscription else None
-    
-    return success_response(response_data)
-
-
 @client_bp.route('/subscription', methods=['GET'])
 @client_token_required
 def get_client_subscription():
