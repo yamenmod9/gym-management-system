@@ -104,6 +104,55 @@ def create_subscription():
     return success_response(subscription.to_dict(), "Subscription created successfully", 201)
 
 
+@subscriptions_bp.route('/activate', methods=['POST'])
+@jwt_required()
+@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+def activate_subscription():
+    """Activate new subscription (alias for create)"""
+    try:
+        data = request.json
+        
+        # Validate required fields
+        required_fields = ['customer_id', 'service_id', 'branch_id']
+        for field in required_fields:
+            if field not in data:
+                return error_response(f"Missing required field: {field}", 400)
+        
+        # Validate branch access
+        user = get_current_user()
+        if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+            if user.branch_id and data['branch_id'] != user.branch_id:
+                return error_response("Cannot create subscription for another branch", 403)
+        
+        # Prepare data for service
+        subscription_data = {
+            'customer_id': data['customer_id'],
+            'service_id': data['service_id'],
+            'branch_id': data['branch_id'],
+            'payment_method': data.get('payment_method', 'cash'),
+            'reference_number': data.get('reference_number'),
+            'start_date': data.get('start_date')
+        }
+        
+        subscription, error = SubscriptionService.create_subscription(subscription_data, user.id)
+        
+        if error:
+            return error_response(error, 400)
+        
+        # Format response to match Flutter app expectations
+        response_data = subscription.to_dict()
+        response_data['subscription_id'] = subscription.id
+        
+        return success_response(
+            response_data,
+            "Subscription activated successfully",
+            201
+        )
+    
+    except Exception as e:
+        return error_response(f"Failed to activate subscription: {str(e)}", 500)
+
+
 @subscriptions_bp.route('/<int:subscription_id>/renew', methods=['POST'])
 @jwt_required()
 @role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
