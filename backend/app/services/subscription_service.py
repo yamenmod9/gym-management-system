@@ -28,9 +28,14 @@ class SubscriptionService:
             return None, "Service not found or inactive"
         
         # Calculate dates
-        start_date = data.get('start_date', date.today())
-        if isinstance(start_date, str):
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+        start_date = data.get('start_date')
+        if not start_date:
+            start_date = date.today()
+        elif isinstance(start_date, str):
+            try:
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            except ValueError:
+                start_date = date.today()
         
         end_date = start_date + timedelta(days=service.duration_days)
         
