@@ -3,7 +3,10 @@ Customer model - Gym members/clients
 """
 from datetime import datetime
 from app.extensions import db
+from passlib.hash import pbkdf2_sha256
 import enum
+import secrets
+import string
 
 
 class Gender(enum.Enum):
@@ -39,6 +42,11 @@ class Customer(db.Model):
     
     # QR Code for gym access
     qr_code = db.Column(db.String(50), unique=True, nullable=True, index=True)
+    
+    # Client App Authentication
+    password_hash = db.Column(db.String(255), nullable=True)  # Hashed password for client app
+    temp_password = db.Column(db.String(20), nullable=True)  # Plain temporary password (for first login)
+    password_changed = db.Column(db.Boolean, default=False, nullable=False)  # Has client changed password?
     
     # Branch relationship
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=False, index=True)
@@ -104,6 +112,28 @@ class Customer(db.Model):
             today = datetime.utcnow().date()
             return (today - self.date_of_birth).days // 365
         return None
+    
+    def set_password(self, password):
+        """Hash and set password"""
+        self.password_hash = pbkdf2_sha256.hash(password)
+        self.temp_password = None  # Clear temp password once real password is set
+        self.password_changed = True
+    
+    def check_password(self, password):
+        """Verify password"""
+        if not self.password_hash:
+            return False
+        return pbkdf2_sha256.verify(password, self.password_hash)
+    
+    def generate_temp_password(self):
+        """Generate a random temporary password"""
+        # Generate 8-character alphanumeric password
+        alphabet = string.ascii_uppercase + string.digits
+        temp_pass = ''.join(secrets.choice(alphabet) for _ in range(8))
+        self.temp_password = temp_pass
+        self.set_password(temp_pass)  # Also set as hashed password
+        self.password_changed = False
+        return temp_pass
 
     def to_dict(self):
         """Convert to dictionary"""

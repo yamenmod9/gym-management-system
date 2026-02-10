@@ -34,6 +34,78 @@ def get_client_profile():
     
     response_data = customer.to_dict()
     response_data['active_subscription'] = active_subscription.to_dict() if active_subscription else None
+    response_data['password_changed'] = customer.password_changed
+    response_data['qr_image_url'] = f'/api/client/qr-image'
+    
+    return success_response(response_data)
+
+
+@client_bp.route('/change-password', methods=['POST'])
+@client_token_required
+def change_password():
+    """
+    Change client password
+    
+    Request body:
+        - current_password: Current password
+        - new_password: New password (min 6 characters)
+    
+    Returns:
+        Success message
+    """
+    customer = get_current_client()
+    
+    if not customer:
+        return error_response('Customer not found', 404)
+    
+    data = request.get_json()
+    
+    if not data or 'current_password' not in data or 'new_password' not in data:
+        return error_response('Current password and new password are required', 400)
+    
+    current_password = data['current_password'].strip()
+    new_password = data['new_password'].strip()
+    
+    # Validate new password
+    if len(new_password) < 6:
+        return error_response('New password must be at least 6 characters', 400)
+    
+    # Verify current password
+    if not customer.check_password(current_password):
+        return error_response('Current password is incorrect', 401)
+    
+    # Set new password
+    customer.set_password(new_password)
+    db.session.commit()
+    
+    return success_response(
+        {'password_changed': True},
+        'Password changed successfully'
+    )
+
+
+@client_bp.route('/qr-code', methods=['GET'])
+@client_token_required
+def get_client_profile():
+    """
+    Get current client profile
+    
+    Returns:
+        Customer profile with active subscription
+    """
+    customer = get_current_client()
+    
+    if not customer:
+        return error_response('Customer not found', 404)
+    
+    # Get active subscription
+    active_subscription = Subscription.query.filter_by(
+        customer_id=customer.id,
+        status=SubscriptionStatus.ACTIVE
+    ).first()
+    
+    response_data = customer.to_dict()
+    response_data['active_subscription'] = active_subscription.to_dict() if active_subscription else None
     
     return success_response(response_data)
 

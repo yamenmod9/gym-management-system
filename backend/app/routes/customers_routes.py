@@ -209,9 +209,12 @@ def register_customer():
         # Generate QR code in format GYM-{id}
         customer.qr_code = f"GYM-{customer.id}"
         
+        # Generate temporary password for client app login
+        temp_password = customer.generate_temp_password()
+        
         db.session.commit()
         
-        # Return Flutter-compatible response
+        # Return Flutter-compatible response with credentials
         return success_response(
             {
                 "id": customer.id,
@@ -229,7 +232,14 @@ def register_customer():
                 "qr_code": customer.qr_code,
                 "branch_id": customer.branch_id,
                 "is_active": customer.is_active,
-                "created_at": customer.created_at.isoformat()
+                "created_at": customer.created_at.isoformat(),
+                # Client App Credentials (Give these to the client)
+                "client_credentials": {
+                    "client_id": f"GYM-{customer.id}",
+                    "phone": customer.phone,
+                    "temporary_password": temp_password,
+                    "note": "Give these credentials to the client for their mobile app login"
+                }
             },
             "Customer registered successfully",
             201

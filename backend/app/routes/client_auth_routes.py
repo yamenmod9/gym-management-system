@@ -11,6 +11,65 @@ from app.extensions import db
 client_auth_bp = Blueprint('client_auth', __name__, url_prefix='/api/client/auth')
 
 
+@client_auth_bp.route('/login', methods=['POST'])
+def client_login():
+    """
+    Client login with phone and password
+    
+    Request body:
+        - phone: Customer phone number
+        - password: Password (temporary or changed)
+    
+    Returns:
+        - access_token: JWT token for client
+        - customer: Customer profile data
+        - password_changed: Whether client has changed password
+    """
+    data = request.get_json()
+    
+    if not data or 'phone' not in data or 'password' not in data:
+        return error_response('Phone and password are required', 400)
+    
+    phone = data['phone'].strip()
+    password = data['password'].strip()
+    
+    # Find customer by phone
+    customer = Customer.query.filter_by(phone=phone, is_active=True).first()
+    
+    if not customer:
+        return error_response('Invalid phone or password', 401)
+    
+    # Verify password
+    if not customer.check_password(password):
+        return error_response('Invalid phone or password', 401)
+    
+    # Generate client JWT
+    access_token = create_client_token(customer.id)
+    
+    # Get active subscription
+    from app.models.subscription import Subscription, SubscriptionStatus
+    active_subscription = Subscription.query.filter_by(
+        customer_id=customer.id,
+        status=SubscriptionStatus.ACTIVE
+    ).first()
+    
+    return success_response({
+        'access_token': access_token,
+        'token_type': 'Bearer',
+        'password_changed': customer.password_changed,
+        'customer': {
+            'id': customer.id,
+            'full_name': customer.full_name,
+            'phone': customer.phone,
+            'email': customer.email,
+            'qr_code': customer.qr_code,
+            'branch_id': customer.branch_id,
+            'branch_name': customer.branch.name if customer.branch else None,
+            'has_active_subscription': active_subscription is not None
+        }
+    }, 'Login successful')
+
+
 @client_auth_bp.route('/request-code', methods=['POST'])
 def request_activation_code():
     """
