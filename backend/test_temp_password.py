@@ -4,8 +4,23 @@ Tests staff viewing temp passwords and client password change flow
 """
 import requests
 import json
+import os
+import sys
 
-BASE_URL = "http://localhost:8000/api"
+# Get base URL from environment variable or command line argument
+if len(sys.argv) > 1:
+    BASE_URL = sys.argv[1].rstrip('/') + '/api'
+elif os.environ.get('API_BASE_URL'):
+    BASE_URL = os.environ.get('API_BASE_URL').rstrip('/') + '/api'
+else:
+    # Default to localhost for development
+    BASE_URL = "http://localhost:8000/api"
+
+print(f"Using API URL: {BASE_URL}")
+
+# Disable SSL warnings for self-signed certificates if needed
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def print_section(title):
     """Print a formatted section header"""
@@ -252,15 +267,30 @@ def main():
     print("\n" + "="*70)
 
 if __name__ == "__main__":
-    print("\nStarting tests...")
-    print("Make sure the backend server is running on http://localhost:8000")
+    print("\n" + "="*70)
+    print("  TEMPORARY PASSWORD FUNCTIONALITY TEST")
+    print("="*70)
+    print("\nUsage:")
+    print("  python test_temp_password.py [BASE_URL]")
+    print("\nExamples:")
+    print("  python test_temp_password.py http://localhost:8000")
+    print("  python test_temp_password.py https://yamenmod91.pythonanywhere.com")
+    print("\nOr set environment variable:")
+    print("  export API_BASE_URL=https://yamenmod91.pythonanywhere.com")
+    print("  python test_temp_password.py")
+    print("\n" + "="*70)
+    
     input("\nPress Enter to continue...")
     
     try:
         main()
     except requests.exceptions.ConnectionError:
         print("\n✗ ERROR: Cannot connect to backend server")
-        print("  Make sure the server is running: python run.py")
+        print(f"  URL: {BASE_URL}")
+        print("\n  Troubleshooting:")
+        print("  - If testing locally: Make sure server is running (python run.py)")
+        print("  - If testing on PythonAnywhere: Use HTTPS URL")
+        print(f"    python test_temp_password.py https://yamenmod91.pythonanywhere.com")
     except Exception as e:
         print(f"\n✗ ERROR: {str(e)}")
         import traceback
