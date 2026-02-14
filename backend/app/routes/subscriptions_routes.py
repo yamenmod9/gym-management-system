@@ -231,3 +231,80 @@ def stop_subscription(subscription_id):
         return error_response(error, 400)
     
     return success_response(subscription.to_dict(), "Subscription stopped successfully")
+
+
+# Alternative endpoints for Flutter app - accept subscription_id in body instead of URL
+@subscriptions_bp.route('/renew', methods=['POST'])
+@jwt_required()
+@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+def renew_subscription_body():
+    """Renew subscription (body-based)"""
+    data = request.get_json()
+    
+    if not data or 'subscription_id' not in data:
+        return error_response('subscription_id is required', 400)
+    
+    subscription_id = data['subscription_id']
+    
+    # Use the existing renewal logic
+    subscription, error = SubscriptionService.renew_subscription(subscription_id)
+    
+    if error:
+        return error_response(error, 400)
+    
+    return success_response(subscription.to_dict(), "Subscription renewed successfully")
+
+
+@subscriptions_bp.route('/freeze', methods=['POST'])
+@jwt_required()
+@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+def freeze_subscription_body():
+    """Freeze subscription (body-based)"""
+    data = request.get_json()
+    
+    if not data or 'subscription_id' not in data:
+        return error_response('subscription_id is required', 400)
+    
+    subscription_id = data['subscription_id']
+    freeze_days = data.get('freeze_days')
+    reason = data.get('reason')
+    
+    if not freeze_days:
+        return error_response('freeze_days is required', 400)
+    
+    # Use existing freeze logic
+    subscription, error = SubscriptionService.freeze_subscription(
+        subscription_id,
+        freeze_days,
+        reason
+    )
+    
+    if error:
+        return error_response(error, 400)
+    
+    return success_response(subscription.to_dict(), "Subscription frozen successfully")
+
+
+@subscriptions_bp.route('/stop', methods=['POST'])
+@jwt_required()
+@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+def stop_subscription_body():
+    """Stop subscription (body-based)"""
+    data = request.get_json()
+    
+    if not data or 'subscription_id' not in data:
+        return error_response('subscription_id is required', 400)
+    
+    subscription_id = data['subscription_id']
+    reason = data.get('reason', 'Customer request')
+    
+    # Use existing stop logic
+    subscription, error = SubscriptionService.stop_subscription(
+        subscription_id,
+        reason
+    )
+    
+    if error:
+        return error_response(error, 400)
+    
+    return success_response(subscription.to_dict(), "Subscription stopped successfully")

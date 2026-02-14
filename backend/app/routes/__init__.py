@@ -15,9 +15,16 @@ from .dashboards_routes import dashboards_bp
 from .daily_closing_routes import daily_closing_bp
 from .test_routes import test_bp
 from .debug_routes import debug_bp
-from .client_auth_routes import client_auth_bp
+from .client_auth_routes import client_auth_bp, client_compat_bp
 from .client_routes import client_bp
 from .validation_routes import validation_bp
+
+# New Flutter-compatible routes
+from .qr_routes import qr_bp
+from .payments_routes import payments_bp
+from .reports_routes import reports_bp
+from .alerts_routes import alerts_bp
+from .finance_routes import finance_bp
 
 
 def register_blueprints(app):
@@ -39,5 +46,13 @@ def register_blueprints(app):
     
     # Client-facing routes
     app.register_blueprint(client_auth_bp)
+    app.register_blueprint(client_compat_bp)
     app.register_blueprint(client_bp)
     app.register_blueprint(validation_bp)
+    
+    # Flutter-compatible alias routes
+    app.register_blueprint(qr_bp)
+    app.register_blueprint(payments_bp)
+    app.register_blueprint(reports_bp)
+    app.register_blueprint(alerts_bp)
+    app.register_blueprint(finance_bp)

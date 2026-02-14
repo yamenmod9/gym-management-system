@@ -61,3 +61,14 @@ def change_password():
         return error_response(message, 400)
     
     return success_response(message=message)
+
+
+@auth_bp.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """
+    Logout current user
+    Note: Since we're using stateless JWT, this is mainly for client-side cleanup.
+    In production, consider implementing JWT blacklisting.
+    """
+    return success_response(message="Logged out successfully")

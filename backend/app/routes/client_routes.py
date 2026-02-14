@@ -222,6 +222,39 @@ def get_client_qr():
     })
 
 
+@client_bp.route('/refresh-qr', methods=['POST'])
+@client_token_required
+def refresh_client_qr():
+    """
+    Refresh QR code (alias for GET /qr)
+    Returns the same as GET /qr since QR codes don't expire in this implementation
+    """
+    # Get current client
+    customer_id = request.customer_id
+    customer = db.session.get(Customer, customer_id)
+    
+    if not customer or not customer.is_active:
+        return error_response('Customer not found or inactive', 404)
+    
+    # QR code is permanent (GYM-{id}), but we return it in the expected format
+    return success_response({
+        'qr_code': customer.qr_code,
+        'qr_token': customer.qr_code,  # Static QR
+        'expires_at': None,  # Never expires
+        'message': 'QR code is permanent and does not need refreshing'
+    })
+
+
+@client_bp.route('/entry-history', methods=['GET'])
+@client_token_required
+def get_client_entry_history():
+    """
+    Get client entry history (alias for /history)
+    """
+    # Redirect to the actual history implementation
+    return get_client_history()
+
+
 @client_bp.route('/history', methods=['GET'])
 @client_token_required
 def get_client_history():

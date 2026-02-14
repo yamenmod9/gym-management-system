@@ -290,6 +290,55 @@ def update_customer(customer_id):
     return success_response(customer.to_dict(), "Customer updated successfully")
 
 
+@customers_bp.route('/search', methods=['GET'])
+@jwt_required()
+def search_customers():
+    """
+    Search customers by name, phone, email, national_id, or qr_code
+    
+    Query params:
+        - q: Search query string
+        - branch_id: Filter by branch (optional)
+        - limit: Max results (default: 50)
+    """
+    query_string = request.args.get('q', '').strip()
+    branch_id = request.args.get('branch_id', type=int)
+    limit = request.args.get('limit', 50, type=int)
+    
+    if not query_string:
+        return error_response('Search query (q) is required', 400)
+    
+    current_user = get_current_user()
+    
+    # Build search query
+    search_pattern = f'%{query_string}%'
+    query = Customer.query.filter(
+        db.or_(
+            Customer.full_name.ilike(search_pattern),
+            Customer.phone.ilike(search_pattern),
+            Customer.email.ilike(search_pattern),
+            Customer.national_id.ilike(search_pattern),
+            Customer.qr_code.ilike(search_pattern)
+        ),
+        Customer.is_active == True
+    )
+    
+    # Role-based filtering
+    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+        query = query.filter(Customer.branch_id == current_user.branch_id)
+    elif branch_id:
+        query = query.filter(Customer.branch_id == branch_id)
+    
+    # Limit results
+    customers = query.limit(limit).all()
+    
+    return success_response({
+        'items': [c.to_dict() for c in customers],
+        'total': len(customers),
+        'query': query_string
+    })
+
+
 @customers_bp.route('/<int:customer_id>', methods=['DELETE'])
 @jwt_required()
 @role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)

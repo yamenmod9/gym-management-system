@@ -275,3 +275,51 @@ def _mask_identifier(identifier: str, method: str) -> str:
         if len(identifier) > 4:
             return identifier[:2] + '*' * (len(identifier) - 4) + identifier[-2:]
         return identifier
+
+
+@client_auth_bp.route('/logout', methods=['POST'])
+def client_logout():
+    """
+    Logout client user
+    Note: Since we're using stateless JWT, this is mainly for client-side cleanup.
+    In production, consider implementing JWT blacklisting.
+    """
+    return success_response(message="Logged out successfully")
+
+
+@client_auth_bp.route('/refresh', methods=['POST'])
+def refresh_client_token():
+    """
+    Refresh client access token
+    
+    Request body:
+        - refresh_token: Refresh token (currently not implemented, returns same behavior as login)
+    
+    Note: Full refresh token implementation requires storing refresh tokens
+    and using flask_jwt_extended's refresh_token decorators
+    """
+    data = request.get_json()
+    
+    if not data or 'refresh_token' not in data:
+        return error_response('Refresh token is required', 400)
+    
+    # For now, return error - full implementation requires refresh token storage
+    return error_response('Token refresh not yet implemented. Please login again.', 501)
+
+
+# Backwards compatibility aliases with shorter paths (without /auth prefix)
+# These match the Flutter app spec exactly
+from flask import Blueprint as BP
+client_compat_bp = BP('client_compat', __name__, url_prefix='/api/client')
+
+
+@client_compat_bp.route('/request-activation', methods=['POST'])
+def request_activation_compat():
+    """Alias for /api/client/auth/request-code"""
+    return request_activation_code()
+
+
+@client_compat_bp.route('/verify-activation', methods=['POST'])
+def verify_activation_compat():
+    """Alias for /api/client/auth/verify-code"""
+    return verify_activation_code()
