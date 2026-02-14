@@ -135,9 +135,14 @@ class Customer(db.Model):
         self.password_changed = False
         return temp_pass
 
-    def to_dict(self):
-        """Convert to dictionary"""
-        return {
+    def to_dict(self, include_temp_password=True):
+        """Convert to dictionary
+        
+        Args:
+            include_temp_password: If True, includes temp_password for staff viewing
+                                  Set to False for client-facing endpoints
+        """
+        data = {
             'id': self.id,
             'full_name': self.full_name,
             'phone': self.phone,
@@ -159,6 +164,14 @@ class Customer(db.Model):
             'branch_id': self.branch_id,
             'branch_name': self.branch.name if self.branch else None,
             'is_active': self.is_active,
+            'password_changed': self.password_changed,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
+        
+        # Only include temp_password for staff (not customers)
+        # Only show if password hasn't been changed yet
+        if include_temp_password and not self.password_changed:
+            data['temp_password'] = self.temp_password
+        
+        return data

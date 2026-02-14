@@ -277,6 +277,50 @@ def _mask_identifier(identifier: str, method: str) -> str:
         return identifier
 
 
+@client_auth_bp.route('/change-password', methods=['POST'])
+def change_password():
+    """
+    Change customer password (for first-time login or password update)
+    
+    Request body:
+        - phone: Customer phone number
+        - old_password: Current password (temporary or old password)
+        - new_password: New password (min 8 characters)
+    
+    Returns:
+        - message: Success message
+    """
+    data = request.get_json()
+    
+    if not data or 'phone' not in data or 'old_password' not in data or 'new_password' not in data:
+        return error_response('Phone, old_password, and new_password are required', 400)
+    
+    phone = data['phone'].strip()
+    old_password = data['old_password'].strip()
+    new_password = data['new_password'].strip()
+    
+    # Validate new password
+    if len(new_password) < 8:
+        return error_response('New password must be at least 8 characters', 400)
+    
+    # Find customer
+    customer = Customer.query.filter_by(phone=phone, is_active=True).first()
+    
+    if not customer:
+        return error_response('Customer not found', 404)
+    
+    # Verify old password
+    if not customer.check_password(old_password):
+        return error_response('Current password is incorrect', 401)
+    
+    # Update password using set_password (which handles hashing and clearing temp_password)
+    customer.set_password(new_password)
+    
+    db.session.commit()
+    
+    return success_response(message='Password changed successfully')
+
+
 @client_auth_bp.route('/logout', methods=['POST'])
 def client_logout():
     """
