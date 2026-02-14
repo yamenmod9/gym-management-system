@@ -18,6 +18,59 @@ from app.extensions import db
 dashboards_bp = Blueprint('dashboards', __name__, url_prefix='/api/dashboards')
 
 
+@dashboards_bp.route('/overview', methods=['GET'])
+@jwt_required()
+@role_required(UserRole.OWNER)
+def get_dashboard_overview():
+    """Get overall gym system metrics (Owner only)"""
+    from app.models import Branch, Customer, Subscription, Transaction
+    from sqlalchemy import func
+    
+    # Get date range from query params
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    # Total metrics
+    total_customers = Customer.query.count()
+    total_branches = Branch.query.filter_by(is_active=True).count()
+    active_subscriptions = Subscription.query.filter_by(status=SubscriptionStatus.ACTIVE).count()
+    
+    # Total revenue calculation
+    revenue_query = db.session.query(func.sum(Transaction.amount)).scalar()
+    total_revenue = float(revenue_query) if revenue_query else 0.0
+    
+    # Revenue by branch
+    revenue_by_branch = []
+    branches = Branch.query.filter_by(is_active=True).all()
+    
+    for branch in branches:
+        branch_revenue = db.session.query(func.sum(Transaction.amount)).filter(
+            Transaction.branch_id == branch.id
+        ).scalar()
+        
+        branch_customers = Customer.query.filter_by(branch_id=branch.id).count()
+        branch_active_subs = Subscription.query.filter_by(
+            branch_id=branch.id,
+            status=SubscriptionStatus.ACTIVE
+        ).count()
+        
+        revenue_by_branch.append({
+            'branch_id': branch.id,
+            'branch_name': branch.name,
+            'revenue': float(branch_revenue) if branch_revenue else 0.0,
+            'customers': branch_customers,
+            'active_subscriptions': branch_active_subs
+        })
+    
+    return success_response({
+        'total_revenue': total_revenue,
+        'total_customers': total_customers,
+        'active_subscriptions': active_subscriptions,
+        'total_branches': total_branches,
+        'revenue_by_branch': revenue_by_branch
+    })
+
+
 @dashboards_bp.route('/owner', methods=['GET'])
 @jwt_required()
 @role_required(UserRole.OWNER)
@@ -43,6 +96,61 @@ def get_accountant_dashboard():
     
     data = DashboardService.get_accountant_dashboard(branch_id)
     return success_response(data)
+
+
+@dashboards_bp.route('/branch/<int:branch_id>', methods=['GET'])
+@jwt_required()
+@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+def get_branch_dashboard(branch_id):
+    """Get branch-specific metrics"""
+    from app.models import Branch, Customer, Subscription, Transaction, User, Complaint, Expense
+    from sqlalchemy import func
+    
+    user = get_current_user()
+    
+    # Branch managers can only see their own branch
+    if user.role == UserRole.BRANCH_MANAGER and user.branch_id != branch_id:
+        return error_response("Access denied to this branch", 403)
+    
+    branch = db.session.get(Branch, branch_id)
+    if not branch:
+        return error_response("Branch not found", 404)
+    
+    # Branch metrics
+    total_customers = Customer.query.filter_by(branch_id=branch_id).count()
+    active_subscriptions = Subscription.query.filter_by(
+        branch_id=branch_id,
+        status=SubscriptionStatus.ACTIVE
+    ).count()
+    
+    branch_revenue = db.session.query(func.sum(Transaction.amount)).filter(
+        Transaction.branch_id == branch_id
+    ).scalar()
+    total_revenue = float(branch_revenue) if branch_revenue else 0.0
+    
+    staff_count = User.query.filter_by(branch_id=branch_id, is_active=True).count()
+    open_complaints = Complaint.query.filter_by(
+        branch_id=branch_id,
+        status=ComplaintStatus.OPEN
+    ).count()
+    pending_expenses = Expense.query.filter_by(
+        branch_id=branch_id,
+        status=ExpenseStatus.PENDING
+    ).count()
+    
+    return success_response({
+        'branch': {
+            'id': branch.id,
+            'name': branch.name,
+            'location': f"{branch.city}, {branch.address}" if branch.city else branch.address
+        },
+        'total_customers': total_customers,
+        'active_subscriptions': active_subscriptions,
+        'total_revenue': total_revenue,
+        'staff_count': staff_count,
+        'open_complaints': open_complaints,
+        'pending_expenses': pending_expenses
+    })
 
 
 @dashboards_bp.route('/branch-manager', methods=['GET'])

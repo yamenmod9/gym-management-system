@@ -47,6 +47,50 @@ def get_users():
     )
 
 
+@users_bp.route('/employees', methods=['GET'])
+@users_bp.route('/staff', methods=['GET'])
+@jwt_required()
+@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+def get_employees():
+    """Get all staff members (alias for /api/users)"""
+    from app.utils import get_current_user
+    
+    role = request.args.get('role', type=str)
+    branch_id = request.args.get('branch_id', type=int)
+    
+    user = get_current_user()
+    
+    query = User.query
+    
+    # Branch managers can only see their own branch staff
+    if user.role == UserRole.BRANCH_MANAGER:
+        query = query.filter_by(branch_id=user.branch_id)
+    elif branch_id:
+        query = query.filter_by(branch_id=branch_id)
+    
+    if role:
+        try:
+            query = query.filter_by(role=UserRole(role))
+        except ValueError:
+            return error_response("Invalid role", 400)
+    
+    query = query.order_by(User.created_at.desc())
+    users = query.all()
+    
+    return success_response([{
+        'id': u.id,
+        'username': u.username,
+        'role': u.role.value,
+        'full_name': u.full_name,
+        'email': u.email,
+        'phone': u.phone,
+        'branch_id': u.branch_id,
+        'branch_name': u.branch.name if u.branch else None,
+        'is_active': u.is_active,
+        'created_at': u.created_at.isoformat()
+    } for u in users])
+
+
 @users_bp.route('/<int:user_id>', methods=['GET'])
 @jwt_required()
 @role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
