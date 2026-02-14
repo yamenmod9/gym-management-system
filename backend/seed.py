@@ -27,18 +27,28 @@ from app.models import (
 random.seed(42)
 
 
+def generate_temp_password():
+    """Generate a random 6-character temporary password (e.g., AB12CD)"""
+    import string
+    # Format: 2 uppercase + 2 digits + 2 uppercase
+    part1 = ''.join(random.choices(string.ascii_uppercase, k=2))
+    part2 = ''.join(random.choices(string.digits, k=2))
+    part3 = ''.join(random.choices(string.ascii_uppercase, k=2))
+    return f"{part1}{part2}{part3}"
+
+
 def seed_database():
     """Seed the database with production-quality test data"""
     # Check environment - use production on PythonAnywhere, development locally
     import sys
     env = 'production' if any('pythonanywhere' in path.lower() for path in sys.path) else os.getenv('FLASK_ENV', 'development')
     
-    print(f"🔧 Using environment: {env}")
+    print(f"[+] Using environment: {env}")
     app = create_app(env)
     
     with app.app_context():
         print("\n" + "="*70)
-        print("🌱 SEEDING DATABASE - PRODUCTION-QUALITY TEST DATA")
+        print("[*] SEEDING DATABASE - PRODUCTION-QUALITY TEST DATA")
         print("="*70 + "\n")
         
         # Clear existing data
@@ -90,7 +100,7 @@ def seed_database():
         
         # Print comprehensive statistics
         print("\n" + "="*70)
-        print("📊 DATABASE STATISTICS - FINAL COUNTS")
+        print("[*] DATABASE STATISTICS - FINAL COUNTS")
         print("="*70)
         print(f"  Branches: {len(branches)}")
         print(f"  Users: {len(users)} (14 total: Owner, 3 Managers, 6 Reception, 2 Central Accountants, 2 Branch Accountants)")
@@ -106,14 +116,14 @@ def seed_database():
         print("="*70)
         
         print("\n" + "="*70)
-        print("📋 TEST ACCOUNTS - ALL ROLES (14 USERS TOTAL)")
+        print("[*] TEST ACCOUNTS - ALL ROLES (14 USERS TOTAL)")
         print("="*70)
-        print("\n🔐 OWNER ROLE (1):")
+        print("\n[OWNER] OWNER ROLE (1):")
         print("  Username: owner | Password: owner123")
         print("  Full Name: Abu Faisal - System Owner")
         print("  Access: Complete system control")
         
-        print("\n👔 BRANCH MANAGER ROLES (3 - one per branch):")
+        print("\n[MANAGER] BRANCH MANAGER ROLES (3 - one per branch):")
         print("  Username: manager1 | Password: manager123")
         print("  Branch: Dragon Club | Name: Ahmed Khalil")
         print("  ")
@@ -123,7 +133,7 @@ def seed_database():
         print("  Username: manager3 | Password: manager123")
         print("  Branch: Tiger Club | Name: Khaled Mansour")
         
-        print("\n👥 FRONT DESK / RECEPTION ROLES (6 - two per branch):")
+        print("\n[RECEPTION] FRONT DESK / RECEPTION ROLES (6 - two per branch):")
         print("  Username: reception1 | Password: reception123")
         print("  Branch: Dragon Club | Name: Sara Mohamed")
         print("  ")
@@ -142,32 +152,42 @@ def seed_database():
         print("  Username: reception6 | Password: reception123")
         print("  Branch: Tiger Club | Name: Yasmin Samir")
         
-        print("\n💰 CENTRAL ACCOUNTANT ROLES (2):")
+        print("\n[ACCOUNTANT] CENTRAL ACCOUNTANT ROLES (2):")
         print("  Username: accountant1 | Password: accountant123")
         print("  Name: Hassan El-Masry | Access: All branches financial oversight")
         print("  ")
         print("  Username: accountant2 | Password: accountant123")
         print("  Name: Amira Zaki | Access: All branches financial oversight")
         
-        print("\n💼 BRANCH ACCOUNTANT ROLES (2):")
+        print("\n[ACCOUNTANT] BRANCH ACCOUNTANT ROLES (2):")
         print("  Username: baccountant1 | Password: accountant123")
         print("  Branch: Dragon Club | Name: Mona Farid")
         print("  ")
         print("  Username: baccountant2 | Password: accountant123")
         print("  Branch: Phoenix Club | Name: Rania Nabil")
         
+        # Print sample customer credentials
+        print("\n[CLIENT] CLIENT APP TEST ACCOUNTS (Sample from 150 customers):")
+        sample_customers = Customer.query.limit(5).all()
+        for customer in sample_customers:
+            print(f"  Phone: {customer.phone} | Password: {customer.temp_password}")
+            print(f"  Name: {customer.full_name} | Branch: {customer.branch.name}")
+            print(f"  Note: Password must be changed on first login")
+            print("  ")
+        
         print("\n" + "="*70)
-        print("✅ DATABASE SEEDED SUCCESSFULLY - READY FOR FLUTTER TESTING")
+        print("[SUCCESS] DATABASE SEEDED SUCCESSFULLY - READY FOR FLUTTER TESTING")
         print("="*70)
-        print("\n💡 Key Features:")
-        print("  ✓ Hundreds of transactions for leaderboard testing")
-        print("  ✓ Varied subscription statuses (active, frozen, stopped, expired)")
-        print("  ✓ Expiring subscriptions for alert testing (48h, 7 days)")
-        print("  ✓ Freeze history tracking")
-        print("  ✓ Expense approval workflows with pending items")
-        print("  ✓ Weighted branch performance (Dragon high, Tiger lower)")
-        print("  ✓ Daily closing surplus/shortage scenarios")
-        print("  ✓ Complaint resolution tracking")
+        print("\n[*] Key Features:")
+        print("  [+] Hundreds of transactions for leaderboard testing")
+        print("  [+] Varied subscription statuses (active, frozen, stopped, expired)")
+        print("  [+] Expiring subscriptions for alert testing (48h, 7 days)")
+        print("  [+] Freeze history tracking")
+        print("  [+] Expense approval workflows with pending items")
+        print("  [+] Weighted branch performance (Dragon high, Tiger lower)")
+        print("  [+] Daily closing surplus/shortage scenarios")
+        print("  [+] Complaint resolution tracking")
+        print("  [+] All 150 customers have temporary passwords for first-time login")
         print("  ✓ Complete data for all dashboard analytics")
         print("="*70 + "\n")
 
@@ -476,6 +496,9 @@ def create_customers(branches):
             height = random.randint(155, 195)
             weight = random.randint(50, 120)
             
+            # Generate temporary password for first login
+            temp_password = generate_temp_password()
+            
             customer = Customer(
                 full_name=full_name,
                 phone=f'010{random.randint(10000000, 99999999)}',
@@ -495,8 +518,14 @@ def create_customers(branches):
                     None
                 ]),
                 branch_id=branch.id,
-                is_active=True
+                is_active=True,
+                temp_password=temp_password,
+                password_changed=False
             )
+            
+            # Hash the temp password (don't use set_password() as it clears temp_password)
+            from passlib.hash import pbkdf2_sha256
+            customer.password_hash = pbkdf2_sha256.hash(temp_password)
             
             # Calculate health metrics
             customer.calculate_health_metrics()
