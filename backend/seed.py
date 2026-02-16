@@ -20,7 +20,7 @@ from app.models import (
     Service, ServiceType, Subscription, SubscriptionStatus,
     Transaction, PaymentMethod, TransactionType,
     Expense, ExpenseStatus, Complaint, ComplaintType, ComplaintStatus,
-    Fingerprint, FreezeHistory, DailyClosing
+    Fingerprint, FreezeHistory, DailyClosing, EntryLog
 )
 
 # Set seed for reproducible results (can be commented out for true randomness)
@@ -96,6 +96,10 @@ def seed_database():
         print("  ↳ Creating daily closings...")
         create_daily_closings(branches, users)
         
+        # Create entry logs (attendance records)
+        print("  ↳ Creating entry logs...")
+        create_entry_logs(customers, subscriptions, branches)
+        
         db.session.commit()
         
         # Print comprehensive statistics
@@ -113,6 +117,7 @@ def seed_database():
         print(f"  Fingerprints: {Fingerprint.query.count()}")
         print(f"  Freeze History: {FreezeHistory.query.count()}")
         print(f"  Daily Closings: {DailyClosing.query.count()}")
+        print(f"  Entry Logs: {EntryLog.query.count()} (2000 attendance records - last 30 days)")
         print("="*70)
         
         print("\n" + "="*70)
@@ -649,6 +654,45 @@ def create_subscriptions(customers, services, branches, users):
                 stop_reason=random.choice(stop_reasons) if status == SubscriptionStatus.STOPPED else None,
                 stopped_at=datetime.now() - timedelta(days=random.randint(1, 10)) if status == SubscriptionStatus.STOPPED else None
             )
+            
+            # Assign subscription type and remaining values based on service type
+            if service.service_type == ServiceType.GYM:
+                # Gym services are coin-based
+                subscription.subscription_type = 'coins'
+                subscription.total_coins = random.choice([20, 25, 30])  # Random coin package
+                # Calculate remaining coins based on subscription age and status
+                if status == SubscriptionStatus.EXPIRED:
+                    subscription.remaining_coins = 0
+                elif status == SubscriptionStatus.STOPPED:
+                    subscription.remaining_coins = random.randint(0, subscription.total_coins // 2)
+                else:
+                    # Active/Frozen: use some coins but not all
+                    coins_used = int((days_old / service.duration_days) * subscription.total_coins * random.uniform(0.6, 1.0))
+                    subscription.remaining_coins = max(0, subscription.total_coins - coins_used)
+            
+            elif service.class_limit and service.class_limit > 0:
+                # Services with class limits are session-based
+                if service.service_type == ServiceType.KARATE:
+                    subscription.subscription_type = 'training'
+                else:
+                    subscription.subscription_type = 'sessions'
+                
+                subscription.total_sessions = service.class_limit
+                # Calculate remaining sessions based on classes_attended
+                subscription.remaining_sessions = max(0, service.class_limit - subscription.classes_attended)
+                
+                if status == SubscriptionStatus.EXPIRED:
+                    subscription.remaining_sessions = 0
+                elif status == SubscriptionStatus.STOPPED:
+                    subscription.remaining_sessions = random.randint(0, service.class_limit // 2)
+            
+            else:
+                # Time-based subscriptions (swimming recreation, bundles)
+                subscription.subscription_type = 'time_based'
+                subscription.remaining_coins = None
+                subscription.total_coins = None
+                subscription.remaining_sessions = None
+                subscription.total_sessions = None
             
             subscriptions.append(subscription)
             db.session.add(subscription)
@@ -1363,6 +1407,115 @@ def create_daily_closings(branches, users):
     print(f"    - Accountants have {high_alerts + medium_alerts} items requiring attention")
     
     return closings
+
+
+def create_entry_logs(customers, subscriptions, branches):
+    """Create 2000 entry logs (attendance records) for last 30 days"""
+    from app.models.entry_log import EntryLog, EntryType, EntryStatus
+    
+    entry_logs = []
+    today = date.today()
+    thirty_days_ago = today - timedelta(days=30)
+    
+    # Get active/recently active subscriptions
+    eligible_subscriptions = [
+        s for s in subscriptions 
+        if s.status in [SubscriptionStatus.ACTIVE, SubscriptionStatus.FROZEN] 
+        or (s.status == SubscriptionStatus.EXPIRED and (today - s.end_date).days < 30)
+    ]
+    
+    if not eligible_subscriptions:
+        print("  ⚠ No eligible subscriptions for entry logs")
+        return []
+    
+    # Create 2000 entries over last 30 days
+    target_entries = 2000
+    entries_created = 0
+    
+    # Distribution: More entries on recent days, fewer on older days
+    for day_offset in range(30):
+        entry_date = today - timedelta(days=day_offset)
+        
+        # More entries on recent days (exponential decay)
+        # Recent days: 80-100 entries, older days: 40-60 entries
+        if day_offset < 7:
+            daily_entries = random.randint(80, 100)
+        elif day_offset < 14:
+            daily_entries = random.randint(65, 85)
+        elif day_offset < 21:
+            daily_entries = random.randint(50, 70)
+        else:
+            daily_entries = random.randint(40, 60)
+        
+        # Adjust to hit target
+        remaining = target_entries - entries_created
+        if day_offset == 29:  # Last day
+            daily_entries = remaining
+        elif remaining < daily_entries:
+            daily_entries = remaining
+        
+        for _ in range(daily_entries):
+            if entries_created >= target_entries:
+                break
+            
+            # Pick random active subscription
+            subscription = random.choice(eligible_subscriptions)
+            customer = subscription.customer
+            branch = subscription.branch
+            
+            # Random time during gym hours (6 AM - 11 PM)
+            entry_hour = random.randint(6, 22)
+            entry_minute = random.randint(0, 59)
+            entry_time = datetime.combine(entry_date, datetime.min.time()) + timedelta(hours=entry_hour, minutes=entry_minute)
+            
+            # Determine coins/sessions deducted
+            coins_deducted = 0
+            if subscription.subscription_type == 'coins':
+                coins_deducted = 1
+            elif subscription.subscription_type in ['sessions', 'training']:
+                # For session-based, track in classes_attended not coins_deducted
+                coins_deducted = 0
+            
+            # Determine entry type (mostly QR scan)
+            entry_type = random.choices(
+                [EntryType.QR_SCAN, EntryType.FINGERPRINT, EntryType.MANUAL],
+                weights=[85, 10, 5],
+                k=1
+            )[0]
+            
+            entry_log = EntryLog(
+                customer_id=customer.id,
+                subscription_id=subscription.id,
+                branch_id=branch.id,
+                entry_time=entry_time,
+                entry_type=entry_type,
+                entry_status=EntryStatus.APPROVED,
+                coins_deducted=coins_deducted,
+                validation_token=customer.qr_code if entry_type == EntryType.QR_SCAN else None,
+                created_at=entry_time
+            )
+            
+            entry_logs.append(entry_log)
+            db.session.add(entry_log)
+            entries_created += 1
+        
+        if entries_created >= target_entries:
+            break
+    
+    db.session.flush()
+    
+    # Statistics by branch
+    branch_stats = {}
+    for branch in branches:
+        count = sum(1 for e in entry_logs if e.branch_id == branch.id)
+        branch_stats[branch.name] = count
+    
+    print(f"  ✓ Created {len(entry_logs)} entry logs (attendance records)")
+    print(f"    - Last 30 days: {len(entry_logs)} check-ins")
+    for branch_name, count in branch_stats.items():
+        print(f"    - {branch_name}: {count} entries")
+    
+    return entry_logs
 
 
 if __name__ == '__main__':

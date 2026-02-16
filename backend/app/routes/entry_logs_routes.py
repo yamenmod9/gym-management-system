@@ -105,44 +105,72 @@ def scan_qr_code():
             }
         )
     
-    # Check remaining coins/visits
-    if subscription.remaining_visits is not None and subscription.remaining_visits <= 0:
-        return error_response(
-            "No coins remaining",
-            403,
-            {
-                "code": "NO_COINS",
-                "customer_name": customer.full_name,
-                "customer_id": customer.id,
-                "remaining_coins": 0,
-                "subscription_type": subscription.service.name
-            }
-        )
+    # Check remaining coins/sessions based on subscription type
+    coins_deducted = 0
+    sessions_deducted = 0
     
-    # All checks passed - record entry and deduct coin
+    if subscription.subscription_type == 'coins':
+        # Coin-based subscription
+        if subscription.remaining_coins is not None and subscription.remaining_coins <= 0:
+            return error_response(
+                "No coins remaining",
+                403,
+                {
+                    "code": "NO_COINS",
+                    "customer_name": customer.full_name,
+                    "customer_id": customer.id,
+                    "remaining_coins": 0,
+                    "subscription_type": subscription.service.name
+                }
+            )
+        coins_deducted = 1
+    elif subscription.subscription_type in ['sessions', 'training']:
+        # Session-based subscription
+        if subscription.remaining_sessions is not None and subscription.remaining_sessions <= 0:
+            return error_response(
+                "No sessions remaining",
+                403,
+                {
+                    "code": "NO_SESSIONS",
+                    "customer_name": customer.full_name,
+                    "customer_id": customer.id,
+                    "remaining_sessions": 0,
+                    "subscription_type": subscription.service.name
+                }
+            )
+        sessions_deducted = 1
+    # For time_based, no deduction needed
+    
+    # All checks passed - record entry and deduct coin/session
     entry_log = EntryLog(
         customer_id=customer.id,
         subscription_id=subscription.id,
         branch_id=branch_id,
         entry_time=datetime.utcnow(),
-        entry_type=EntryType.QR_CODE,
-        coins_deducted=1
+        entry_type=EntryType.QR_SCAN,
+        coins_deducted=coins_deducted
     )
     
-    # Deduct coin/visit
-    if subscription.remaining_visits is not None:
-        subscription.remaining_visits -= 1
+    # Deduct coin or session
+    if coins_deducted > 0 and subscription.remaining_coins is not None:
+        subscription.remaining_coins -= coins_deducted
+    
+    if sessions_deducted > 0 and subscription.remaining_sessions is not None:
+        subscription.remaining_sessions -= sessions_deducted
     
     db.session.add(entry_log)
     db.session.commit()
     
     return success_response({
-        "message": "Check-in successful",
-        "entry_log_id": entry_log.id,
+        "attendance_id": entry_log.id,
+        "entry_id": entry_log.id,  # Alias for compatibility
         "customer_name": customer.full_name,
         "customer_id": customer.id,
-        "entry_time": entry_log.entry_time.isoformat(),
-        "coins_used": 1,
-        "remaining_coins": subscription.remaining_visits if subscription.remaining_visits is not None else None,
-        "subscription_end_date": subscription.end_date.isoformat()
-    })
+        "check_in_time": entry_log.entry_time.isoformat(),
+        "coins_deducted": coins_deducted,
+        "sessions_deducted": sessions_deducted,
+        "remaining_coins": subscription.remaining_coins if subscription.subscription_type == 'coins' else None,
+        "remaining_sessions": subscription.remaining_sessions if subscription.subscription_type in ['sessions', 'training'] else None,
+        "subscription_end_date": subscription.end_date.isoformat(),
+        "subscription_type": subscription.subscription_type
+    }, "Check-in recorded successfully")

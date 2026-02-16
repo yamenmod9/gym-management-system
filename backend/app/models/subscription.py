@@ -52,6 +52,13 @@ class Subscription(db.Model):
     remaining_visits = db.Column(db.Integer, nullable=True)  # For unlimited or visit-based subscriptions
     remaining_classes = db.Column(db.Integer, nullable=True)  # For class-based subscriptions
     
+    # Subscription type and display tracking
+    subscription_type = db.Column(db.String(20), nullable=True)  # coins, time_based, sessions, training
+    remaining_coins = db.Column(db.Integer, nullable=True)  # For coin-based subscriptions
+    total_coins = db.Column(db.Integer, nullable=True)  # Original coin count
+    remaining_sessions = db.Column(db.Integer, nullable=True)  # For session/training subscriptions
+    total_sessions = db.Column(db.Integer, nullable=True)  # Original session count
+    
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -112,6 +119,63 @@ class Subscription(db.Model):
         self.stop_reason = reason
         self.stopped_at = datetime.utcnow()
         return True, "Subscription stopped successfully"
+    
+    @property
+    def display_metric(self):
+        """Get display metric type for client app"""
+        if self.subscription_type == 'coins':
+            return 'coins'
+        elif self.subscription_type == 'time_based':
+            return 'time'
+        elif self.subscription_type == 'sessions':
+            return 'sessions'
+        elif self.subscription_type == 'training':
+            return 'training'
+        else:
+            return 'time'  # Default to time-based
+    
+    @property
+    def display_value(self):
+        """Get display value for client app"""
+        if self.subscription_type == 'coins':
+            return self.remaining_coins or 0
+        elif self.subscription_type == 'time_based':
+            days = (self.end_date - datetime.now().date()).days
+            return days if days > 0 else 0
+        elif self.subscription_type in ['sessions', 'training']:
+            return self.remaining_sessions or 0
+        else:
+            # Default to time-based calculation
+            days = (self.end_date - datetime.now().date()).days
+            return days if days > 0 else 0
+    
+    @property
+    def display_label(self):
+        """Get formatted display label for client app"""
+        if self.subscription_type == 'coins':
+            coins = self.remaining_coins or 0
+            return f"{coins} Coins" if coins != 1 else "1 Coin"
+        elif self.subscription_type == 'time_based':
+            days = (self.end_date - datetime.now().date()).days
+            if days <= 0:
+                return "Expired"
+            months = days // 30
+            remaining_days = days % 30
+            if months > 0:
+                return f"{months} month{'s' if months != 1 else ''}, {remaining_days} day{'s' if remaining_days != 1 else ''}"
+            return f"{days} day{'s' if days != 1 else ''}"
+        elif self.subscription_type == 'sessions':
+            sessions = self.remaining_sessions or 0
+            return f"{sessions} Sessions" if sessions != 1 else "1 Session"
+        elif self.subscription_type == 'training':
+            sessions = self.remaining_sessions or 0
+            return f"{sessions} Training Sessions" if sessions != 1 else "1 Training Session"
+        else:
+            # Default to time-based
+            days = (self.end_date - datetime.now().date()).days
+            if days <= 0:
+                return "Expired"
+            return f"{days} day{'s' if days != 1 else ''}"
 
     def to_dict(self):
         """Convert to dictionary"""
@@ -135,5 +199,14 @@ class Subscription(db.Model):
             'classes_attended': self.classes_attended,
             'created_at': self.created_at.isoformat(),
             'is_expired': self.is_expired(),
-            'can_access': self.can_access()
+            'can_access': self.can_access(),
+            # Display fields for client app
+            'subscription_type': self.subscription_type,
+            'remaining_coins': self.remaining_coins,
+            'total_coins': self.total_coins,
+            'remaining_sessions': self.remaining_sessions,
+            'total_sessions': self.total_sessions,
+            'display_metric': self.display_metric,
+            'display_value': self.display_value,
+            'display_label': self.display_label
         }
