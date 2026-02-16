@@ -46,6 +46,14 @@ def scan_qr_code():
     customer_id = data.get('customer_id')
     branch_id = data.get('branch_id')
     
+    # Extract customer_id from QR code if present
+    if qr_code and not customer_id:
+        if 'customer_id:' in qr_code:
+            try:
+                customer_id = int(qr_code.split('customer_id:')[1])
+            except (ValueError, IndexError):
+                pass  # Will try to find by qr_code string
+    
     # Require branch_id
     if not branch_id:
         return error_response("branch_id is required", 400)
@@ -59,11 +67,13 @@ def scan_qr_code():
     if not branch:
         return error_response("Branch not found", 404)
     
-    # Find customer by QR code or customer_id
+    # Find customer by customer_id first, then by QR code
     customer = None
     if customer_id:
         customer = db.session.get(Customer, customer_id)
-    elif qr_code:
+    
+    # If not found by ID, try by QR code string match
+    if not customer and qr_code:
         customer = Customer.query.filter_by(qr_code=qr_code).first()
     
     if not customer:

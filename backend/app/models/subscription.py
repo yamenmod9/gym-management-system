@@ -82,6 +82,16 @@ class Subscription(db.Model):
     def can_access(self):
         """Check if customer can access facility"""
         return self.status == SubscriptionStatus.ACTIVE and not self.is_expired()
+    
+    @property
+    def remaining_days(self):
+        """Calculate remaining days for time-based subscriptions"""
+        if self.subscription_type == 'coins':
+            return None  # Coins don't expire by days
+        if self.end_date:
+            delta = self.end_date - datetime.utcnow().date()
+            return max(0, delta.days)
+        return 0
 
     def freeze(self, days, reason=None):
         """Freeze subscription"""
@@ -206,6 +216,7 @@ class Subscription(db.Model):
             'total_coins': self.total_coins,
             'remaining_sessions': self.remaining_sessions,
             'total_sessions': self.total_sessions,
+            'remaining_days': self.remaining_days,
             'display_metric': self.display_metric,
             'display_value': self.display_value,
             'display_label': self.display_label
