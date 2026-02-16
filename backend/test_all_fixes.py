@@ -11,15 +11,24 @@ from datetime import datetime
 # Configuration - Auto-detect environment
 def get_base_url():
     """Auto-detect the correct base URL based on environment"""
-    # Check if running on PythonAnywhere
-    hostname = socket.gethostname()
-    if 'pythonanywhere' in hostname.lower():
-        # Running on PythonAnywhere - use the web app URL
-        return "https://yamenmod91.pythonanywhere.com"
+    # Check if PYTHONANYWHERE_DOMAIN environment variable is set (most reliable)
+    if os.getenv('PYTHONANYWHERE_DOMAIN'):
+        return f"https://{os.getenv('PYTHONANYWHERE_DOMAIN')}"
     
     # Check if PYTHONANYWHERE_SITE environment variable is set
     if os.getenv('PYTHONANYWHERE_SITE'):
         return f"https://{os.getenv('PYTHONANYWHERE_SITE')}.pythonanywhere.com"
+    
+    # Check if we're in a PythonAnywhere environment by looking for specific paths
+    if os.path.exists('/home/yamenmod91'):
+        # We're on PythonAnywhere - use the known domain
+        return "https://yamenmod91.pythonanywhere.com"
+    
+    # Check hostname as last resort
+    hostname = socket.gethostname()
+    if 'liveconsole' in hostname.lower() or hostname.startswith('green-') or hostname.startswith('blue-'):
+        # Definitely PythonAnywhere console
+        return "https://yamenmod91.pythonanywhere.com"
     
     # Default to localhost for local development
     return "http://localhost:5000"
