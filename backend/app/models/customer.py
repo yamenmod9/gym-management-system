@@ -130,8 +130,9 @@ class Customer(db.Model):
         # Generate 8-character alphanumeric password
         alphabet = string.ascii_uppercase + string.digits
         temp_pass = ''.join(secrets.choice(alphabet) for _ in range(8))
+        self.set_password(temp_pass)  # Hash the password (this clears temp_password)
+        # Set temp_password AFTER set_password (which clears it)
         self.temp_password = temp_pass
-        self.set_password(temp_pass)  # Also set as hashed password
         self.password_changed = False
         return temp_pass
 
