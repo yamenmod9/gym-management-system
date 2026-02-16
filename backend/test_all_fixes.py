@@ -4,10 +4,27 @@ Tests all 6 critical areas mentioned in the requirements
 """
 import requests
 import json
+import os
+import socket
 from datetime import datetime
 
-# Configuration
-BASE_URL = "http://localhost:5000"
+# Configuration - Auto-detect environment
+def get_base_url():
+    """Auto-detect the correct base URL based on environment"""
+    # Check if running on PythonAnywhere
+    hostname = socket.gethostname()
+    if 'pythonanywhere' in hostname.lower():
+        # Running on PythonAnywhere - use the web app URL
+        return "https://yamenmod91.pythonanywhere.com"
+    
+    # Check if PYTHONANYWHERE_SITE environment variable is set
+    if os.getenv('PYTHONANYWHERE_SITE'):
+        return f"https://{os.getenv('PYTHONANYWHERE_SITE')}.pythonanywhere.com"
+    
+    # Default to localhost for local development
+    return "http://localhost:5000"
+
+BASE_URL = get_base_url()
 RECEPTIONIST_TOKEN = None
 OWNER_TOKEN = None
 CLIENT_TOKEN = None
@@ -35,23 +52,37 @@ def login_receptionist():
     """Login as receptionist (Branch 1)"""
     print_header("Authentication: Receptionist Login")
     
-    response = requests.post(
-        f"{BASE_URL}/api/auth/login",
-        json={"username": "front_desk_1", "password": "front123"}
-    )
-    
-    if response.status_code == 200:
-        global RECEPTIONIST_TOKEN
-        data = response.json()['data']
-        RECEPTIONIST_TOKEN = data['access_token']
-        print_test("Receptionist Login", True, {
-            "username": "front_desk_1",
-            "branch_id": data['user'].get('branch_id'),
-            "role": data['user'].get('role')
-        })
-        return True
-    else:
-        print_test("Receptionist Login", False, error=response.text)
+    try:
+        response = requests.post(
+            f"{BASE_URL}/api/auth/login",
+            json={"username": "front_desk_1", "password": "front123"},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            global RECEPTIONIST_TOKEN
+            data = response.json()['data']
+            RECEPTIONIST_TOKEN = data['access_token']
+            print_test("Receptionist Login", True, {
+                "username": "front_desk_1",
+                "branch_id": data['user'].get('branch_id'),
+                "role": data['user'].get('role')
+            })
+            return True
+        else:
+            print_test("Receptionist Login", False, error=response.text)
+            return False
+    except requests.exceptions.ConnectionError as e:
+        print_test("Receptionist Login", False, 
+                  error=f"Connection failed to {BASE_URL}. Is the server running?")
+        print(f"\n💡 Troubleshooting:")
+        print(f"   - Make sure the Flask app is running")
+        print(f"   - Check if BASE_URL is correct: {BASE_URL}")
+        if 'localhost' in BASE_URL:
+            print(f"   - For PythonAnywhere, reload the web app")
+        return False
+    except Exception as e:
+        print_test("Receptionist Login", False, error=str(e))
         return False
 
 def login_owner():
@@ -460,7 +491,21 @@ def run_all_tests():
     return results
 
 if __name__ == "__main__":
-    # Update BASE_URL for production testing
-    # BASE_URL = "https://yamenmod91.pythonanywhere.com"
+    import sys
+    
+    # Allow manual override of base URL via command line
+    if len(sys.argv) > 1:
+        BASE_URL = sys.argv[1]
+        print(f"Using custom base URL from command line: {BASE_URL}")
+    
+    # Detect environment and show info
+    print(f"Running on: {socket.gethostname()}")
+    print(f"Detected base URL: {BASE_URL}")
+    
+    # For PythonAnywhere, remind about WSGI reload
+    if 'pythonanywhere' in BASE_URL:
+        print("\n⚠️  REMINDER: If you've made code changes, reload the web app:")
+        print("   Go to Web tab → Click 'Reload yamenmod91.pythonanywhere.com'")
+        print("")
     
     run_all_tests()
