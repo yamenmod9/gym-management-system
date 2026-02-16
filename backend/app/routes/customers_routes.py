@@ -161,10 +161,16 @@ def register_customer():
             else:
                 return error_response("branch_id is required", 400)
         
-        # Validate branch access
+        # ✅ FIX: Ensure proper type comparison (convert both to int)
+        branch_id = int(branch_id) if branch_id else None
+        user_branch_id = int(user.branch_id) if user.branch_id else None
+        
+        # Validate branch access - only restrict non-owners/non-central-accountants
         if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-            if user.branch_id and branch_id != user.branch_id:
-                return error_response("Cannot register customer for another branch", 403)
+            # Only block if trying to register for a DIFFERENT branch
+            if user_branch_id and branch_id and branch_id != user_branch_id:
+                return error_response("You can only register customers for your own branch", 403)
+            # ✅ If same branch or branch_id matches user's branch, allow it (no error)
         
         # Parse date_of_birth if provided (for age calculation)
         date_of_birth = None
