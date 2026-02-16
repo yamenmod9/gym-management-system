@@ -64,7 +64,7 @@ def login_receptionist():
     try:
         response = requests.post(
             f"{BASE_URL}/api/auth/login",
-            json={"username": "front_desk_1", "password": "front123"},
+            json={"username": "reception1", "password": "reception123"},
             timeout=10
         )
         
@@ -73,7 +73,7 @@ def login_receptionist():
             data = response.json()['data']
             RECEPTIONIST_TOKEN = data['access_token']
             print_test("Receptionist Login", True, {
-                "username": "front_desk_1",
+                "username": "reception1",
                 "branch_id": data['user'].get('branch_id'),
                 "role": data['user'].get('role')
             })
