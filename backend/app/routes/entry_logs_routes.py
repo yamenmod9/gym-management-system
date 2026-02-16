@@ -19,12 +19,21 @@ entry_logs_bp = Blueprint('entry_logs', __name__, url_prefix='/api/entry-logs')
 @role_required(UserRole.FRONT_DESK, UserRole.BRANCH_MANAGER, UserRole.OWNER)
 def scan_qr_code():
     """
-    Record customer check-in via QR scan
+    Record customer check-in via QR scan or customer ID
     
-    Request Body:
+    Request Body (Option 1 - QR Code):
     {
         "qr_code": "GYM-000001",
         "branch_id": 1
+    }
+    
+    Request Body (Option 2 - Customer ID):
+    {
+        "customer_id": 115,
+        "branch_id": 1,
+        "qr_code": "customer_id:115",  # Optional
+        "check_in_time": "2026-02-16T14:30:00Z",  # Optional
+        "action": "check_in_only"  # Optional
     }
     """
     data = request.get_json()
@@ -32,22 +41,30 @@ def scan_qr_code():
     if not data:
         return error_response("Request body is required", 400)
     
+    # Accept either qr_code or customer_id
     qr_code = data.get('qr_code')
+    customer_id = data.get('customer_id')
     branch_id = data.get('branch_id')
     
-    if not qr_code:
-        return error_response("qr_code is required", 400)
-    
+    # Require branch_id
     if not branch_id:
         return error_response("branch_id is required", 400)
+    
+    # Require either qr_code or customer_id
+    if not qr_code and not customer_id:
+        return error_response("Either qr_code or customer_id is required", 400)
     
     # Verify branch exists
     branch = db.session.get(Branch, branch_id)
     if not branch:
         return error_response("Branch not found", 404)
     
-    # Find customer by QR code
-    customer = Customer.query.filter_by(qr_code=qr_code).first()
+    # Find customer by QR code or customer_id
+    customer = None
+    if customer_id:
+        customer = db.session.get(Customer, customer_id)
+    elif qr_code:
+        customer = Customer.query.filter_by(qr_code=qr_code).first()
     
     if not customer:
         return error_response("Customer not found", 404)

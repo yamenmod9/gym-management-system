@@ -142,6 +142,17 @@ class Customer(db.Model):
             include_temp_password: If True, includes temp_password for staff viewing
                                   Set to False for client-facing endpoints
         """
+        # Check if customer has active subscription
+        from app.models.subscription import Subscription, SubscriptionStatus
+        has_active_subscription = db.session.query(
+            db.exists().where(
+                db.and_(
+                    Subscription.customer_id == self.id,
+                    Subscription.status == SubscriptionStatus.ACTIVE
+                )
+            )
+        ).scalar()
+        
         data = {
             'id': self.id,
             'full_name': self.full_name,
@@ -160,11 +171,12 @@ class Customer(db.Model):
             'ideal_weight': self.ideal_weight,
             'daily_calories': self.daily_calories,
             'health_notes': self.health_notes,
-            'qr_code': self.qr_code,
+            'qr_code': self.qr_code or f"customer_id:{self.id}",  # Generate QR code if not set
             'branch_id': self.branch_id,
             'branch_name': self.branch.name if self.branch else None,
             'is_active': self.is_active,
             'password_changed': self.password_changed,
+            'has_active_subscription': has_active_subscription,  # ✅ CRITICAL FIX
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

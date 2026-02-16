@@ -70,6 +70,7 @@ class CustomerSchema(Schema):
     is_active = fields.Bool()
     password_changed = fields.Bool(dump_only=True)
     temp_password = fields.Str(dump_only=True, allow_none=True)
+    has_active_subscription = fields.Bool(dump_only=True)  # ✅ CRITICAL FIX
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
 
