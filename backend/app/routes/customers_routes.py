@@ -70,7 +70,7 @@ def get_customer(customer_id):
         if user.branch_id and customer.branch_id != user.branch_id:
             return error_response("Access denied", 403)
     
-    return success_response(customer.to_dict())
+    return success_response(customer.to_dict(include_temp_password=True))
 
 
 @customers_bp.route('/phone/<string:phone>', methods=['GET'])
@@ -88,7 +88,7 @@ def get_customer_by_phone(phone):
         if user.branch_id and customer.branch_id != user.branch_id:
             return error_response("Access denied", 403)
     
-    return success_response(customer.to_dict())
+    return success_response(customer.to_dict(include_temp_password=True))
 
 
 @customers_bp.route('', methods=['POST'])
@@ -293,7 +293,7 @@ def update_customer(customer_id):
     
     db.session.commit()
     
-    return success_response(customer.to_dict(), "Customer updated successfully")
+    return success_response(customer.to_dict(include_temp_password=True), "Customer updated successfully")
 
 
 @customers_bp.route('/search', methods=['GET'])
@@ -339,7 +339,7 @@ def search_customers():
     customers = query.limit(limit).all()
     
     return success_response({
-        'items': [c.to_dict() for c in customers],
+        'items': [c.to_dict(include_temp_password=True) for c in customers],
         'total': len(customers),
         'query': query_string
     })
