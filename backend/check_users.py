@@ -2,7 +2,8 @@
 Check what users exist in the database
 Run this to see available usernames and their roles
 """
-from app import create_app, db
+from app import create_app
+from app.extensions import db
 from app.models.user import User
 
 app = create_app()
