@@ -110,7 +110,11 @@ class Customer(db.Model):
         """Calculate age from date_of_birth"""
         if self.date_of_birth:
             today = datetime.utcnow().date()
-            return (today - self.date_of_birth).days // 365
+            age = today.year - self.date_of_birth.year
+            # Subtract one year if birthday hasn't occurred this year yet
+            if (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day):
+                age -= 1
+            return age
         return None
     
     def set_password(self, password):
@@ -145,11 +149,18 @@ class Customer(db.Model):
         """
         # Check if customer has active subscription
         from app.models.subscription import Subscription, SubscriptionStatus
+        from datetime import date
+
+        # Active subscription = status is ACTIVE AND (coins type OR not expired)
         has_active_subscription = db.session.query(
             db.exists().where(
                 db.and_(
                     Subscription.customer_id == self.id,
-                    Subscription.status == SubscriptionStatus.ACTIVE
+                    Subscription.status == SubscriptionStatus.ACTIVE,
+                    db.or_(
+                        Subscription.subscription_type == 'coins',  # Coins never expire by date
+                        Subscription.end_date >= date.today()  # Time-based must not be expired
+                    )
                 )
             )
         ).scalar()

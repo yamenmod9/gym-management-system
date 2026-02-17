@@ -19,22 +19,28 @@ def get_client_profile():
     Get current client profile
     
     Returns:
-        Customer profile with active subscription
+        Customer profile with active subscription and QR status
     """
     customer = get_current_client()
     
     if not customer:
         return error_response('Customer not found', 404)
     
-    # Get active subscription
-    active_subscription = Subscription.query.filter_by(
-        customer_id=customer.id,
-        status=SubscriptionStatus.ACTIVE
+    # Get active subscription with proper validation
+    from datetime import date
+    active_subscription = Subscription.query.filter(
+        Subscription.customer_id == customer.id,
+        Subscription.status == SubscriptionStatus.ACTIVE,
+        db.or_(
+            Subscription.subscription_type == 'coins',  # Coins never expire
+            Subscription.end_date >= date.today()  # Time-based must not be expired
+        )
     ).first()
     
-    response_data = customer.to_dict()
+    response_data = customer.to_dict(include_temp_password=False)
     response_data['active_subscription'] = active_subscription.to_dict() if active_subscription else None
     response_data['password_changed'] = customer.password_changed
+    response_data['qr_code_active'] = active_subscription is not None  # Add QR active status
     response_data['qr_image_url'] = f'/api/client/qr-image'
     
     return success_response(response_data)
@@ -301,17 +307,28 @@ def get_client_history():
     
     items, total, pages, current_page = paginate(query, page, per_page)
     
-    entries = [entry.to_dict() for entry in items]
-    
-    return success_response({
-        'entries': entries,
-        'pagination': {
-            'total': total,
-            'pages': pages,
-            'current_page': current_page,
-            'per_page': per_page
+    # Format entries with proper structure for Flutter client
+    entries = []
+    for entry in items:
+        entry_dict = entry.to_dict()
+
+        # Ensure all required fields are present
+        entry_data = {
+            'id': entry_dict.get('id'),
+            'date': entry.entry_time.strftime('%Y-%m-%d') if entry.entry_time else '',
+            'time': entry.entry_time.strftime('%H:%M:%S') if entry.entry_time else '',
+            'datetime': entry.entry_time.isoformat() if entry.entry_time else '',
+            'branch': entry.branch.name if entry.branch else 'Unknown',
+            'branch_id': entry_dict.get('branch_id'),
+            'service': entry.service.name if entry.service else 'Gym Access',
+            'service_id': entry_dict.get('service_id'),
+            'coins_used': entry_dict.get('coins_used', 1),
+            'entry_type': entry_dict.get('entry_type', 'scan')
         }
-    })
+        entries.append(entry_data)
+
+    # Return array directly (Flutter expects data: [array])
+    return success_response(entries)
 
 
 @client_bp.route('/stats', methods=['GET'])
