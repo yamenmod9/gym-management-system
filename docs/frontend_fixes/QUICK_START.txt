@@ -1,0 +1,64 @@
+┌─────────────────────────────────────────────────────────────┐
+│                  🎯 QUICK START GUIDE                        │
+│              Running Both Apps Simultaneously                │
+└─────────────────────────────────────────────────────────────┘
+
+📱 WHAT YOU GET:
+   • Two separate apps on your device:
+     - "Gym Client" (client app)
+     - "Gym Staff" (staff app)
+   • Both can run at the same time
+   • Independent debug sessions
+   • Hot reload works on both
+
+🚀 QUICKEST WAY TO START:
+
+   IntelliJ/Android Studio:
+   1. Select "Client App" → Click Run ▶️
+   2. Select "Staff app" → Click Run ▶️
+   ✅ Done!
+
+   VS Code:
+   1. Press Ctrl+Shift+D
+   2. Select "Both Apps" from dropdown
+   3. Press F5
+   ✅ Done!
+
+📂 KEY FILES MODIFIED:
+   ✓ android/app/build.gradle.kts (product flavors)
+   ✓ .idea/runConfigurations/Client_App.xml
+   ✓ .idea/runConfigurations/Staff_app.xml
+   ✓ .vscode/launch.json (new)
+   ✓ android/app/src/main/AndroidManifest.xml
+   ✓ android/app/src/main/res/values/strings.xml (new)
+
+🔧 FIRST TIME SETUP:
+   cd android && ./gradlew clean && cd ..
+   flutter clean
+   flutter pub get
+
+⚠️  TROUBLESHOOTING:
+   Problem: "App won't install"
+   Solution: Uninstall old version first
+
+   Problem: "Debug port in use"
+   Solution: Stop other Flutter debug sessions
+
+   Problem: "Gradle sync failed"
+   Solution: File → Invalidate Caches → Restart
+
+📦 BUILD RELEASE APKs:
+   Client: flutter build apk --flavor client -t lib/client_main.dart
+   Staff:  flutter build apk --flavor staff -t lib/main.dart
+
+🎮 APP IDENTIFIERS:
+   Client: com.example.gym_frontend.client
+   Staff:  com.example.gym_frontend.staff
+
+📚 MORE INFO:
+   See DUAL_APP_SETUP_COMPLETE.md for detailed guide
+
+┌─────────────────────────────────────────────────────────────┐
+│  Ready to develop! Run both apps and see them side-by-side │
+└─────────────────────────────────────────────────────────────┘
+

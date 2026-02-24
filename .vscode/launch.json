@@ -1,0 +1,57 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Client App (Mobile)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/client_main.dart",
+            "args": [
+                "--flavor",
+                "client"
+            ]
+        },
+        {
+            "name": "Staff App (Mobile)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "--flavor",
+                "staff"
+            ]
+        },
+        {
+            "name": "Client App (Web)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/client_main.dart",
+            "args": [
+                "-d",
+                "chrome",
+                "--web-port=8080",
+                "--web-hostname=localhost"
+            ]
+        },
+        {
+            "name": "Staff App (Web)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "-d",
+                "chrome",
+                "--web-port=8081",
+                "--web-hostname=localhost"
+            ]
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Both Apps (Mobile)",
+            "configurations": ["Client App (Mobile)", "Staff App (Mobile)"],
+            "stopAll": true
+        }
+    ]
+}
+
