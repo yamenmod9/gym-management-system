@@ -34,7 +34,6 @@ class OwnerDashboardProvider extends ChangeNotifier {
   List<dynamic> get employeePerformance => _employeePerformance;
   List<dynamic> get complaints => _complaints;
 
-  // Set filters
   void setSelectedBranch(int? branchId) {
     _selectedBranchId = branchId;
     notifyListeners();
@@ -48,7 +47,6 @@ class OwnerDashboardProvider extends ChangeNotifier {
     loadDashboardData();
   }
 
-  // Load all dashboard data
   Future<void> loadDashboardData() async {
     _isLoading = true;
     _error = null;
@@ -56,8 +54,7 @@ class OwnerDashboardProvider extends ChangeNotifier {
 
     try {
       await Future.wait([
-        _loadAlerts(),
-        _loadRevenueData(),
+        _loadOwnerDashboard(),
         _loadBranchComparison(),
         _loadEmployeePerformance(),
         _loadComplaints(),
@@ -71,180 +68,176 @@ class OwnerDashboardProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadAlerts() async {
+  /// Primary method: uses /api/dashboards/overview for key metrics and
+  /// /api/dashboards/owner for smart alerts.
+  Future<void> _loadOwnerDashboard() async {
     try {
-      debugPrint('📢 Loading smart alerts...');
-      final response = await _apiService.get(ApiEndpoints.smartAlerts);
-      debugPrint('📢 Alerts API Response Status: ${response.statusCode}');
-      if (response.statusCode == 200 && response.data != null) {
-        _alerts = response.data['alerts'] ?? response.data['data'] ?? [];
-        debugPrint('✅ Alerts loaded: ${_alerts.length}');
+      debugPrint('📊 Loading owner dashboard overview...');
+
+      // --- Overview metrics ---
+      final overviewResponse = await _apiService.get(ApiEndpoints.dashboardOverview);
+      debugPrint('📊 Overview status: ${overviewResponse.statusCode}');
+
+      if (overviewResponse.statusCode == 200 && overviewResponse.data != null) {
+        final data = overviewResponse.data['data'] ?? overviewResponse.data;
+        _revenueData = {
+          'total_revenue': data['total_revenue'] ?? 0.0,
+          'active_subscriptions': data['active_subscriptions'] ?? 0,
+          'total_customers': data['total_customers'] ?? 0,
+          'total_branches': data['total_branches'] ?? 0,
+          'total_expenses': data['total_expenses'] ?? 0.0,
+          'net_profit': data['net_profit'] ?? 0.0,
+        };
+        // revenue_by_branch can be used to populate branch comparison if needed
+        if (data['revenue_by_branch'] != null && _branchComparison.isEmpty) {
+          _branchComparison = List<dynamic>.from(data['revenue_by_branch']);
+        }
+        debugPrint('✅ Overview loaded – revenue: ${_revenueData!['total_revenue']}, customers: ${_revenueData!['total_customers']}');
+      } else {
+        await _loadOwnerDashboardFallback();
+      }
+
+      // --- Smart alerts from /api/dashboards/owner ---
+      try {
+        final ownerResp = await _apiService.get(ApiEndpoints.dashboardOwner);
+        debugPrint('📢 Owner dashboard status: ${ownerResp.statusCode}');
+        if (ownerResp.statusCode == 200 && ownerResp.data != null) {
+          final d = ownerResp.data['data'] ?? ownerResp.data;
+          final alerts = d['alerts'];
+          if (alerts is Map) {
+            // Convert map of alert types to a flat list for the UI
+            _alerts = alerts.entries.map<Map<String, dynamic>>((e) => {
+              'title': _alertTitle(e.key),
+              'description': '${e.value} item(s)',
+              'risk_level': (e.value is int && e.value > 5) ? 'high' : 'medium',
+              'count': e.value,
+            }).where((a) => (a['count'] as int? ?? 0) > 0).toList();
+          }
+          // Also enrich revenue data from owner dashboard if not already set
+          if (_revenueData == null && d['revenue'] != null) {
+            final rev = d['revenue'];
+            _revenueData = {
+              'total_revenue': rev['total_30_days'] ?? 0.0,
+              'active_subscriptions': rev['active_subscriptions'] ?? 0,
+              'total_customers': rev['total_customers'] ?? 0,
+            };
+          }
+          debugPrint('✅ Alerts loaded: ${_alerts.length}');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Owner dashboard alerts failed: $e');
+        await _loadSmartAlertsFallback();
       }
     } catch (e) {
-      debugPrint('❌ Error loading alerts: $e');
+      debugPrint('❌ Error loading owner dashboard: $e');
+      await _loadOwnerDashboardFallback();
     }
   }
 
-  Future<void> _loadRevenueData() async {
+  String _alertTitle(String key) {
+    switch (key) {
+      case 'expiring_subscriptions': return 'Expiring Subscriptions';
+      case 'expiring_soon': return 'Expiring Soon (3 days)';
+      case 'open_complaints': return 'Open Complaints';
+      case 'pending_expenses': return 'Pending Expenses';
+      default: return key.replaceAll('_', ' ').toUpperCase();
+    }
+  }
+
+  /// Fallback: use /api/dashboards/owner directly for combined data
+  Future<void> _loadOwnerDashboardFallback() async {
     try {
-      debugPrint('💰 Loading revenue data...');
-
-      // Try revenue report first
-      try {
-        final response = await _apiService.get(
-          ApiEndpoints.reportsRevenue,
-          queryParameters: {
-            if (_selectedBranchId != null) 'branch_id': _selectedBranchId,
-            'start_date': _startDate.toIso8601String().split('T')[0],
-            'end_date': _endDate.toIso8601String().split('T')[0],
-          },
-        );
-        debugPrint('💰 Revenue API Response Status: ${response.statusCode}');
-        if (response.statusCode == 200 && response.data != null) {
-          _revenueData = response.data;
-          debugPrint('💰 Revenue data keys: ${_revenueData?.keys}');
-          debugPrint('✅ Total Revenue: ${_revenueData?['total_revenue']}');
-          debugPrint('✅ Active Subscriptions: ${_revenueData?['active_subscriptions']}');
-          debugPrint('✅ Total Customers: ${_revenueData?['total_customers']}');
-          return;
+      debugPrint('📊 Fallback: loading from /api/dashboards/owner...');
+      final resp = await _apiService.get(ApiEndpoints.dashboardOwner);
+      if (resp.statusCode == 200 && resp.data != null) {
+        final d = resp.data['data'] ?? resp.data;
+        if (d['revenue'] != null) {
+          final rev = d['revenue'];
+          _revenueData = {
+            'total_revenue': rev['total_30_days'] ?? 0.0,
+            'active_subscriptions': rev['active_subscriptions'] ?? 0,
+            'total_customers': rev['total_customers'] ?? 0,
+            'total_expenses': 0.0,
+            'net_profit': 0.0,
+          };
         }
-      } catch (e) {
-        debugPrint('⚠️ Revenue report failed, fetching real data: $e');
       }
-
-      // Fallback: Calculate from actual data
-      _revenueData = {};
-
-      // Get customers count (NO BRANCH FILTERING for owner - show ALL customers)
-      try {
-        final customersResponse = await _apiService.get(
-          ApiEndpoints.customers,
-          queryParameters: null, // Owner sees ALL customers regardless of branch
-        );
-        if (customersResponse.statusCode == 200 && customersResponse.data != null) {
-          var customers = [];
-          if (customersResponse.data is List) {
-            customers = customersResponse.data;
-          } else if (customersResponse.data['data'] != null) {
-            customers = customersResponse.data['data'] is Map
-              ? (customersResponse.data['data']['items'] ?? [])
-              : customersResponse.data['data'];
-          } else if (customersResponse.data['items'] != null) {
-            customers = customersResponse.data['items'];
-          }
-          
-          // If branch filter is active, filter the results in memory
-          if (_selectedBranchId != null) {
-            customers = customers.where((c) => c['branch_id'] == _selectedBranchId).toList();
-          }
-          
-          _revenueData!['total_customers'] = customers.length;
-          debugPrint('✅ Total Customers from API: ${customers.length}');
-        }
-      } catch (e) {
-        debugPrint('⚠️ Failed to fetch customers: $e');
-        _revenueData!['total_customers'] = 0;
-      }
-
-      // Get subscriptions count (NO BRANCH FILTERING for owner - show ALL subscriptions)
-      try {
-        final subsResponse = await _apiService.get(
-          ApiEndpoints.subscriptions,
-          queryParameters: null, // Owner sees ALL subscriptions regardless of branch
-        );
-        if (subsResponse.statusCode == 200 && subsResponse.data != null) {
-          var subscriptions = [];
-          if (subsResponse.data is List) {
-            subscriptions = subsResponse.data;
-          } else if (subsResponse.data['data'] != null) {
-            subscriptions = subsResponse.data['data'] is Map
-              ? (subsResponse.data['data']['items'] ?? [])
-              : subsResponse.data['data'];
-          } else if (subsResponse.data['items'] != null) {
-            subscriptions = subsResponse.data['items'];
-          }
-
-          // If branch filter is active, filter the results in memory
-          if (_selectedBranchId != null) {
-            subscriptions = subscriptions.where((s) => s['branch_id'] == _selectedBranchId).toList();
-          }
-
-          // Count active subscriptions
-          final activeSubs = subscriptions.where((sub) {
-            final status = sub['status']?.toString().toLowerCase() ?? '';
-            return status == 'active';
-          }).toList();
-
-          _revenueData!['active_subscriptions'] = activeSubs.length;
-
-          // Calculate revenue from subscriptions
-          double totalRevenue = 0;
-          for (var sub in activeSubs) {
-            totalRevenue += (sub['amount'] ?? sub['price'] ?? 0).toDouble();
-          }
-          _revenueData!['total_revenue'] = totalRevenue;
-
-          debugPrint('✅ Active Subscriptions from API: ${activeSubs.length}');
-          debugPrint('✅ Calculated Revenue: $totalRevenue');
-        }
-      } catch (e) {
-        debugPrint('⚠️ Failed to fetch subscriptions: $e');
-        _revenueData!['active_subscriptions'] = 0;
-        _revenueData!['total_revenue'] = 0.0;
-      }
-
     } catch (e) {
-      debugPrint('❌ Error loading revenue: $e');
-      _revenueData = {
+      debugPrint('❌ Fallback also failed: $e');
+      _revenueData ??= {
         'total_revenue': 0.0,
         'active_subscriptions': 0,
         'total_customers': 0,
+        'total_expenses': 0.0,
+        'net_profit': 0.0,
       };
+    }
+  }
+
+  Future<void> _loadSmartAlertsFallback() async {
+    try {
+      final response = await _apiService.get(ApiEndpoints.smartAlerts);
+      if (response.statusCode == 200 && response.data != null) {
+        final d = response.data['data'] ?? response.data;
+        // smartAlerts returns flat counts: expiring_today, expiring_week, low_coins, etc.
+        _alerts = [];
+        final fields = {
+          'expiring_today': 'Expiring Today',
+          'expiring_week': 'Expiring This Week',
+          'low_coins': 'Low Coins Members',
+          'open_complaints': 'Open Complaints',
+          'pending_expenses': 'Pending Expenses',
+        };
+        fields.forEach((key, title) {
+          final count = d[key] ?? 0;
+          if (count > 0) {
+            _alerts.add({
+              'title': title,
+              'description': '$count item(s) need attention',
+              'risk_level': count > 5 ? 'high' : 'medium',
+              'count': count,
+            });
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Smart alerts fallback failed: $e');
     }
   }
 
   Future<void> _loadBranchComparison() async {
     try {
-      debugPrint('🏢 Loading branches...');
+      debugPrint('🏢 Loading branch comparison...');
 
-      // Try to get branches from /api/branches first
+      // Primary: /api/reports/branch-comparison
       try {
-        final branchesResponse = await _apiService.get(ApiEndpoints.branches);
-        debugPrint('🏢 Branches API Response Status: ${branchesResponse.statusCode}');
-
-        if (branchesResponse.statusCode == 200 && branchesResponse.data != null) {
-          // Handle different response formats
-          if (branchesResponse.data is List) {
-            _branchComparison = branchesResponse.data;
-          } else if (branchesResponse.data['data'] != null) {
-            _branchComparison = branchesResponse.data['data'];
-          } else if (branchesResponse.data['branches'] != null) {
-            _branchComparison = branchesResponse.data['branches'];
-          } else if (branchesResponse.data['items'] != null) {
-            _branchComparison = branchesResponse.data['items'];
+        final response = await _apiService.get(ApiEndpoints.reportsBranchComparison);
+        debugPrint('🏢 Branch Comparison status: ${response.statusCode}');
+        if (response.statusCode == 200 && response.data != null) {
+          if (response.data is List) {
+            _branchComparison = response.data;
+          } else if (response.data['data'] != null) {
+            _branchComparison = response.data['data'];
           }
-
           if (_branchComparison.isNotEmpty) {
-            debugPrint('✅ Branches loaded: ${_branchComparison.length}');
+            debugPrint('✅ Branches loaded from comparison: ${_branchComparison.length}');
             return;
           }
         }
       } catch (e) {
-        debugPrint('⚠️ /api/branches failed, trying branch comparison: $e');
+        debugPrint('⚠️ Branch comparison failed: $e');
       }
 
-      // Fallback to branch comparison endpoint
-      final response = await _apiService.get(
-        ApiEndpoints.reportsBranchComparison,
-        queryParameters: {
-          'start_date': _startDate.toIso8601String().split('T')[0],
-          'end_date': _endDate.toIso8601String().split('T')[0],
-        },
-      );
-      debugPrint('🏢 Branch Comparison API Response Status: ${response.statusCode}');
-      if (response.statusCode == 200 && response.data != null) {
-        _branchComparison = response.data['branches'] ?? response.data['data'] ?? [];
-        debugPrint('✅ Branches loaded from comparison: ${_branchComparison.length}');
+      // Fallback: /api/branches
+      final branchesResponse = await _apiService.get(ApiEndpoints.branches);
+      if (branchesResponse.statusCode == 200 && branchesResponse.data != null) {
+        if (branchesResponse.data is List) {
+          _branchComparison = branchesResponse.data;
+        } else if (branchesResponse.data['data'] != null) {
+          final d = branchesResponse.data['data'];
+          _branchComparison = d is Map ? (d['items'] ?? []) : d;
+        }
+        debugPrint('✅ Branches loaded from /api/branches: ${_branchComparison.length}');
       }
     } catch (e) {
       debugPrint('❌ Error loading branches: $e');
@@ -253,73 +246,41 @@ class OwnerDashboardProvider extends ChangeNotifier {
 
   Future<void> _loadEmployeePerformance() async {
     try {
-      debugPrint('👥 Loading employees/staff...');
+      debugPrint('👥 Loading employee performance...');
+      final params = <String, dynamic>{
+        'start_date': _startDate.toIso8601String().split('T')[0],
+        'end_date': _endDate.toIso8601String().split('T')[0],
+      };
+      if (_selectedBranchId != null) params['branch_id'] = _selectedBranchId;
 
-      // Try multiple endpoints
-      final endpoints = ['/api/users', '/api/employees', '/api/staff'];
-
-      for (final endpoint in endpoints) {
-        try {
-          final Map<String, dynamic> params = {
-            'start_date': _startDate.toIso8601String().split('T')[0],
-            'end_date': _endDate.toIso8601String().split('T')[0],
-          };
-          if (_selectedBranchId != null) {
-            params['branch_id'] = _selectedBranchId;
-          }
-
-          final response = await _apiService.get(endpoint, queryParameters: params);
-          debugPrint('👥 Staff API Response Status ($endpoint): ${response.statusCode}');
-
-          if (response.statusCode == 200 && response.data != null) {
-            // Handle different response formats
-            if (response.data is List) {
-              _employeePerformance = response.data;
-            } else if (response.data['data'] != null) {
-              _employeePerformance = response.data['data'];
-            } else if (response.data['users'] != null) {
-              _employeePerformance = response.data['users'];
-            } else if (response.data['employees'] != null) {
-              _employeePerformance = response.data['employees'];
-            } else if (response.data['staff'] != null) {
-              _employeePerformance = response.data['staff'];
-            } else if (response.data['items'] != null) {
-              _employeePerformance = response.data['items'];
-            }
-
-            if (_employeePerformance.isNotEmpty) {
-              // Filter to only staff roles
-              _employeePerformance = _employeePerformance.where((user) {
-                final role = user['role']?.toString().toLowerCase() ?? '';
-                return ['manager', 'reception', 'accountant', 'receptionist', 'branch_manager'].contains(role);
-              }).toList();
-
-              debugPrint('✅ Staff loaded: ${_employeePerformance.length}');
-              return; // Success, exit
-            }
-          }
-        } catch (e) {
-          debugPrint('⚠️ Endpoint $endpoint failed: $e');
-          continue;
+      final response = await _apiService.get(
+        ApiEndpoints.reportsEmployeePerformance,
+        queryParameters: params,
+      );
+      debugPrint('👥 Employee Performance status: ${response.statusCode}');
+      if (response.statusCode == 200 && response.data != null) {
+        if (response.data is List) {
+          _employeePerformance = response.data;
+        } else if (response.data['data'] != null) {
+          _employeePerformance = response.data['data'];
+        } else if (response.data['employees'] != null) {
+          _employeePerformance = response.data['employees'];
         }
+        debugPrint('✅ Employees loaded: ${_employeePerformance.length}');
+        return;
       }
 
-      // Fallback to employee performance report
-      try {
-        final response = await _apiService.get(
-          ApiEndpoints.reportsEmployeePerformance,
-          queryParameters: {
-            if (_selectedBranchId != null) 'branch_id': _selectedBranchId,
-            'start_date': _startDate.toIso8601String().split('T')[0],
-            'end_date': _endDate.toIso8601String().split('T')[0],
-          },
-        );
-        if (response.statusCode == 200 && response.data != null) {
-          _employeePerformance = response.data['employees'] ?? response.data['data'] ?? [];
-          debugPrint('✅ Staff loaded from performance report: ${_employeePerformance.length}');
-        }
-      } catch (e) {
-        debugPrint('❌ All employee endpoints failed');
+      // Fallback: /api/users
+      final usersResp = await _apiService.get('/api/users', queryParameters: params);
+      if (usersResp.statusCode == 200 && usersResp.data != null) {
+        var users = usersResp.data is List
+            ? usersResp.data
+            : (usersResp.data['data'] ?? usersResp.data['users'] ?? usersResp.data['items'] ?? []);
+        _employeePerformance = (users as List).where((u) {
+          final role = u['role']?.toString().toLowerCase() ?? '';
+          return ['manager', 'reception', 'accountant', 'receptionist', 'branch_manager', 'front_desk'].contains(role);
+        }).toList();
+        debugPrint('✅ Staff loaded from /api/users: ${_employeePerformance.length}');
       }
     } catch (e) {
       debugPrint('❌ Error loading employees: $e');
@@ -329,17 +290,23 @@ class OwnerDashboardProvider extends ChangeNotifier {
   Future<void> _loadComplaints() async {
     try {
       debugPrint('📝 Loading complaints...');
-      final response = await _apiService.get(
-        ApiEndpoints.complaints,
-        queryParameters: {
-          if (_selectedBranchId != null) 'branch_id': _selectedBranchId,
-          'start_date': _startDate.toIso8601String().split('T')[0],
-          'end_date': _endDate.toIso8601String().split('T')[0],
-        },
-      );
-      debugPrint('📝 Complaints API Response Status: ${response.statusCode}');
+      final params = <String, dynamic>{
+        'start_date': _startDate.toIso8601String().split('T')[0],
+        'end_date': _endDate.toIso8601String().split('T')[0],
+      };
+      if (_selectedBranchId != null) params['branch_id'] = _selectedBranchId;
+
+      final response = await _apiService.get(ApiEndpoints.complaints, queryParameters: params);
+      debugPrint('📝 Complaints status: ${response.statusCode}');
       if (response.statusCode == 200 && response.data != null) {
-        _complaints = response.data['complaints'] ?? response.data['data'] ?? [];
+        if (response.data is List) {
+          _complaints = response.data;
+        } else if (response.data['data'] != null) {
+          final d = response.data['data'];
+          _complaints = d is Map ? (d['items'] ?? []) : d;
+        } else if (response.data['complaints'] != null) {
+          _complaints = response.data['complaints'];
+        }
         debugPrint('✅ Complaints loaded: ${_complaints.length}');
       }
     } catch (e) {

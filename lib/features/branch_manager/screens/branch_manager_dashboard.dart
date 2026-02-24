@@ -5,6 +5,7 @@ import '../../../core/auth/auth_provider.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../shared/widgets/stat_card.dart';
+import '../../../core/utils/helpers.dart';
 import '../providers/branch_manager_provider.dart';
 import 'branch_manager_settings_screen.dart';
 
@@ -227,11 +228,13 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
     final performance = provider.branchPerformance ?? {};
     final dailyOps = provider.dailyOperations ?? {};
 
-    // safely extract values
-    final revenue = (dailyOps['today_revenue'] ?? performance['today_revenue'] ?? 0).toString();
-    final activeMembers = (performance['active_members'] ?? performance['active_subscriptions'] ?? 0).toString();
-    final checkIns = (dailyOps['check_ins'] ?? dailyOps['today_checkins'] ?? 0).toString();
-    final pendingComplaints = provider.complaints.where((c) => c['status'] == 'pending').length.toString();
+    final todayRevenue = (dailyOps['total_revenue'] ?? performance['today_revenue'] ?? 0).toDouble();
+    final activeMembers = performance['active_members'] ?? performance['active_subscriptions'] ?? 0;
+    final totalCustomers = performance['total_customers'] ?? 0;
+    final pendingComplaints = provider.complaints.where((c) =>
+        c['status']?.toString().toLowerCase() == 'pending' ||
+        c['status']?.toString().toLowerCase() == 'open').length;
+    final expiringCount = performance['expiring_subscriptions'] ?? 0;
 
     return GridView.count(
       crossAxisCount: 2,
@@ -243,27 +246,27 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
       children: [
         StatCard(
           title: 'Today\'s Revenue',
-          value: revenue,
+          value: NumberHelper.formatCurrency(todayRevenue),
           icon: Icons.attach_money,
           color: Colors.green,
         ),
         StatCard(
           title: 'Active Members',
-          value: activeMembers,
+          value: NumberHelper.formatNumber(activeMembers),
           icon: Icons.people,
           color: Colors.blue,
         ),
         StatCard(
-          title: 'Check-ins',
-          value: checkIns,
-          icon: Icons.fitness_center,
+          title: 'Total Customers',
+          value: NumberHelper.formatNumber(totalCustomers),
+          icon: Icons.person,
           color: Colors.orange,
         ),
         StatCard(
-          title: 'Pending Issues',
-          value: pendingComplaints,
-          icon: Icons.report_problem,
-          color: Colors.red,
+          title: expiringCount > 0 ? 'Expiring Soon ($expiringCount)' : 'Pending Issues',
+          value: NumberHelper.formatNumber(expiringCount > 0 ? expiringCount : pendingComplaints),
+          icon: expiringCount > 0 ? Icons.timer_off : Icons.report_problem,
+          color: expiringCount > 0 ? Colors.deepOrange : Colors.red,
         ),
       ],
     );

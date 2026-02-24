@@ -254,42 +254,88 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
 
   Widget _buildStatsGrid(AccountantProvider provider) {
     final dailySales = provider.dailySales ?? {};
-    final totalSales = (dailySales['total_sales'] ?? 0).toDouble();
-    final totalExpenses = (provider.expenses.fold(0.0, (sum, e) => sum + (e['amount'] ?? 0))).toDouble();
-    final netProfit = totalSales - totalExpenses;
-    final transactionCount = (dailySales['transaction_count'] ?? 0) + provider.expenses.length;
 
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 1.5,
+    // Prefer monthly data from the dashboard endpoint, fall back to today's data
+    final monthlyRevenue = (dailySales['monthly_revenue'] ?? 0).toDouble();
+    final todaySales = (dailySales['total_sales'] ?? 0).toDouble();
+
+    // Expenses: from backend monthly summary or from loaded expense list
+    final monthlyExpenses = (dailySales['monthly_expenses'] as num?)?.toDouble() ??
+        provider.expenses.fold<double>(0.0, (sum, e) => sum + ((e['amount'] as num?) ?? 0).toDouble());
+    final monthlyNet = (dailySales['monthly_net'] as num?)?.toDouble() ?? (monthlyRevenue - monthlyExpenses);
+    final transactionCount = dailySales['transaction_count'] ?? 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        StatCard(
-          title: 'Total Sales',
-          value: NumberHelper.formatCurrency(totalSales),
-          icon: Icons.trending_up,
-          color: Colors.green,
+        // Today's summary card
+        if (todaySales > 0 || transactionCount > 0) ...[
+          Text(
+            "Today's Summary",
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: StatCard(
+                  title: "Today's Sales",
+                  value: NumberHelper.formatCurrency(todaySales),
+                  icon: Icons.today,
+                  color: Colors.teal,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: StatCard(
+                  title: 'Transactions',
+                  value: NumberHelper.formatNumber(transactionCount),
+                  icon: Icons.receipt_long,
+                  color: Colors.purple,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
+        Text(
+          'This Month',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey),
         ),
-        StatCard(
-          title: 'Total Expenses',
-          value: NumberHelper.formatCurrency(totalExpenses),
-          icon: Icons.trending_down,
-          color: Colors.orange,
-        ),
-        StatCard(
-          title: 'Net Profit',
-          value: NumberHelper.formatCurrency(netProfit),
-          icon: Icons.account_balance_wallet,
-          color: netProfit >= 0 ? Colors.blue : Colors.red,
-        ),
-        StatCard(
-          title: 'Transactions',
-          value: NumberHelper.formatNumber(transactionCount),
-          icon: Icons.receipt_long,
-          color: Colors.purple,
+        const SizedBox(height: 8),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 1.5,
+          children: [
+            StatCard(
+              title: 'Monthly Revenue',
+              value: NumberHelper.formatCurrency(monthlyRevenue > 0 ? monthlyRevenue : todaySales),
+              icon: Icons.trending_up,
+              color: Colors.green,
+            ),
+            StatCard(
+              title: 'Monthly Expenses',
+              value: NumberHelper.formatCurrency(monthlyExpenses),
+              icon: Icons.trending_down,
+              color: Colors.orange,
+            ),
+            StatCard(
+              title: 'Net Profit',
+              value: NumberHelper.formatCurrency(monthlyNet),
+              icon: Icons.account_balance_wallet,
+              color: monthlyNet >= 0 ? Colors.blue : Colors.red,
+            ),
+            StatCard(
+              title: 'Pending Expenses',
+              value: NumberHelper.formatNumber(dailySales['pending_expenses'] ?? provider.expenses.where((e) => e['status'] == 'pending').length),
+              icon: Icons.pending_actions,
+              color: Colors.deepOrange,
+            ),
+          ],
         ),
       ],
     );

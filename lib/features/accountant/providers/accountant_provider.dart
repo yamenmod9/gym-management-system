@@ -22,6 +22,9 @@ class AccountantProvider extends ChangeNotifier {
   Map<String, dynamic>? _weeklyReport;
   Map<String, dynamic>? _monthlyReport;
 
+  // Accountant dashboard summary from backend
+  Map<String, dynamic>? _accountantDashboard;
+
   AccountantProvider(this._apiService);
 
   // Getters
@@ -37,8 +40,8 @@ class AccountantProvider extends ChangeNotifier {
   Map<String, dynamic>? get cashDifferences => _cashDifferences;
   Map<String, dynamic>? get weeklyReport => _weeklyReport;
   Map<String, dynamic>? get monthlyReport => _monthlyReport;
+  Map<String, dynamic>? get accountantDashboard => _accountantDashboard;
 
-  // Set filters
   void setFilters({
     int? branchId,
     int? serviceId,
@@ -62,7 +65,7 @@ class AccountantProvider extends ChangeNotifier {
 
     try {
       await Future.wait([
-        _loadDailySales(),
+        _loadAccountantDashboard(),
         _loadExpenses(),
         _loadCashDifferences(),
         _loadWeeklyReport(),
@@ -77,76 +80,115 @@ class AccountantProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadDailySales() async {
+  /// Primary: /api/dashboards/accountant – returns today's sales + monthly summary
+  Future<void> _loadAccountantDashboard() async {
     try {
-      debugPrint('💰 Loading daily sales...');
-      
-      // Try daily sales endpoint first
-      try {
-        final response = await _apiService.get(
-          ApiEndpoints.financeDailySales,
-          queryParameters: {
-            if (_selectedBranchId != null) 'branch_id': _selectedBranchId,
-            if (_selectedServiceId != null) 'service_id': _selectedServiceId,
-            if (_selectedPaymentMethod != null) 'payment_method': _selectedPaymentMethod,
-            'start_date': _startDate.toIso8601String().split('T')[0],
-            'end_date': _endDate.toIso8601String().split('T')[0],
-          },
-        );
-        debugPrint('💰 Daily Sales API Response Status: ${response.statusCode}');
-        if (response.statusCode == 200 && response.data != null) {
-          _dailySales = response.data;
-          debugPrint('✅ Daily sales loaded');
-          return;
-        }
-      } catch (e) {
-        debugPrint('⚠️ Daily sales endpoint failed, calculating from payments: $e');
+      debugPrint('💰 Loading accountant dashboard...');
+      final params = <String, dynamic>{};
+      if (_selectedBranchId != null) params['branch_id'] = _selectedBranchId;
+
+      final response = await _apiService.get(
+        ApiEndpoints.dashboardAccountant,
+        queryParameters: params.isNotEmpty ? params : null,
+      );
+      debugPrint('💰 Accountant dashboard status: ${response.statusCode}');
+
+      if (response.statusCode == 200 && response.data != null) {
+        final d = response.data['data'] ?? response.data;
+        _accountantDashboard = d;
+
+        // Map the nested structure to flat dailySales for the UI
+        final today = d['today'] ?? {};
+        _dailySales = {
+          'total_sales': today['total'] ?? 0.0,
+          'cash_sales': today['cash'] ?? 0.0,
+          'card_sales': today['network'] ?? today['card'] ?? 0.0,
+          'online_sales': today['transfer'] ?? today['online'] ?? 0.0,
+          'transaction_count': today['count'] ?? 0,
+          // Monthly data for cards
+          'monthly_revenue': (d['current_month'] ?? {})['revenue'] ?? 0.0,
+          'monthly_expenses': (d['current_month'] ?? {})['expenses'] ?? 0.0,
+          'monthly_net': (d['current_month'] ?? {})['net'] ?? 0.0,
+          'pending_expenses': (d['current_month'] ?? {})['pending_expenses'] ?? 0,
+        };
+
+        debugPrint('✅ Accountant dashboard loaded – today total: ${_dailySales!['total_sales']}');
+        return;
       }
-      
-      // Fallback: Calculate from payments
-      try {
-        final paymentsResponse = await _apiService.get(
-          ApiEndpoints.payments,
-          queryParameters: {
-            if (_selectedBranchId != null) 'branch_id': _selectedBranchId,
-            'start_date': _startDate.toIso8601String().split('T')[0],
-            'end_date': _endDate.toIso8601String().split('T')[0],
-          },
-        );
-        
-        if (paymentsResponse.statusCode == 200 && paymentsResponse.data != null) {
-          var payments = [];
-          if (paymentsResponse.data is List) {
-            payments = paymentsResponse.data;
-          } else if (paymentsResponse.data['data'] != null) {
-            payments = paymentsResponse.data['data'] is Map
-              ? (paymentsResponse.data['data']['items'] ?? [])
-              : paymentsResponse.data['data'];
-          } else if (paymentsResponse.data['items'] != null) {
-            payments = paymentsResponse.data['items'];
-          } else if (paymentsResponse.data['payments'] != null) {
-            payments = paymentsResponse.data['payments'];
-          }
-          
-          double totalSales = 0;
-          for (var payment in payments) {
-            totalSales += (payment['amount'] ?? 0).toDouble();
-          }
-          
-          _dailySales = {
-            'total_sales': totalSales,
-            'payment_count': payments.length,
-          };
-          debugPrint('✅ Calculated sales from payments: $totalSales (${payments.length} payments)');
-        }
-      } catch (e) {
-        debugPrint('⚠️ Failed to fetch payments: $e');
-        _dailySales = {'total_sales': 0.0, 'payment_count': 0};
-      }
-      
     } catch (e) {
-      debugPrint('❌ Error loading daily sales: $e');
-      _dailySales = {'total_sales': 0.0, 'payment_count': 0};
+      debugPrint('⚠️ Accountant dashboard failed, using daily-sales fallback: $e');
+    }
+
+    // Fallback: /api/finance/daily-sales
+    await _loadDailySalesFallback();
+  }
+
+  Future<void> _loadDailySalesFallback() async {
+    try {
+      debugPrint('💰 Fallback: loading daily sales...');
+      final response = await _apiService.get(
+        ApiEndpoints.financeDailySales,
+        queryParameters: {
+          if (_selectedBranchId != null) 'branch_id': _selectedBranchId,
+          if (_selectedServiceId != null) 'service_id': _selectedServiceId,
+          if (_selectedPaymentMethod != null) 'payment_method': _selectedPaymentMethod,
+          'start_date': _startDate.toIso8601String().split('T')[0],
+          'end_date': _endDate.toIso8601String().split('T')[0],
+        },
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final d = response.data['data'] ?? response.data;
+        _dailySales = {
+          'total_sales': d['total_sales'] ?? 0.0,
+          'cash_sales': d['cash_sales'] ?? 0.0,
+          'card_sales': d['card_sales'] ?? 0.0,
+          'online_sales': d['online_sales'] ?? 0.0,
+          'transaction_count': d['transaction_count'] ?? 0,
+          'monthly_revenue': 0.0,
+          'monthly_expenses': 0.0,
+          'monthly_net': 0.0,
+          'pending_expenses': 0,
+        };
+        debugPrint('✅ Daily sales fallback loaded: ${_dailySales!['total_sales']}');
+        return;
+      }
+
+      // Last resort: calculate from payments
+      final paymentsResponse = await _apiService.get(
+        ApiEndpoints.payments,
+        queryParameters: {
+          if (_selectedBranchId != null) 'branch_id': _selectedBranchId,
+          'start_date': _startDate.toIso8601String().split('T')[0],
+          'end_date': _endDate.toIso8601String().split('T')[0],
+        },
+      );
+      if (paymentsResponse.statusCode == 200 && paymentsResponse.data != null) {
+        var payments = paymentsResponse.data is List
+            ? paymentsResponse.data
+            : (paymentsResponse.data['data'] is Map
+                ? (paymentsResponse.data['data']['items'] ?? [])
+                : (paymentsResponse.data['data'] ?? paymentsResponse.data['payments'] ?? paymentsResponse.data['items'] ?? []));
+        double totalSales = 0;
+        for (var p in payments) totalSales += (p['amount'] ?? 0).toDouble();
+        _dailySales = {
+          'total_sales': totalSales,
+          'transaction_count': payments.length,
+          'monthly_revenue': 0.0,
+          'monthly_expenses': 0.0,
+          'monthly_net': 0.0,
+          'pending_expenses': 0,
+        };
+      }
+    } catch (e) {
+      debugPrint('❌ Daily sales fallback failed: $e');
+      _dailySales = {
+        'total_sales': 0.0,
+        'transaction_count': 0,
+        'monthly_revenue': 0.0,
+        'monthly_expenses': 0.0,
+        'monthly_net': 0.0,
+        'pending_expenses': 0,
+      };
     }
   }
 
@@ -157,13 +199,22 @@ class AccountantProvider extends ChangeNotifier {
         ApiEndpoints.financeExpenses,
         queryParameters: {
           if (_selectedBranchId != null) 'branch_id': _selectedBranchId,
-          'start_date': _startDate.toIso8601String().split('T')[0],
-          'end_date': _endDate.toIso8601String().split('T')[0],
+          'date_from': _startDate.toIso8601String().split('T')[0],
+          'date_to': _endDate.toIso8601String().split('T')[0],
         },
       );
-      debugPrint('💸 Expenses API Response Status: ${response.statusCode}');
+      debugPrint('💸 Expenses status: ${response.statusCode}');
       if (response.statusCode == 200 && response.data != null) {
-        _expenses = response.data['expenses'] ?? response.data['data'] ?? [];
+        if (response.data is List) {
+          _expenses = response.data;
+        } else if (response.data['data'] != null) {
+          final d = response.data['data'];
+          _expenses = d is Map ? (d['items'] ?? []) : d;
+        } else if (response.data['expenses'] != null) {
+          _expenses = response.data['expenses'];
+        } else {
+          _expenses = [];
+        }
         debugPrint('✅ Expenses loaded: ${_expenses.length}');
       } else {
         _expenses = [];
@@ -180,15 +231,15 @@ class AccountantProvider extends ChangeNotifier {
         ApiEndpoints.financeCashDifferences,
         queryParameters: {
           if (_selectedBranchId != null) 'branch_id': _selectedBranchId,
-          'start_date': _startDate.toIso8601String().split('T')[0],
-          'end_date': _endDate.toIso8601String().split('T')[0],
+          'date_from': _startDate.toIso8601String().split('T')[0],
+          'date_to': _endDate.toIso8601String().split('T')[0],
         },
       );
       if (response.statusCode == 200 && response.data != null) {
-        _cashDifferences = response.data;
+        _cashDifferences = response.data['data'] ?? response.data;
       }
     } catch (e) {
-      // Handle silently
+      // Silently ignore
     }
   }
 
@@ -201,10 +252,10 @@ class AccountantProvider extends ChangeNotifier {
         },
       );
       if (response.statusCode == 200 && response.data != null) {
-        _weeklyReport = response.data;
+        _weeklyReport = response.data['data'] ?? response.data;
       }
     } catch (e) {
-      // Handle silently
+      // Silently ignore
     }
   }
 
@@ -217,10 +268,10 @@ class AccountantProvider extends ChangeNotifier {
         },
       );
       if (response.statusCode == 200 && response.data != null) {
-        _monthlyReport = response.data;
+        _monthlyReport = response.data['data'] ?? response.data;
       }
     } catch (e) {
-      // Handle silently
+      // Silently ignore
     }
   }
 

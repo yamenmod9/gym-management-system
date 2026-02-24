@@ -61,4 +61,11 @@ class ApiEndpoints {
   // Alert Endpoints
   static const String alerts = '/api/alerts';
   static const String smartAlerts = '/api/alerts/smart';
+
+  // Dashboard Endpoints
+  static const String dashboardOverview = '/api/dashboards/overview';
+  static const String dashboardOwner = '/api/dashboards/owner';
+  static const String dashboardAccountant = '/api/dashboards/accountant';
+  static const String dashboardBranchManager = '/api/dashboards/branch-manager';
+  static String dashboardBranch(int branchId) => '/api/dashboards/branch/$branchId';
 }

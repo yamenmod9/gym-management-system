@@ -41,11 +41,8 @@ class BranchManagerProvider extends ChangeNotifier {
 
     try {
       await Future.wait([
-        _loadBranchPerformance(),
-        _loadAttendance(),
+        _loadBranchManagerDashboard(),
         _loadComplaints(),
-        _loadRevenueByService(),
-        _loadDailyOperations(),
       ]);
       _error = null;
     } catch (e) {
@@ -56,122 +53,141 @@ class BranchManagerProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadBranchPerformance() async {
+  /// Primary: /api/dashboards/branch-manager – returns all branch stats at once
+  Future<void> _loadBranchManagerDashboard() async {
     try {
-      debugPrint('🏢 Loading branch $branchId performance...');
-      
-      // Try performance endpoint first
-      try {
-        final response = await _apiService.get(
-          ApiEndpoints.branchPerformance(branchId),
-        );
-        debugPrint('🏢 Branch Performance API Response Status: ${response.statusCode}');
-        if (response.statusCode == 200 && response.data != null) {
-          _branchPerformance = response.data;
-          debugPrint('🏢 Performance data keys: ${_branchPerformance?.keys}');
-          debugPrint('✅ Total customers: ${_branchPerformance?['total_customers']}');
-          debugPrint('✅ Active subscriptions: ${_branchPerformance?['active_subscriptions']}');
-          return;
+      debugPrint('🏢 Loading branch manager dashboard (branch $branchId)...');
+
+      final response = await _apiService.get(ApiEndpoints.dashboardBranchManager);
+      debugPrint('🏢 Branch Manager Dashboard status: ${response.statusCode}');
+
+      if (response.statusCode == 200 && response.data != null) {
+        final d = response.data['data'] ?? response.data;
+        // DashboardService returns: customers.active, customers.total, revenue.last_7_days,
+        // alerts.expiring_subscriptions, alerts.open_complaints, staff.count
+        _branchPerformance = {
+          'active_subscriptions': d['customers']?['active'] ?? 0,
+          'active_members': d['customers']?['active'] ?? 0,
+          'total_customers': d['customers']?['total'] ?? 0,
+          'total_revenue': (d['revenue']?['last_7_days'] ?? 0).toDouble(),
+          'today_revenue': (d['revenue']?['last_7_days'] ?? 0).toDouble(),
+          'staff_count': d['staff']?['count'] ?? 0,
+          'expiring_subscriptions': d['alerts']?['expiring_subscriptions'] ?? 0,
+          'open_complaints': d['alerts']?['open_complaints'] ?? 0,
+        };
+
+        // Fill _dailyOperations with today stats from /api/reports/daily
+        await _loadDailyOperations();
+        // If daily operations loaded today_revenue, update it
+        if (_dailyOperations != null) {
+          _branchPerformance!['today_revenue'] =
+              (_dailyOperations!['total_revenue'] ?? _branchPerformance!['today_revenue']).toDouble();
+          _branchPerformance!['check_ins'] = _dailyOperations!['new_subscriptions'] ?? 0;
         }
-      } catch (e) {
-        debugPrint('⚠️ Performance endpoint failed, fetching real data: $e');
+
+        debugPrint('✅ Branch dashboard loaded – active: ${_branchPerformance!['active_members']}, revenue: ${_branchPerformance!['total_revenue']}');
+        return;
       }
-      
-      // Fallback: Calculate from actual data
-      _branchPerformance = {};
-      
-      // Get customers count
-      try {
-        final customersResponse = await _apiService.get(
-          ApiEndpoints.customers,
-          queryParameters: {'branch_id': branchId},
-        );
-        if (customersResponse.statusCode == 200 && customersResponse.data != null) {
-          var customers = [];
-          if (customersResponse.data is List) {
-            customers = customersResponse.data;
-          } else if (customersResponse.data['data'] != null) {
-            customers = customersResponse.data['data'] is Map 
-              ? (customersResponse.data['data']['items'] ?? [])
-              : customersResponse.data['data'];
-          } else if (customersResponse.data['items'] != null) {
-            customers = customersResponse.data['items'];
-          }
-          _branchPerformance!['total_customers'] = customers.length;
-          debugPrint('✅ Total Customers from API: ${customers.length}');
-        }
-      } catch (e) {
-        debugPrint('⚠️ Failed to fetch customers: $e');
-        _branchPerformance!['total_customers'] = 0;
-      }
-      
-      // Get subscriptions count
-      try {
-        final subsResponse = await _apiService.get(
-          ApiEndpoints.subscriptions,
-          queryParameters: {'branch_id': branchId},
-        );
-        if (subsResponse.statusCode == 200 && subsResponse.data != null) {
-          var subscriptions = [];
-          if (subsResponse.data is List) {
-            subscriptions = subsResponse.data;
-          } else if (subsResponse.data['data'] != null) {
-            subscriptions = subsResponse.data['data'] is Map
-              ? (subsResponse.data['data']['items'] ?? [])
-              : subsResponse.data['data'];
-          } else if (subsResponse.data['items'] != null) {
-            subscriptions = subsResponse.data['items'];
-          }
-          
-          // Count active subscriptions
-          final activeSubs = subscriptions.where((sub) {
-            final status = sub['status']?.toString().toLowerCase() ?? '';
-            return status == 'active';
-          }).toList();
-          
-          _branchPerformance!['active_subscriptions'] = activeSubs.length;
-          
-          // Calculate revenue
-          double totalRevenue = 0;
-          for (var sub in activeSubs) {
-            totalRevenue += (sub['amount'] ?? sub['price'] ?? 0).toDouble();
-          }
-          _branchPerformance!['total_revenue'] = totalRevenue;
-          
-          debugPrint('✅ Active Subscriptions from API: ${activeSubs.length}');
-          debugPrint('✅ Calculated Revenue: $totalRevenue');
-        }
-      } catch (e) {
-        debugPrint('⚠️ Failed to fetch subscriptions: $e');
-        _branchPerformance!['active_subscriptions'] = 0;
-        _branchPerformance!['total_revenue'] = 0.0;
-      }
-      
     } catch (e) {
-      debugPrint('❌ Error loading branch performance: $e');
-      _branchPerformance = {
-        'total_customers': 0,
-        'active_subscriptions': 0,
-        'total_revenue': 0.0,
-      };
+      debugPrint('⚠️ Branch manager dashboard failed: $e, trying /api/dashboards/branch/$branchId');
     }
+
+    // Fallback 1: /api/dashboards/branch/{id}
+    try {
+      final response = await _apiService.get(ApiEndpoints.dashboardBranch(branchId));
+      if (response.statusCode == 200 && response.data != null) {
+        final d = response.data['data'] ?? response.data;
+        _branchPerformance = {
+          'active_subscriptions': d['active_subscriptions'] ?? 0,
+          'active_members': d['active_subscriptions'] ?? 0,
+          'total_customers': d['total_customers'] ?? 0,
+          'total_revenue': (d['total_revenue'] ?? 0).toDouble(),
+          'today_revenue': (d['total_revenue'] ?? 0).toDouble(),
+          'staff_count': d['staff_count'] ?? 0,
+          'open_complaints': d['open_complaints'] ?? 0,
+        };
+        debugPrint('✅ Branch dashboard (fallback) loaded');
+        await _loadDailyOperations();
+        return;
+      }
+    } catch (e) {
+      debugPrint('⚠️ Branch dashboard fallback also failed: $e');
+    }
+
+    // Fallback 2: /api/branches/{id}/performance
+    await _loadBranchPerformanceFallback();
   }
 
-  Future<void> _loadAttendance() async {
+  Future<void> _loadBranchPerformanceFallback() async {
     try {
-      debugPrint('📅 Loading attendance for branch $branchId...');
-      final response = await _apiService.get(
-        ApiEndpoints.attendanceByBranch,
-        queryParameters: {'branch_id': branchId},
-      );
-      debugPrint('📅 Attendance API Response Status: ${response.statusCode}');
+      debugPrint('🏢 Using branch performance endpoint...');
+      final response = await _apiService.get(ApiEndpoints.branchPerformance(branchId));
       if (response.statusCode == 200 && response.data != null) {
-        _attendance = response.data['attendance'] ?? response.data['data'] ?? [];
-        debugPrint('✅ Attendance records loaded: ${_attendance.length}');
+        final d = response.data['data'] ?? response.data;
+        _branchPerformance = {
+          'active_subscriptions': d['active_subscriptions'] ?? 0,
+          'active_members': d['active_subscriptions'] ?? 0,
+          'total_customers': d['total_customers'] ?? 0,
+          'total_revenue': (d['total_revenue'] ?? 0).toDouble(),
+          'today_revenue': (d['total_revenue'] ?? 0).toDouble(),
+          'staff_count': 0,
+          'open_complaints': d['open_complaints'] ?? 0,
+          'check_ins': d['check_ins_count'] ?? 0,
+        };
+        debugPrint('✅ Branch performance loaded: ${_branchPerformance!['total_customers']} customers');
+        return;
       }
     } catch (e) {
-      debugPrint('❌ Error loading attendance: $e');
+      debugPrint('❌ Branch performance fallback failed: $e');
     }
+
+    // Last resort: fetch customers + subscriptions individually
+    await _loadBranchDataManually();
+  }
+
+  Future<void> _loadBranchDataManually() async {
+    _branchPerformance = {
+      'active_subscriptions': 0,
+      'active_members': 0,
+      'total_customers': 0,
+      'total_revenue': 0.0,
+      'today_revenue': 0.0,
+      'staff_count': 0,
+      'open_complaints': 0,
+    };
+
+    try {
+      final customersResponse = await _apiService.get(
+        ApiEndpoints.customers,
+        queryParameters: {'branch_id': branchId},
+      );
+      if (customersResponse.statusCode == 200 && customersResponse.data != null) {
+        var customers = customersResponse.data is List
+            ? customersResponse.data
+            : (customersResponse.data['data'] is Map
+                ? (customersResponse.data['data']['items'] ?? [])
+                : (customersResponse.data['data'] ?? []));
+        _branchPerformance!['total_customers'] = customers.length;
+      }
+    } catch (_) {}
+
+    try {
+      final subsResponse = await _apiService.get(
+        ApiEndpoints.subscriptions,
+        queryParameters: {'branch_id': branchId},
+      );
+      if (subsResponse.statusCode == 200 && subsResponse.data != null) {
+        var subs = subsResponse.data is List
+            ? subsResponse.data
+            : (subsResponse.data['data'] is Map
+                ? (subsResponse.data['data']['items'] ?? [])
+                : (subsResponse.data['data'] ?? []));
+        final activeSubs = (subs as List).where((s) =>
+            s['status']?.toString().toLowerCase() == 'active').toList();
+        _branchPerformance!['active_subscriptions'] = activeSubs.length;
+        _branchPerformance!['active_members'] = activeSubs.length;
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadComplaints() async {
@@ -181,33 +197,19 @@ class BranchManagerProvider extends ChangeNotifier {
         ApiEndpoints.complaints,
         queryParameters: {'branch_id': branchId},
       );
-      debugPrint('📝 Complaints API Response Status: ${response.statusCode}');
       if (response.statusCode == 200 && response.data != null) {
-        _complaints = response.data['complaints'] ?? response.data['data'] ?? [];
+        if (response.data is List) {
+          _complaints = response.data;
+        } else if (response.data['data'] != null) {
+          final d = response.data['data'];
+          _complaints = d is Map ? (d['items'] ?? []) : d;
+        } else if (response.data['complaints'] != null) {
+          _complaints = response.data['complaints'];
+        }
         debugPrint('✅ Complaints loaded: ${_complaints.length}');
       }
     } catch (e) {
       debugPrint('❌ Error loading complaints: $e');
-    }
-  }
-
-  Future<void> _loadRevenueByService() async {
-    try {
-      debugPrint('💰 Loading revenue by service for branch $branchId...');
-      final response = await _apiService.get(
-        ApiEndpoints.reportsRevenue,
-        queryParameters: {
-          'branch_id': branchId,
-          'group_by': 'service',
-        },
-      );
-      debugPrint('💰 Revenue API Response Status: ${response.statusCode}');
-      if (response.statusCode == 200 && response.data != null) {
-        _revenueByService = response.data;
-        debugPrint('💰 Revenue data keys: ${_revenueByService?.keys}');
-      }
-    } catch (e) {
-      debugPrint('❌ Error loading revenue: $e');
     }
   }
 
@@ -218,13 +220,12 @@ class BranchManagerProvider extends ChangeNotifier {
         ApiEndpoints.reportsDaily,
         queryParameters: {'branch_id': branchId},
       );
-      debugPrint('📊 Daily Operations API Response Status: ${response.statusCode}');
       if (response.statusCode == 200 && response.data != null) {
-        _dailyOperations = response.data;
-        debugPrint('📊 Daily operations data keys: ${_dailyOperations?.keys}');
+        _dailyOperations = response.data['data'] ?? response.data;
+        debugPrint('📊 Daily operations loaded – revenue: ${_dailyOperations!['total_revenue']}');
       }
     } catch (e) {
-      debugPrint('❌ Error loading daily operations: $e');
+      debugPrint('⚠️ Daily operations failed: $e');
     }
   }
 

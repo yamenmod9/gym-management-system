@@ -286,9 +286,10 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
 
   Widget _buildStatsGrid(OwnerDashboardProvider provider) {
     final revenueData = provider.revenueData ?? {};
-    final totalRevenue = revenueData['total_revenue'] ?? 0.0;
+    final totalRevenue = (revenueData['total_revenue'] as num?)?.toDouble() ?? 0.0;
     final activeSubscriptions = revenueData['active_subscriptions'] ?? 0;
     final totalCustomers = revenueData['total_customers'] ?? 0;
+    final totalBranches = revenueData['total_branches'] ?? provider.branchComparison.length;
 
     return GridView.count(
       crossAxisCount: 2,
@@ -300,7 +301,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       children: [
         StatCard(
           title: 'Total Revenue',
-          value: NumberHelper.formatCurrency(totalRevenue.toDouble()),
+          value: NumberHelper.formatCurrency(totalRevenue),
           icon: Icons.attach_money,
           color: Colors.green,
         ),
@@ -318,7 +319,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         ),
         StatCard(
           title: 'Branches',
-          value: NumberHelper.formatNumber(provider.branchComparison.length),
+          value: NumberHelper.formatNumber(totalBranches),
           icon: Icons.store,
           color: Colors.purple,
         ),
@@ -461,6 +462,12 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
 
   Widget _buildFinanceTab(BuildContext context, OwnerDashboardProvider provider) {
     final revenueData = provider.revenueData ?? {};
+    final totalRevenue = (revenueData['total_revenue'] as num?)?.toDouble() ?? 0.0;
+    final totalExpenses = (revenueData['total_expenses'] as num?)?.toDouble() ?? 0.0;
+    final netProfit = (revenueData['net_profit'] as num?)?.toDouble() ?? (totalRevenue - totalExpenses);
+    final activeSubscriptions = revenueData['active_subscriptions'] ?? 0;
+    final totalCustomers = revenueData['total_customers'] ?? 0;
+
     return RefreshIndicator(
       onRefresh: () => provider.refresh(),
       child: ListView(
@@ -468,20 +475,32 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         children: [
           SimpleStatCard(
             label: 'Total Revenue',
-            value: NumberHelper.formatCurrency((revenueData['total_revenue'] ?? 0).toDouble()),
+            value: NumberHelper.formatCurrency(totalRevenue),
             color: Colors.green,
           ),
           const SizedBox(height: 12),
           SimpleStatCard(
             label: 'Total Expenses',
-            value: NumberHelper.formatCurrency((revenueData['total_expenses'] ?? 0).toDouble()),
+            value: NumberHelper.formatCurrency(totalExpenses),
             color: Colors.red,
           ),
           const SizedBox(height: 12),
           SimpleStatCard(
             label: 'Net Profit',
-            value: NumberHelper.formatCurrency((revenueData['net_profit'] ?? 0).toDouble()),
-            color: Colors.blue,
+            value: NumberHelper.formatCurrency(netProfit),
+            color: netProfit >= 0 ? Colors.blue : Colors.red,
+          ),
+          const SizedBox(height: 12),
+          SimpleStatCard(
+            label: 'Active Subscriptions',
+            value: NumberHelper.formatNumber(activeSubscriptions),
+            color: Colors.teal,
+          ),
+          const SizedBox(height: 12),
+          SimpleStatCard(
+            label: 'Total Customers',
+            value: NumberHelper.formatNumber(totalCustomers),
+            color: Colors.orange,
           ),
         ],
       ),
