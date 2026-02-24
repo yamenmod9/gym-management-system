@@ -407,8 +407,8 @@ def get_branch_comparison():
         # Complaints
         from app.models import Complaint
         complaints = Complaint.query.filter_by(branch_id=branch.id).count()
-        open_complaints = Complaint.query.filter_by(branch_id=branch.id, status='open').count()
-        
+        open_complaints = Complaint.query.filter_by(branch_id=branch.id, status=ComplaintStatus.OPEN).count()
+
         # Calculate performance score (simple metric)
         performance_score = min(100, int(
             (active_subs / max(customers, 1) * 50) +  # Subscription rate
@@ -495,11 +495,12 @@ def get_employee_performance():
         ).all()
         
         transactions_count = len(transactions)
-        total_revenue = sum(t.amount - t.discount for t in transactions)
-        
+        total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+
         performance_data.append({
             'staff_id': staff.id,
             'staff_name': staff.username,
+            'full_name': staff.full_name,
             'role': staff.role.value,
             'branch_name': staff.branch.name if staff.branch else 'N/A',
             'transactions_count': transactions_count,

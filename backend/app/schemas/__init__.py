@@ -130,6 +130,7 @@ class StopSubscriptionSchema(Schema):
 class TransactionSchema(Schema):
     id = fields.Int(dump_only=True)
     amount = fields.Decimal(required=True, as_string=True, validate=validate.Range(min=0))
+    discount = fields.Decimal(as_string=True, load_default=0, dump_default=0)
     payment_method = fields.Str(required=True, validate=validate.OneOf([p.value for p in PaymentMethod]))
     transaction_type = fields.Str(required=True, validate=validate.OneOf([t.value for t in TransactionType]))
     branch_id = fields.Int(required=True)
@@ -150,17 +151,20 @@ class ExpenseSchema(Schema):
     id = fields.Int(dump_only=True)
     title = fields.Str(required=True, validate=validate.Length(min=3, max=200))
     description = fields.Str(allow_none=True)
-    amount = fields.Decimal(required=True, as_string=True, validate=validate.Range(min=0))
+    amount = fields.Float(required=True, validate=validate.Range(min=0))
     category = fields.Str(allow_none=True)
     branch_id = fields.Int(required=True)
     branch_name = fields.Str(dump_only=True)
-    status = fields.Str(validate=validate.OneOf([s.value for s in ExpenseStatus]))
+    status = fields.Function(
+        lambda obj: obj.status.value if hasattr(obj.status, 'value') else str(obj.status),
+        deserialize=lambda v: v,
+    )
     created_by_id = fields.Int(dump_only=True)
     created_by_name = fields.Str(dump_only=True)
     reviewed_by_id = fields.Int(dump_only=True)
-    reviewed_by_name = fields.Str(dump_only=True)
+    reviewed_by_name = fields.Str(dump_only=True, allow_none=True)
     review_notes = fields.Str(allow_none=True)
-    reviewed_at = fields.DateTime(dump_only=True)
+    reviewed_at = fields.DateTime(dump_only=True, allow_none=True)
     expense_date = fields.Date(required=True)
     created_at = fields.DateTime(dump_only=True)
 

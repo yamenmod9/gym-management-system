@@ -206,25 +206,27 @@ def get_daily_sales():
     
     # Calculate totals by payment method
     cash_total = 0.0
-    card_total = 0.0
-    online_total = 0.0
+    network_total = 0.0
+    transfer_total = 0.0
     
     for t in transactions:
-        net_amount = t.amount - t.discount
+        net_amount = float(t.amount) - float(t.discount or 0)
         if t.payment_method.value == 'cash':
             cash_total += net_amount
-        elif t.payment_method.value == 'card':
-            card_total += net_amount
-        elif t.payment_method.value == 'online':
-            online_total += net_amount
+        elif t.payment_method.value == 'network':
+            network_total += net_amount
+        elif t.payment_method.value == 'transfer':
+            transfer_total += net_amount
     
-    total_sales = cash_total + card_total + online_total
+    total_sales = cash_total + network_total + transfer_total
     
     return success_response({
         'date': report_date.isoformat(),
         'total_sales': total_sales,
         'cash_sales': cash_total,
-        'card_sales': card_total,
-        'online_sales': online_total,
+        'network_sales': network_total,
+        'transfer_sales': transfer_total,
+        'card_sales': network_total,
+        'online_sales': transfer_total,
         'transaction_count': len(transactions)
     })

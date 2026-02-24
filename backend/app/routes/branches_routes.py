@@ -8,9 +8,10 @@ from app.schemas import BranchSchema
 from app.models.branch import Branch
 from app.utils import (
     success_response, error_response, role_required,
-    paginate, format_pagination_response
+    paginate, format_pagination_response, get_current_user
 )
 from app.models.user import UserRole
+from app.models.complaint import ComplaintStatus
 from app.extensions import db
 
 branches_bp = Blueprint('branches', __name__, url_prefix='/api/branches')
@@ -207,16 +208,16 @@ def get_branch_performance(branch_id):
         )
     ).all()
     
-    total_revenue = sum(t.amount - t.discount for t in transactions)
-    
+    total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+
     # Revenue by service
     from collections import defaultdict
     revenue_by_service = defaultdict(float)
     for t in transactions:
         if t.subscription and t.subscription.service:
             service_name = t.subscription.service.name
-            revenue_by_service[service_name] += (t.amount - t.discount)
-    
+            revenue_by_service[service_name] += float(t.amount) - float(t.discount or 0)
+
     # Average subscription value
     avg_subscription_value = total_revenue / len(transactions) if transactions else 0
     
@@ -232,8 +233,8 @@ def get_branch_performance(branch_id):
     
     # Complaints
     complaints_count = Complaint.query.filter_by(branch_id=branch_id).count()
-    open_complaints = Complaint.query.filter_by(branch_id=branch_id, status='open').count()
-    
+    open_complaints = Complaint.query.filter_by(branch_id=branch_id, status=ComplaintStatus.OPEN).count()
+
     # Staff performance
     from app.models import User
     staff = User.query.filter_by(branch_id=branch_id).all()
@@ -249,10 +250,11 @@ def get_branch_performance(branch_id):
         ).all()
         
         if staff_transactions:
-            staff_revenue = sum(t.amount - t.discount for t in staff_transactions)
+            staff_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in staff_transactions))
             staff_performance.append({
                 'staff_id': staff_member.id,
                 'staff_name': staff_member.username,
+                'full_name': staff_member.full_name,
                 'transactions_count': len(staff_transactions),
                 'total_revenue': staff_revenue
             })
