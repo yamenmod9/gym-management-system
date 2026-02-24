@@ -124,16 +124,34 @@ def activate_subscription():
             if user.branch_id and data['branch_id'] != user.branch_id:
                 return error_response("Cannot create subscription for another branch", 403)
         
-        # Prepare data for service
+        # Prepare data for service — forward ALL subscription-type fields
         subscription_data = {
             'customer_id': data['customer_id'],
             'service_id': data['service_id'],
             'branch_id': data['branch_id'],
             'payment_method': data.get('payment_method', 'cash'),
             'reference_number': data.get('reference_number'),
-            'start_date': data.get('start_date')
+            'start_date': data.get('start_date'),
+            # ── type overrides from client ────────────────────────────
+            'subscription_type': data.get('subscription_type'),       # 'coins', 'time_based', 'sessions', 'training'
+            # coins fields
+            'coins':             data.get('coins'),
+            'coin_amount':       data.get('coin_amount'),
+            'remaining_coins':   data.get('remaining_coins'),
+            # session / training fields
+            'session_count':     data.get('session_count') or data.get('sessions'),
+            # time_based: duration in months from the form
+            'duration_months':   data.get('duration_months'),
         }
-        
+
+        # If duration_months provided, override the service's default end_date
+        if subscription_data.get('duration_months'):
+            try:
+                months = int(subscription_data['duration_months'])
+                subscription_data['duration_days_override'] = months * 30
+            except (ValueError, TypeError):
+                pass
+
         subscription, error = SubscriptionService.create_subscription(subscription_data, user.id)
         
         if error:

@@ -64,7 +64,9 @@ class SubscriptionService:
             except ValueError:
                 start_date = date.today()
         
-        end_date = start_date + timedelta(days=service.duration_days)
+        # Allow caller to override the duration (e.g. duration_months → days from the form)
+        duration_days = data.get('duration_days_override') or service.duration_days
+        end_date = start_date + timedelta(days=int(duration_days))
 
         # ── Derive subscription type ──────────────────────────────────────
         # Allow caller to override via data['subscription_type'], otherwise derive

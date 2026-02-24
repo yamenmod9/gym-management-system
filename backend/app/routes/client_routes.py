@@ -32,7 +32,7 @@ def get_client_profile():
         Subscription.customer_id == customer.id,
         Subscription.status == SubscriptionStatus.ACTIVE,
         db.or_(
-            Subscription.subscription_type == 'coins',  # Coins never expire
+            Subscription.subscription_type.in_(['coins', 'sessions', 'training']),  # These don't expire by date
             Subscription.end_date >= date.today()  # Time-based must not be expired
         )
     ).first()
