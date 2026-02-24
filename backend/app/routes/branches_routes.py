@@ -1,0 +1,276 @@
+"""
+Branch management routes
+"""
+from flask import Blueprint, request
+from flask_jwt_extended import jwt_required
+from marshmallow import ValidationError
+from app.schemas import BranchSchema
+from app.models.branch import Branch
+from app.utils import (
+    success_response, error_response, role_required,
+    paginate, format_pagination_response
+)
+from app.models.user import UserRole
+from app.extensions import db
+
+branches_bp = Blueprint('branches', __name__, url_prefix='/api/branches')
+
+
+@branches_bp.route('', methods=['GET'])
+@jwt_required()
+def get_branches():
+    """Get all branches"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    is_active = request.args.get('is_active', type=bool)
+    
+    query = Branch.query
+    
+    if is_active is not None:
+        query = query.filter_by(is_active=is_active)
+    
+    query = query.order_by(Branch.name)
+    
+    items, total, pages, current_page = paginate(query, page, per_page)
+    
+    schema = BranchSchema()
+    return success_response(
+        format_pagination_response(items, total, pages, current_page, schema)
+    )
+
+
+@branches_bp.route('/<int:branch_id>', methods=['GET'])
+@jwt_required()
+def get_branch(branch_id):
+    """Get branch by ID"""
+    branch = db.session.get(Branch, branch_id)
+    
+    if not branch:
+        return error_response("Branch not found", 404)
+    
+    return success_response(branch.to_dict())
+
+
+@branches_bp.route('', methods=['POST'])
+@jwt_required()
+@role_required(UserRole.OWNER)
+def create_branch():
+    """Create new branch"""
+    try:
+        schema = BranchSchema()
+        data = schema.load(request.json)
+    except ValidationError as e:
+        return error_response("Validation error", 400, e.messages)
+    
+    # Check if code already exists
+    if Branch.query.filter_by(code=data['code']).first():
+        return error_response("Branch code already exists", 400)
+    
+    # Check if name already exists
+    if Branch.query.filter_by(name=data['name']).first():
+        return error_response("Branch name already exists", 400)
+    
+    branch = Branch(**data)
+    db.session.add(branch)
+    db.session.commit()
+    
+    return success_response(branch.to_dict(), "Branch created successfully", 201)
+
+
+@branches_bp.route('/<int:branch_id>', methods=['PUT'])
+@jwt_required()
+@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+def update_branch(branch_id):
+    """Update branch"""
+    branch = db.session.get(Branch, branch_id)
+    
+    if not branch:
+        return error_response("Branch not found", 404)
+    
+    try:
+        schema = BranchSchema(partial=True)
+        data = schema.load(request.json)
+    except ValidationError as e:
+        return error_response("Validation error", 400, e.messages)
+    
+    # Update fields
+    for field in ['name', 'address', 'phone', 'city', 'is_active']:
+        if field in data:
+            setattr(branch, field, data[field])
+    
+    db.session.commit()
+    
+    return success_response(branch.to_dict(), "Branch updated successfully")
+
+
+@branches_bp.route('/<int:branch_id>', methods=['DELETE'])
+@jwt_required()
+@role_required(UserRole.OWNER)
+def delete_branch(branch_id):
+    """Deactivate branch (soft delete)"""
+    branch = db.session.get(Branch, branch_id)
+    
+    if not branch:
+        return error_response("Branch not found", 404)
+    
+    branch.is_active = False
+    db.session.commit()
+    
+    return success_response(message="Branch deactivated successfully")
+
+
+@branches_bp.route('/<int:branch_id>/performance', methods=['GET'])
+@jwt_required()
+def get_branch_performance(branch_id):
+    """
+    Get branch performance metrics
+    
+    Query params:
+        - month: Month for analysis (YYYY-MM, default: current month)
+    """
+    from app.models import Customer, Subscription, Transaction, Complaint
+    from app.models.subscription import SubscriptionStatus
+    from datetime import datetime, timedelta
+    from sqlalchemy import and_, func
+    
+    branch = db.session.get(Branch, branch_id)
+    
+    if not branch:
+        return error_response("Branch not found", 404)
+    
+    # Check access
+    current_user = get_current_user()
+    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+        if current_user.branch_id and branch_id != current_user.branch_id:
+            return error_response("Access denied", 403)
+    
+    month_str = request.args.get('month')
+    
+    if month_str:
+        try:
+            month_date = datetime.strptime(month_str, '%Y-%m')
+        except ValueError:
+            return error_response('Invalid month format. Use YYYY-MM', 400)
+    else:
+        month_date = datetime.utcnow().replace(day=1)
+    
+    # Calculate month range
+    month_start = month_date.replace(day=1)
+    if month_date.month == 12:
+        month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
+    else:
+        month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
+    
+    # Total customers
+    total_customers = Customer.query.filter_by(
+        branch_id=branch_id,
+        is_active=True
+    ).count()
+    
+    # New customers this month
+    new_customers = Customer.query.filter(
+        and_(
+            Customer.branch_id == branch_id,
+            Customer.created_at >= datetime.combine(month_start.date(), datetime.min.time()),
+            Customer.created_at <= datetime.combine(month_end.date(), datetime.max.time())
+        )
+    ).count()
+    
+    # Active subscriptions
+    active_subscriptions = Subscription.query.filter_by(
+        branch_id=branch_id,
+        status=SubscriptionStatus.ACTIVE
+    ).count()
+    
+    # Expired subscriptions this month
+    expired_subscriptions = Subscription.query.filter(
+        and_(
+            Subscription.branch_id == branch_id,
+            Subscription.status == SubscriptionStatus.EXPIRED,
+            Subscription.end_date >= month_start.date(),
+            Subscription.end_date <= month_end.date()
+        )
+    ).count()
+    
+    # Frozen subscriptions
+    frozen_subscriptions = Subscription.query.filter_by(
+        branch_id=branch_id,
+        status=SubscriptionStatus.FROZEN
+    ).count()
+    
+    # Revenue
+    transactions = Transaction.query.filter(
+        and_(
+            Transaction.branch_id == branch_id,
+            Transaction.created_at >= datetime.combine(month_start.date(), datetime.min.time()),
+            Transaction.created_at <= datetime.combine(month_end.date(), datetime.max.time())
+        )
+    ).all()
+    
+    total_revenue = sum(t.amount - t.discount for t in transactions)
+    
+    # Revenue by service
+    from collections import defaultdict
+    revenue_by_service = defaultdict(float)
+    for t in transactions:
+        if t.subscription and t.subscription.service:
+            service_name = t.subscription.service.name
+            revenue_by_service[service_name] += (t.amount - t.discount)
+    
+    # Average subscription value
+    avg_subscription_value = total_revenue / len(transactions) if transactions else 0
+    
+    # Check-ins count (entry logs)
+    from app.models import EntryLog
+    check_ins_count = EntryLog.query.filter(
+        and_(
+            EntryLog.branch_id == branch_id,
+            EntryLog.entry_time >= datetime.combine(month_start.date(), datetime.min.time()),
+            EntryLog.entry_time <= datetime.combine(month_end.date(), datetime.max.time())
+        )
+    ).count()
+    
+    # Complaints
+    complaints_count = Complaint.query.filter_by(branch_id=branch_id).count()
+    open_complaints = Complaint.query.filter_by(branch_id=branch_id, status='open').count()
+    
+    # Staff performance
+    from app.models import User
+    staff = User.query.filter_by(branch_id=branch_id).all()
+    
+    staff_performance = []
+    for staff_member in staff:
+        staff_transactions = Transaction.query.filter(
+            and_(
+                Transaction.created_by == staff_member.id,
+                Transaction.created_at >= datetime.combine(month_start.date(), datetime.min.time()),
+                Transaction.created_at <= datetime.combine(month_end.date(), datetime.max.time())
+            )
+        ).all()
+        
+        if staff_transactions:
+            staff_revenue = sum(t.amount - t.discount for t in staff_transactions)
+            staff_performance.append({
+                'staff_id': staff_member.id,
+                'staff_name': staff_member.username,
+                'transactions_count': len(staff_transactions),
+                'total_revenue': staff_revenue
+            })
+    
+    return success_response({
+        'branch_id': branch_id,
+        'branch_name': branch.name,
+        'month': month_start.strftime('%Y-%m'),
+        'total_customers': total_customers,
+        'new_customers': new_customers,
+        'active_subscriptions': active_subscriptions,
+        'expired_subscriptions': expired_subscriptions,
+        'frozen_subscriptions': frozen_subscriptions,
+        'total_revenue': total_revenue,
+        'revenue_by_service': dict(revenue_by_service),
+        'average_subscription_value': avg_subscription_value,
+        'check_ins_count': check_ins_count,
+        'complaints_count': complaints_count,
+        'open_complaints': open_complaints,
+        'staff_performance': staff_performance
+    })

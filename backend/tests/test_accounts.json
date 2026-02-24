@@ -1,0 +1,38 @@
+{
+  "test_accounts": {
+    "owner": {
+      "username": "owner",
+      "password": "owner123",
+      "role": "owner",
+      "email": "owner@gym.com"
+    },
+    "manager": {
+      "username": "manager1",
+      "password": "manager123",
+      "role": "branch_manager",
+      "email": "manager1@gym.com",
+      "branch": "Downtown Branch"
+    },
+    "reception": {
+      "username": "reception1",
+      "password": "reception123",
+      "role": "front_desk",
+      "email": "reception1@gym.com",
+      "branch": "Downtown Branch"
+    },
+    "accountant": {
+      "username": "accountant1",
+      "password": "accountant123",
+      "role": "central_accountant",
+      "email": "accountant@gym.com"
+    }
+  },
+  "notes": [
+    "All passwords are for testing only",
+    "Use these accounts to test different role-based features",
+    "The owner account has full system access",
+    "Branch managers can only access their assigned branch",
+    "Receptionists handle day-to-day operations",
+    "Accountants handle financial reporting"
+  ]
+}
