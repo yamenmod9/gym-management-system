@@ -24,11 +24,8 @@ dashboards_bp = Blueprint('dashboards', __name__, url_prefix='/api/dashboards')
 def get_dashboard_overview():
     """Get overall gym system metrics (Owner only)"""
     from app.models import Branch, Customer, Subscription, Transaction
+    from app.models.expense import Expense, ExpenseStatus
     from sqlalchemy import func
-    
-    # Get date range from query params
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
     
     # Total metrics
     total_customers = Customer.query.count()
@@ -39,6 +36,13 @@ def get_dashboard_overview():
     revenue_query = db.session.query(func.sum(Transaction.amount)).scalar()
     total_revenue = float(revenue_query) if revenue_query else 0.0
     
+    # Total approved expenses
+    expenses_query = db.session.query(func.sum(Expense.amount)).filter(
+        Expense.status == ExpenseStatus.APPROVED
+    ).scalar()
+    total_expenses = float(expenses_query) if expenses_query else 0.0
+    net_profit = total_revenue - total_expenses
+
     # Revenue by branch
     revenue_by_branch = []
     branches = Branch.query.filter_by(is_active=True).all()
@@ -57,8 +61,10 @@ def get_dashboard_overview():
         revenue_by_branch.append({
             'branch_id': branch.id,
             'branch_name': branch.name,
+            'name': branch.name,
             'revenue': float(branch_revenue) if branch_revenue else 0.0,
             'customers': branch_customers,
+            'customer_count': branch_customers,
             'active_subscriptions': branch_active_subs
         })
     
@@ -67,6 +73,8 @@ def get_dashboard_overview():
         'total_customers': total_customers,
         'active_subscriptions': active_subscriptions,
         'total_branches': total_branches,
+        'total_expenses': total_expenses,
+        'net_profit': net_profit,
         'revenue_by_branch': revenue_by_branch
     })
 

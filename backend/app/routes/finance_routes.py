@@ -5,6 +5,7 @@ Maps /api/finance/* for Flutter app compatibility
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from app.models import Expense, DailyClosing, Transaction
+from app.models.expense import ExpenseStatus
 from app.utils import success_response, error_response, get_current_user, role_required, paginate, format_pagination_response
 from app.models.user import UserRole
 from app.extensions import db
@@ -49,8 +50,12 @@ def get_expenses():
     
     # Status filter
     if status:
-        query = query.filter(Expense.approval_status == status)
-    
+        try:
+            expense_status = ExpenseStatus(status)
+            query = query.filter(Expense.status == expense_status)
+        except ValueError:
+            pass
+
     # Date range filter
     if date_from:
         try:
@@ -73,9 +78,9 @@ def get_expenses():
     items, total, pages, current_page = paginate(query, page, per_page)
     
     # Calculate totals
-    pending_total = sum(e.amount for e in items if e.approval_status == 'pending')
-    approved_total = sum(e.amount for e in items if e.approval_status == 'approved')
-    
+    pending_total = sum(e.amount for e in items if e.status == ExpenseStatus.PENDING)
+    approved_total = sum(e.amount for e in items if e.status == ExpenseStatus.APPROVED)
+
     # Format response
     schema = ExpenseSchema()
     response_data = format_pagination_response(items, total, pages, current_page, schema)

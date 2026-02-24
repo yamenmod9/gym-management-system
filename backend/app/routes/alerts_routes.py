@@ -163,12 +163,12 @@ def get_smart_alerts():
     
     # Pending expenses
     from app.models import Expense
-    pending_expenses = Expense.query.filter_by(approval_status='pending').count()
-    urgent_expenses = Expense.query.filter_by(
-        approval_status='pending',
-        priority='urgent'
-    ).count()
-    
+    pending_expenses = Expense.query.filter_by(status='pending').count()
+    urgent_expenses = Expense.query.filter(
+        Expense.status == 'pending',
+        Expense.priority == 'urgent'
+    ).count() if hasattr(Expense, 'priority') else 0
+
     return success_response({
         'expiring_today': expiring_today,
         'expiring_week': expiring_week,
