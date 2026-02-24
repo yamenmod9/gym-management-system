@@ -6,6 +6,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from app.models import Subscription, Customer, Complaint
 from app.models.subscription import SubscriptionStatus
+from app.models.complaint import ComplaintStatus
 from app.utils import success_response, error_response, get_current_user, role_required
 from app.models.user import UserRole
 from datetime import datetime, timedelta
@@ -99,24 +100,30 @@ def get_alerts():
     
     # Open complaints alert
     if not alert_type or alert_type == 'complaints':
-        complaints_query = Complaint.query.filter_by(status='open')
-        
+        complaints_query = Complaint.query.filter_by(status=ComplaintStatus.OPEN)
+
         if branch_id:
             complaints_query = complaints_query.filter_by(branch_id=branch_id)
         
         open_complaints = complaints_query.all()
         
         for complaint in open_complaints:
+            # Calculate priority based on age
+            age_days = (datetime.utcnow() - complaint.created_at).days if complaint.created_at else 0
+            priority = 'high' if age_days > 7 else 'medium' if age_days > 3 else 'low'
+            category = complaint.complaint_type.value if complaint.complaint_type else 'general'
+            desc = complaint.description[:50] if complaint.description else complaint.title
+
             alerts.append({
                 'id': f'comp_{complaint.id}',
                 'alert_type': 'open_complaint',
-                'priority': complaint.priority,
+                'priority': priority,
                 'customer_id': complaint.customer_id,
-                'customer_name': complaint.customer.full_name if complaint.customer else 'N/A',
+                'customer_name': complaint.customer_name or (complaint.customer.full_name if complaint.customer else 'Anonymous'),
                 'branch_id': complaint.branch_id,
-                'message': f'{complaint.category}: {complaint.description[:50]}...',
+                'message': f'{category}: {desc}...',
                 'is_read': False,
-                'created_at': complaint.created_at.isoformat()
+                'created_at': complaint.created_at.isoformat() if complaint.created_at else datetime.utcnow().isoformat()
             })
     
     # Count unread (all are unread in this simple implementation)
@@ -159,15 +166,21 @@ def get_smart_alerts():
     ).count()
     
     # Open complaints
-    open_complaints = Complaint.query.filter_by(status='open').count()
-    
+    open_complaints = Complaint.query.filter_by(status=ComplaintStatus.OPEN).count()
+
     # Pending expenses
     from app.models import Expense
-    pending_expenses = Expense.query.filter_by(status='pending').count()
-    urgent_expenses = Expense.query.filter(
-        Expense.status == 'pending',
-        Expense.priority == 'urgent'
-    ).count() if hasattr(Expense, 'priority') else 0
+    from app.models.expense import ExpenseStatus
+    pending_expenses = Expense.query.filter_by(status=ExpenseStatus.PENDING).count()
+    urgent_expenses = 0
+    try:
+        if hasattr(Expense, 'priority'):
+            urgent_expenses = Expense.query.filter(
+                Expense.status == ExpenseStatus.PENDING,
+                Expense.priority == 'urgent'
+            ).count()
+    except Exception:
+        pass
 
     return success_response({
         'expiring_today': expiring_today,

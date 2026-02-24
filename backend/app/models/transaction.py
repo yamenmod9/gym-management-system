@@ -29,7 +29,8 @@ class Transaction(db.Model):
     
     # Amount
     amount = db.Column(db.Numeric(10, 2), nullable=False)
-    
+    discount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+
     # Payment
     payment_method = db.Column(db.Enum(PaymentMethod), nullable=False)
     transaction_type = db.Column(db.Enum(TransactionType), nullable=False)
@@ -64,6 +65,7 @@ class Transaction(db.Model):
         return {
             'id': self.id,
             'amount': float(self.amount),
+            'discount': float(self.discount) if self.discount else 0.0,
             'payment_method': self.payment_method.value,
             'transaction_type': self.transaction_type.value,
             'branch_id': self.branch_id,

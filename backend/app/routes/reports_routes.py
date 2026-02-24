@@ -62,30 +62,32 @@ def get_revenue_report():
     transactions = query.all()
     
     # Calculate total revenue
-    total_revenue = sum(t.amount - t.discount for t in transactions)
-    
+    total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+
     # Revenue by branch
     revenue_by_branch = defaultdict(float)
     for t in transactions:
         if t.branch:
-            revenue_by_branch[t.branch.name] += (t.amount - t.discount)
-    
+            revenue_by_branch[t.branch.name] += float(t.amount) - float(t.discount or 0)
+
     # Revenue by service
     revenue_by_service = defaultdict(float)
     for t in transactions:
         if t.subscription and t.subscription.service:
             service_name = t.subscription.service.name
-            revenue_by_service[service_name] += (t.amount - t.discount)
-    
-    # Revenue by payment method
+            revenue_by_service[service_name] += float(t.amount) - float(t.discount or 0)
+
+    # Revenue by payment method (keys match PaymentMethod enum values)
     revenue_by_payment_method = {
         'cash': 0.0,
-        'card': 0.0,
-        'online': 0.0
+        'network': 0.0,
+        'transfer': 0.0
     }
     for t in transactions:
-        revenue_by_payment_method[t.payment_method.value] += (t.amount - t.discount)
-    
+        key = t.payment_method.value
+        if key in revenue_by_payment_method:
+            revenue_by_payment_method[key] += float(t.amount) - float(t.discount or 0)
+
     # Format response
     revenue_by_branch_list = [
         {
@@ -155,18 +157,20 @@ def get_daily_report():
     
     # Calculate metrics
     total_transactions = len(transactions)
-    total_revenue = sum(t.amount - t.discount for t in transactions)
-    total_discount = sum(t.discount for t in transactions)
-    
-    # Payment method breakdown
+    total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+    total_discount = float(sum(float(t.discount or 0) for t in transactions))
+
+    # Payment method breakdown (keys match PaymentMethod enum values)
     payment_breakdown = {
         'cash': 0.0,
-        'card': 0.0,
-        'online': 0.0
+        'network': 0.0,
+        'transfer': 0.0
     }
     for t in transactions:
-        payment_breakdown[t.payment_method.value] += (t.amount - t.discount)
-    
+        key = t.payment_method.value
+        if key in payment_breakdown:
+            payment_breakdown[key] += float(t.amount) - float(t.discount or 0)
+
     # New subscriptions today
     sub_query = Subscription.query.filter(
         func.date(Subscription.start_date) == report_date
@@ -190,8 +194,8 @@ def get_daily_report():
             {
                 'id': t.id,
                 'customer_name': t.customer.full_name if t.customer else 'N/A',
-                'amount': t.amount,
-                'discount': t.discount,
+                'amount': float(t.amount),
+                'discount': float(t.discount or 0),
                 'payment_method': t.payment_method.value,
                 'time': t.created_at.strftime('%H:%M:%S')
             }
@@ -250,10 +254,10 @@ def get_weekly_report():
     daily_revenue = defaultdict(float)
     for t in transactions:
         day = t.created_at.date()
-        daily_revenue[day.isoformat()] += (t.amount - t.discount)
-    
-    total_revenue = sum(t.amount - t.discount for t in transactions)
-    
+        daily_revenue[day.isoformat()] += float(t.amount) - float(t.discount or 0)
+
+    total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+
     return success_response({
         'week_start': week_start.isoformat(),
         'week_end': week_end.isoformat(),
@@ -393,8 +397,8 @@ def get_branch_comparison():
             )
         ).all()
         
-        revenue = sum(t.amount - t.discount for t in transactions)
-        
+        revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+
         # Customers
         customers = Customer.query.filter_by(branch_id=branch.id, is_active=True).count()
         
@@ -407,8 +411,8 @@ def get_branch_comparison():
         # Complaints
         from app.models import Complaint
         complaints = Complaint.query.filter_by(branch_id=branch.id).count()
-        open_complaints = Complaint.query.filter_by(branch_id=branch.id, status='open').count()
-        
+        open_complaints = Complaint.query.filter_by(branch_id=branch.id, status=ComplaintStatus.OPEN).count()
+
         # Calculate performance score (simple metric)
         performance_score = min(100, int(
             (active_subs / max(customers, 1) * 50) +  # Subscription rate
@@ -495,11 +499,12 @@ def get_employee_performance():
         ).all()
         
         transactions_count = len(transactions)
-        total_revenue = sum(t.amount - t.discount for t in transactions)
-        
+        total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+
         performance_data.append({
             'staff_id': staff.id,
             'staff_name': staff.username,
+            'full_name': staff.full_name,
             'role': staff.role.value,
             'branch_name': staff.branch.name if staff.branch else 'N/A',
             'transactions_count': transactions_count,

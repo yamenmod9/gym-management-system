@@ -247,7 +247,9 @@ class OwnerDashboardProvider extends ChangeNotifier {
   Future<void> _loadEmployeePerformance() async {
     try {
       debugPrint('👥 Loading employee performance...');
+      final monthStr = '${_startDate.year}-${_startDate.month.toString().padLeft(2, '0')}';
       final params = <String, dynamic>{
+        'month': monthStr,
         'start_date': _startDate.toIso8601String().split('T')[0],
         'end_date': _endDate.toIso8601String().split('T')[0],
       };
@@ -260,11 +262,18 @@ class OwnerDashboardProvider extends ChangeNotifier {
       debugPrint('👥 Employee Performance status: ${response.statusCode}');
       if (response.statusCode == 200 && response.data != null) {
         if (response.data is List) {
-          _employeePerformance = response.data;
+          _employeePerformance = List<dynamic>.from(response.data);
         } else if (response.data['data'] != null) {
-          _employeePerformance = response.data['data'];
+          final d = response.data['data'];
+          if (d is List) {
+            _employeePerformance = d;
+          } else if (d is Map) {
+            _employeePerformance = List<dynamic>.from(d['items'] ?? d['employees'] ?? []);
+          } else {
+            _employeePerformance = [];
+          }
         } else if (response.data['employees'] != null) {
-          _employeePerformance = response.data['employees'];
+          _employeePerformance = List<dynamic>.from(response.data['employees']);
         }
         debugPrint('✅ Employees loaded: ${_employeePerformance.length}');
         return;
@@ -273,12 +282,22 @@ class OwnerDashboardProvider extends ChangeNotifier {
       // Fallback: /api/users
       final usersResp = await _apiService.get('/api/users', queryParameters: params);
       if (usersResp.statusCode == 200 && usersResp.data != null) {
-        var users = usersResp.data is List
-            ? usersResp.data
-            : (usersResp.data['data'] ?? usersResp.data['users'] ?? usersResp.data['items'] ?? []);
-        _employeePerformance = (users as List).where((u) {
+        List<dynamic> users;
+        if (usersResp.data is List) {
+          users = usersResp.data;
+        } else {
+          final d = usersResp.data['data'];
+          if (d is Map) {
+            users = List<dynamic>.from(d['items'] ?? []);
+          } else if (d is List) {
+            users = d;
+          } else {
+            users = usersResp.data['users'] ?? usersResp.data['items'] ?? [];
+          }
+        }
+        _employeePerformance = users.where((u) {
           final role = u['role']?.toString().toLowerCase() ?? '';
-          return ['manager', 'reception', 'accountant', 'receptionist', 'branch_manager', 'front_desk'].contains(role);
+          return ['manager', 'reception', 'accountant', 'receptionist', 'branch_manager', 'front_desk', 'central_accountant', 'branch_accountant'].contains(role);
         }).toList();
         debugPrint('✅ Staff loaded from /api/users: ${_employeePerformance.length}');
       }

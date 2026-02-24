@@ -51,6 +51,21 @@ class Expense(db.Model):
     def __repr__(self):
         return f'<Expense {self.title} - {self.amount}>'
 
+    @property
+    def branch_name(self):
+        """Branch name for schema serialization"""
+        return self.branch.name if self.branch else 'N/A'
+
+    @property
+    def created_by_name(self):
+        """Creator name for schema serialization"""
+        return self.created_by.full_name if self.created_by else 'N/A'
+
+    @property
+    def reviewed_by_name(self):
+        """Reviewer name for schema serialization"""
+        return self.reviewed_by.full_name if self.reviewed_by else None
+
     def approve(self, reviewer_id, notes=None):
         """Approve expense"""
         self.status = ExpenseStatus.APPROVED

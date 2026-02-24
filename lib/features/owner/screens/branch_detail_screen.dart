@@ -52,8 +52,11 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
       );
 
       if (response.statusCode == 200 && response.data != null) {
+        final raw = response.data is Map && response.data.containsKey('data')
+            ? response.data['data']
+            : response.data;
         setState(() {
-          _branchData = response.data;
+          _branchData = raw is Map<String, dynamic> ? raw : {};
           _isLoading = false;
         });
       } else {
@@ -211,7 +214,20 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
 
   Widget _buildRevenueTab() {
     final data = _branchData ?? {};
-    final revenueByService = data['revenue_by_service'] ?? [];
+    final rawRevenue = data['revenue_by_service'];
+
+    // Convert to list: backend may return a dict {serviceName: amount} or a list
+    List<Map<String, dynamic>> revenueByService = [];
+    if (rawRevenue is Map) {
+      rawRevenue.forEach((key, value) {
+        revenueByService.add({
+          'service_name': key,
+          'revenue': value,
+        });
+      });
+    } else if (rawRevenue is List) {
+      revenueByService = List<Map<String, dynamic>>.from(rawRevenue);
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -263,7 +279,7 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
 
   Widget _buildStaffTab() {
     final data = _branchData ?? {};
-    final staff = data['staff'] ?? [];
+    final staff = data['staff_performance'] ?? data['staff'] ?? [];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -284,9 +300,11 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
             )
           else
             ...staff.map<Widget>((member) {
-              final name = member['name'] ?? member['full_name'] ?? 'Unknown';
+              final name = member['staff_name'] ?? member['name'] ?? member['full_name'] ?? 'Unknown';
               final role = member['role'] ?? 'Staff';
               final isActive = member['is_active'] ?? true;
+              final revenue = (member['total_revenue'] ?? 0).toDouble();
+              final txCount = member['transactions_count'] ?? 0;
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -295,13 +313,21 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
                     child: Text(name[0].toUpperCase()),
                   ),
                   title: Text(name),
-                  subtitle: Text(role),
-                  trailing: Chip(
-                    label: Text(isActive ? 'Active' : 'Inactive'),
-                    backgroundColor: isActive
-                        ? Colors.green.withOpacity(0.2)
-                        : Colors.red.withOpacity(0.2),
-                  ),
+                  subtitle: Text('$role • $txCount transactions'),
+                  trailing: revenue > 0
+                      ? Text(
+                          NumberHelper.formatCurrency(revenue),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        )
+                      : Chip(
+                          label: Text(isActive ? 'Active' : 'Inactive'),
+                          backgroundColor: isActive
+                              ? Colors.green.withValues(alpha: 0.2)
+                              : Colors.red.withValues(alpha: 0.2),
+                        ),
                 ),
               );
             }),
@@ -328,13 +354,17 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _buildInfoRow('Today\'s Check-ins', (data['today_checkins'] ?? 0).toString()),
+                  _buildInfoRow('Check-ins This Month', (data['check_ins_count'] ?? 0).toString()),
                   const Divider(),
-                  _buildInfoRow('Active Members Now', (data['active_now'] ?? 0).toString()),
+                  _buildInfoRow('Active Subscriptions', (data['active_subscriptions'] ?? 0).toString()),
                   const Divider(),
-                  _buildInfoRow('Pending Complaints', (data['pending_complaints'] ?? 0).toString()),
+                  _buildInfoRow('Open Complaints', (data['open_complaints'] ?? 0).toString()),
                   const Divider(),
-                  _buildInfoRow('Expiring Soon', (data['expiring_soon'] ?? 0).toString()),
+                  _buildInfoRow('Expired This Month', (data['expired_subscriptions'] ?? 0).toString()),
+                  const Divider(),
+                  _buildInfoRow('Frozen Subscriptions', (data['frozen_subscriptions'] ?? 0).toString()),
+                  const Divider(),
+                  _buildInfoRow('New Customers', (data['new_customers'] ?? 0).toString()),
                 ],
               ),
             ),

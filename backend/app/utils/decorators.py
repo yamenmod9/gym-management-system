@@ -12,7 +12,12 @@ def role_required(*allowed_roles):
     """
     Decorator to check if user has required role
     Usage: @role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+           @role_required([UserRole.OWNER, UserRole.BRANCH_MANAGER])  # also supported
     """
+    # Flatten: if caller passed a single list/tuple, unpack it
+    if len(allowed_roles) == 1 and isinstance(allowed_roles[0], (list, tuple)):
+        allowed_roles = tuple(allowed_roles[0])
+
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):

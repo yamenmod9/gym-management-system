@@ -141,8 +141,8 @@ class AccountantProvider extends ChangeNotifier {
         _dailySales = {
           'total_sales': d['total_sales'] ?? 0.0,
           'cash_sales': d['cash_sales'] ?? 0.0,
-          'card_sales': d['card_sales'] ?? 0.0,
-          'online_sales': d['online_sales'] ?? 0.0,
+          'card_sales': d['network_sales'] ?? d['card_sales'] ?? 0.0,
+          'online_sales': d['transfer_sales'] ?? d['online_sales'] ?? 0.0,
           'transaction_count': d['transaction_count'] ?? 0,
           'monthly_revenue': 0.0,
           'monthly_expenses': 0.0,
