@@ -308,3 +308,50 @@ def stop_subscription_body():
         return error_response(error, 400)
     
     return success_response(subscription.to_dict(), "Subscription stopped successfully")
+
+
+@subscriptions_bp.route('/repair-types', methods=['POST'])
+@jwt_required()
+@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+def repair_subscription_types():
+    """
+    One-time repair endpoint: back-fills subscription_type, remaining_coins,
+    total_coins, remaining_sessions, total_sessions for all subscriptions
+    that have subscription_type = NULL (legacy records created before the fix).
+    Safe to call multiple times.
+    """
+    fixed = 0
+    skipped = 0
+
+    subs = Subscription.query.filter(Subscription.subscription_type == None).all()
+
+    for sub in subs:
+        if not sub.service:
+            skipped += 1
+            continue
+
+        sub_type = SubscriptionService._derive_subscription_type(sub.service)
+        sub.subscription_type = sub_type
+
+        if sub_type == 'coins' and sub.remaining_coins is None:
+            coin_amount = sub.service.class_limit or 50
+            sub.remaining_coins = coin_amount
+            sub.total_coins = coin_amount
+
+        elif sub_type in ('sessions', 'training') and sub.remaining_sessions is None:
+            session_count = sub.service.class_limit or 10
+            sub.remaining_sessions = session_count
+            sub.total_sessions = session_count
+
+        fixed += 1
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f"DB error during repair: {str(e)}", 500)
+
+    return success_response(
+        {'fixed': fixed, 'skipped': skipped},
+        f"Repaired {fixed} subscription(s), skipped {skipped}"
+    )

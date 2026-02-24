@@ -7,7 +7,7 @@ from datetime import datetime
 from app.models import Customer, Subscription, EntryLog, Branch
 from app.models.subscription import SubscriptionStatus
 from app.models.entry_log import EntryType
-from app.utils import success_response, error_response, role_required
+from app.utils import success_response, error_response, role_required, get_current_user
 from app.models.user import UserRole
 from app.extensions import db
 
@@ -23,28 +23,34 @@ def scan_qr_code():
     
     Request Body (Option 1 - QR Code):
     {
-        "qr_code": "GYM-000001",
-        "branch_id": 1
+        "qr_code": "GYM-000001"
     }
     
     Request Body (Option 2 - Customer ID):
     {
         "customer_id": 115,
-        "branch_id": 1,
         "qr_code": "customer_id:115",  # Optional
         "check_in_time": "2026-02-16T14:30:00Z",  # Optional
         "action": "check_in_only"  # Optional
     }
+    
+    Note: branch_id is automatically populated from the staff member's branch
     """
     data = request.get_json()
     
     if not data:
         return error_response("Request body is required", 400)
     
+    # ✅ FIX: Auto-populate branch_id from current user
+    current_user = get_current_user()
+    branch_id = current_user.branch_id
+    
+    if not branch_id:
+        return error_response("Staff member has no branch assigned", 400)
+    
     # Accept either qr_code or customer_id
     qr_code = data.get('qr_code')
     customer_id = data.get('customer_id')
-    branch_id = data.get('branch_id')
     
     # Extract customer_id from QR code if present
     if qr_code and not customer_id:
@@ -53,10 +59,6 @@ def scan_qr_code():
                 customer_id = int(qr_code.split('customer_id:')[1])
             except (ValueError, IndexError):
                 pass  # Will try to find by qr_code string
-    
-    # Require branch_id
-    if not branch_id:
-        return error_response("branch_id is required", 400)
     
     # Require either qr_code or customer_id
     if not qr_code and not customer_id:

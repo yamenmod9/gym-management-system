@@ -38,6 +38,29 @@ def get_client_profile():
     ).first()
     
     response_data = customer.to_dict(include_temp_password=False)
+
+    # ── Auto-repair NULL subscription_type on legacy records ─────────────
+    if active_subscription and not active_subscription.subscription_type:
+        from app.services.subscription_service import SubscriptionService
+        sub_type = SubscriptionService._derive_subscription_type(active_subscription.service)
+        active_subscription.subscription_type = sub_type
+
+        # Restore coin / session counters if still empty
+        if sub_type == 'coins' and active_subscription.remaining_coins is None:
+            coin_amount = active_subscription.service.class_limit or 50
+            active_subscription.remaining_coins = coin_amount
+            active_subscription.total_coins = coin_amount
+        elif sub_type in ('sessions', 'training') and active_subscription.remaining_sessions is None:
+            session_count = active_subscription.service.class_limit or 10
+            active_subscription.remaining_sessions = session_count
+            active_subscription.total_sessions = session_count
+
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    # ─────────────────────────────────────────────────────────────────────
+
     response_data['active_subscription'] = active_subscription.to_dict() if active_subscription else None
     response_data['password_changed'] = customer.password_changed
     response_data['qr_code_active'] = active_subscription is not None  # Add QR active status
@@ -311,7 +334,7 @@ def get_client_history():
     entries = []
     for entry in items:
         entry_dict = entry.to_dict()
-
+        
         # Ensure all required fields are present
         entry_data = {
             'id': entry_dict.get('id'),
@@ -326,7 +349,7 @@ def get_client_history():
             'entry_type': entry_dict.get('entry_type', 'scan')
         }
         entries.append(entry_data)
-
+    
     # Return array directly (Flutter expects data: [array])
     return success_response(entries)
 

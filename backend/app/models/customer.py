@@ -150,7 +150,7 @@ class Customer(db.Model):
         # Check if customer has active subscription
         from app.models.subscription import Subscription, SubscriptionStatus
         from datetime import date
-
+        
         # Active subscription = status is ACTIVE AND (coins type OR not expired)
         has_active_subscription = db.session.query(
             db.exists().where(

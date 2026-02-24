@@ -15,6 +15,33 @@ class SubscriptionService:
     """Subscription management service"""
     
     @staticmethod
+    def _derive_subscription_type(service):
+        """
+        Derive subscription_type from a Service object.
+        Handles both uppercase enum names ('GYM') and lowercase values ('gym').
+        """
+        from app.models.service import ServiceType
+
+        # service_type may be an enum instance or a raw string stored by SQLAlchemy
+        stype = service.service_type
+        if isinstance(stype, ServiceType):
+            stype_upper = stype.name.upper()   # e.g. 'GYM'
+        else:
+            stype_upper = str(stype).upper()   # handles 'GYM', 'gym', 'ServiceType.GYM'
+            # Strip 'SERVICETYPE.' prefix if present
+            if '.' in stype_upper:
+                stype_upper = stype_upper.split('.')[-1]
+
+        if stype_upper == 'GYM':
+            return 'coins'
+        if stype_upper == 'KARATE':
+            return 'training'
+        if stype_upper == 'SWIMMING_EDUCATION' or service.class_limit:
+            return 'sessions'
+        # SWIMMING_RECREATION, BUNDLE → time_based
+        return 'time_based'
+
+    @staticmethod
     def create_subscription(data, created_by_user_id):
         """Create a new subscription"""
         # Validate customer
@@ -38,19 +65,40 @@ class SubscriptionService:
                 start_date = date.today()
         
         end_date = start_date + timedelta(days=service.duration_days)
-        
-        # Initialize visit/class tracking based on service type
+
+        # ── Derive subscription type ──────────────────────────────────────
+        # Allow caller to override via data['subscription_type'], otherwise derive
+        sub_type = data.get('subscription_type') or SubscriptionService._derive_subscription_type(service)
+
+        # ── Set type-specific fields ──────────────────────────────────────
+        remaining_coins  = None
+        total_coins      = None
+        remaining_sessions = None
+        total_sessions   = None
         remaining_visits = None
         remaining_classes = None
-        
-        if service.class_limit:
-            # Class-based service (education programs)
-            remaining_classes = service.class_limit
-        else:
-            # Visit-based service (gym, swimming recreation, karate)
-            # Set default to 30 visits per subscription (can be customized)
-            remaining_visits = 30
-        
+
+        if sub_type == 'coins':
+            coin_amount = (
+                data.get('coin_amount')
+                or data.get('coins')
+                or data.get('remaining_coins')
+                or service.class_limit
+                or 50
+            )
+            remaining_coins = int(coin_amount)
+            total_coins     = int(coin_amount)
+
+        elif sub_type in ('sessions', 'training'):
+            session_count = data.get('session_count') or service.class_limit or 10
+            remaining_sessions = int(session_count)
+            total_sessions     = int(session_count)
+            remaining_classes  = remaining_sessions   # keep legacy field in sync
+
+        else:  # time_based
+            # Keep legacy visit tracking for gym door access
+            remaining_visits = None  # unlimited for time-based
+
         # Create subscription
         subscription = Subscription(
             customer_id=customer.id,
@@ -59,8 +107,13 @@ class SubscriptionService:
             start_date=start_date,
             end_date=end_date,
             status=SubscriptionStatus.ACTIVE,
+            subscription_type=sub_type,
+            remaining_coins=remaining_coins,
+            total_coins=total_coins,
+            remaining_sessions=remaining_sessions,
+            total_sessions=total_sessions,
             remaining_visits=remaining_visits,
-            remaining_classes=remaining_classes
+            remaining_classes=remaining_classes,
         )
         
         db.session.add(subscription)
@@ -103,37 +156,71 @@ class SubscriptionService:
             return None, "Subscription not found"
         
         service = subscription.service
-        
+
         # Calculate new dates
-        # If subscription is still active, extend from current end date
-        # Otherwise, start from today
         if subscription.status == SubscriptionStatus.ACTIVE and subscription.end_date >= date.today():
             start_date = subscription.end_date + timedelta(days=1)
         else:
             start_date = date.today()
         
         end_date = start_date + timedelta(days=service.duration_days)
-        
-        # Reinitialize visit/class tracking based on service type
-        if service.class_limit:
-            remaining_classes = service.class_limit
-            remaining_visits = None
-        else:
-            remaining_visits = 30  # Default visits for renewed subscription
-            remaining_classes = None
-        
+
+        # ── Derive / preserve subscription type ──────────────────────────
+        sub_type = (
+            data.get('subscription_type')
+            or subscription.subscription_type
+            or SubscriptionService._derive_subscription_type(service)
+        )
+
+        # ── Reset type-specific counters ─────────────────────────────────
+        remaining_coins    = None
+        total_coins        = None
+        remaining_sessions = None
+        total_sessions     = None
+        remaining_visits   = None
+        remaining_classes  = None
+
+        if sub_type == 'coins':
+            coin_amount = (
+                data.get('coin_amount')
+                or data.get('remaining_coins')
+                or subscription.total_coins
+                or service.class_limit
+                or 50
+            )
+            remaining_coins = int(coin_amount)
+            total_coins     = int(coin_amount)
+
+        elif sub_type in ('sessions', 'training'):
+            session_count = (
+                data.get('session_count')
+                or subscription.total_sessions
+                or service.class_limit
+                or 10
+            )
+            remaining_sessions = int(session_count)
+            total_sessions     = int(session_count)
+            remaining_classes  = remaining_sessions
+
+        # else time_based: no counters needed
+
         # Update subscription
-        subscription.start_date = start_date
-        subscription.end_date = end_date
-        subscription.status = SubscriptionStatus.ACTIVE
-        subscription.freeze_count = 0
-        subscription.total_frozen_days = 0
-        subscription.classes_attended = 0
-        subscription.remaining_visits = remaining_visits
+        subscription.start_date        = start_date
+        subscription.end_date          = end_date
+        subscription.status            = SubscriptionStatus.ACTIVE
+        subscription.subscription_type = sub_type
+        subscription.remaining_coins   = remaining_coins
+        subscription.total_coins       = total_coins
+        subscription.remaining_sessions = remaining_sessions
+        subscription.total_sessions    = total_sessions
+        subscription.remaining_visits  = remaining_visits
         subscription.remaining_classes = remaining_classes
-        subscription.stop_reason = None
-        subscription.stopped_at = None
-        
+        subscription.freeze_count      = 0
+        subscription.total_frozen_days = 0
+        subscription.classes_attended  = 0
+        subscription.stop_reason       = None
+        subscription.stopped_at        = None
+
         # Create renewal transaction
         transaction = Transaction(
             amount=service.price,

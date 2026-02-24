@@ -4,8 +4,11 @@ Customer management routes
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from marshmallow import ValidationError
+from sqlalchemy import or_
+from datetime import datetime
 from app.schemas import CustomerSchema
 from app.models.customer import Customer, Gender
+from app.models.subscription import Subscription
 from app.utils import (
     success_response, error_response, role_required,
     paginate, format_pagination_response, get_current_user
@@ -47,12 +50,37 @@ def get_customers():
     
     query = query.order_by(Customer.created_at.desc())
     
-    items, total, pages, current_page = paginate(query, page, per_page)
+    # Get paginated customers
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     
-    schema = CustomerSchema()
-    return success_response(
-        format_pagination_response(items, total, pages, current_page, schema)
-    )
+    # ✅ ADD: Include has_active_subscription for each customer
+    customers_data = []
+    for customer in pagination.items:
+        customer_dict = customer.to_dict(include_temp_password=True)
+        
+        # Check if customer has active subscription
+        has_active_sub = db.session.query(Subscription).filter(
+            Subscription.customer_id == customer.id,
+            Subscription.status == 'active',
+            or_(
+                Subscription.end_date >= datetime.utcnow().date(),
+                Subscription.subscription_type == 'coins'
+            )
+        ).first() is not None
+        
+        customer_dict['has_active_subscription'] = has_active_sub
+        customers_data.append(customer_dict)
+    
+    return success_response({
+        'items': customers_data,
+        'pagination': {
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'current_page': page,
+            'per_page': per_page
+        }
+    })
+
 
 
 @customers_bp.route('/<int:customer_id>', methods=['GET'])
@@ -150,27 +178,21 @@ def register_customer():
         if Customer.query.filter_by(phone=data['phone']).first():
             return error_response("Phone number already registered", 400)
         
-        # Get current user for branch assignment if needed
+        # Get current user for branch assignment
         user = get_current_user()
         
-        # Use provided branch_id or default to user's branch
-        branch_id = data.get('branch_id')
+        # ✅ FIX: Always use the staff member's branch_id
+        # Receptionists can only register for their own branch
+        # Owners/Central accountants can register for any branch (if provided)
+        if user.role in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+            # Owner/accountant can specify branch_id or use their own
+            branch_id = data.get('branch_id', user.branch_id)
+        else:
+            # Receptionist/Manager/Accountant - always use their branch
+            branch_id = user.branch_id
+        
         if not branch_id:
-            if user.branch_id:
-                branch_id = user.branch_id
-            else:
-                return error_response("branch_id is required", 400)
-        
-        # ✅ FIX: Ensure proper type comparison (convert both to int)
-        branch_id = int(branch_id) if branch_id else None
-        user_branch_id = int(user.branch_id) if user.branch_id else None
-        
-        # Validate branch access - only restrict non-owners/non-central-accountants
-        if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-            # Only block if trying to register for a DIFFERENT branch
-            if user_branch_id and branch_id and branch_id != user_branch_id:
-                return error_response("You can only register customers for your own branch", 403)
-            # ✅ If same branch or branch_id matches user's branch, allow it (no error)
+            return error_response("branch_id is required", 400)
         
         # Parse date_of_birth if provided (for age calculation)
         date_of_birth = None
