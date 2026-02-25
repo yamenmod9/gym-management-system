@@ -53,25 +53,35 @@ class StaffProvider extends ChangeNotifier {
           
           if (response.statusCode == 200 && response.data != null) {
             // Handle different response formats
+            List<dynamic> rawList = [];
             if (response.data is List) {
-              _staff = response.data;
+              rawList = response.data;
             } else if (response.data['data'] != null) {
-              _staff = response.data['data'];
+              final d = response.data['data'];
+              if (d is Map) {
+                rawList = List<dynamic>.from(d['items'] ?? []);
+              } else if (d is List) {
+                rawList = d;
+              }
             } else if (response.data['users'] != null) {
-              _staff = response.data['users'];
+              rawList = response.data['users'];
             } else if (response.data['employees'] != null) {
-              _staff = response.data['employees'];
+              rawList = response.data['employees'];
             } else if (response.data['staff'] != null) {
-              _staff = response.data['staff'];
+              rawList = response.data['staff'];
             } else if (response.data['items'] != null) {
-              _staff = response.data['items'];
+              rawList = response.data['items'];
             }
             
-            // Filter by role if we got data
-            if (_staff.isNotEmpty) {
-              _staff = _staff.where((user) {
+            // Filter by role if we got data - use actual backend role values
+            if (rawList.isNotEmpty) {
+              _staff = rawList.where((user) {
                 final role = user['role']?.toString().toLowerCase() ?? '';
-                return ['manager', 'reception', 'accountant', 'receptionist'].contains(role);
+                return [
+                  'owner', 'branch_manager', 'front_desk',
+                  'central_accountant', 'branch_accountant',
+                  'manager', 'reception', 'accountant', 'receptionist'
+                ].contains(role);
               }).toList();
               
               debugPrint('✅ Staff loaded: ${_staff.length}');

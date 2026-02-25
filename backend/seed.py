@@ -830,6 +830,7 @@ def create_transactions(subscriptions, branches, users):
             created_by=reception.id,
             description=f'New subscription: {subscription.service.name}',
             transaction_date=subscription.start_date,
+            created_at=datetime.combine(subscription.start_date, datetime.min.time()) + timedelta(hours=random.randint(8, 20), minutes=random.randint(0, 59)),
             reference_number=get_ref_number(payment_method)
         )
         transactions.append(transaction)
@@ -859,6 +860,7 @@ def create_transactions(subscriptions, branches, users):
                 created_by=reception.id,
                 description=f'Renewal #{renewal_num + 1}: {subscription.service.name}',
                 transaction_date=renewal_date,
+                created_at=datetime.combine(renewal_date, datetime.min.time()) + timedelta(hours=random.randint(8, 20), minutes=random.randint(0, 59)),
                 reference_number=get_ref_number(payment_method)
             )
             transactions.append(transaction)
@@ -890,6 +892,7 @@ def create_transactions(subscriptions, branches, users):
                     created_by=reception.id,
                     description=f'Freeze fee #{i+1}: {subscription.service.name}',
                     transaction_date=freeze_date,
+                    created_at=datetime.combine(freeze_date, datetime.min.time()) + timedelta(hours=random.randint(8, 20), minutes=random.randint(0, 59)),
                     reference_number=get_ref_number(payment_method)
                 )
                 transactions.append(transaction)
@@ -953,6 +956,7 @@ def create_transactions(subscriptions, branches, users):
                 created_by=reception.id,
                 description=desc,
                 transaction_date=trans_date,
+                created_at=datetime.combine(trans_date, datetime.min.time()) + timedelta(hours=random.randint(8, 20), minutes=random.randint(0, 59)),
                 reference_number=get_ref_number(payment_method)
             )
             transactions.append(transaction)

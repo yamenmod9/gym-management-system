@@ -233,8 +233,8 @@ def get_branch_performance(branch_id):
     
     # Complaints
     complaints_count = Complaint.query.filter_by(branch_id=branch_id).count()
-    open_complaints = Complaint.query.filter_by(branch_id=branch_id, status='open').count()
-    
+    open_complaints = Complaint.query.filter_by(branch_id=branch_id, status=ComplaintStatus.OPEN).count()
+
     # Staff performance
     from app.models import User
     staff = User.query.filter_by(branch_id=branch_id).all()

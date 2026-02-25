@@ -100,9 +100,9 @@ class StaffLeaderboardScreen extends StatelessWidget {
   }
 
   Widget _buildTopPerformerTile(BuildContext context, Map<String, dynamic> employee, int rank) {
-    final name = employee['name'] ?? employee['employee_name'] ?? 'Unknown';
-    final revenue = (employee['revenue'] ?? employee['total_revenue'] ?? 0).toDouble();
-    final customers = employee['customers'] ?? employee['customer_count'] ?? 0;
+    final name = employee['full_name'] ?? employee['staff_name'] ?? employee['name'] ?? employee['employee_name'] ?? employee['username'] ?? 'Unknown';
+    final revenue = (employee['total_revenue'] ?? employee['revenue'] ?? 0).toDouble();
+    final transactions = employee['transactions_count'] ?? employee['customers'] ?? employee['customer_count'] ?? 0;
 
     Color medalColor;
     IconData medalIcon;
@@ -166,7 +166,7 @@ class StaffLeaderboardScreen extends StatelessWidget {
                     const SizedBox(width: 16),
                     Icon(Icons.people, size: 14, color: Colors.blue),
                     const SizedBox(width: 4),
-                    Text('$customers customers'),
+                    Text('$transactions transactions'),
                   ],
                 ),
               ],
@@ -178,11 +178,11 @@ class StaffLeaderboardScreen extends StatelessWidget {
   }
 
   Widget _buildEmployeeCard(BuildContext context, Map<String, dynamic> employee, int rank) {
-    final name = employee['name'] ?? employee['employee_name'] ?? 'Unknown';
+    final name = employee['full_name'] ?? employee['staff_name'] ?? employee['name'] ?? employee['employee_name'] ?? employee['username'] ?? 'Unknown';
     final role = employee['role'] ?? employee['position'] ?? 'Staff';
     final branch = employee['branch_name'] ?? employee['branch'] ?? 'N/A';
-    final revenue = (employee['revenue'] ?? employee['total_revenue'] ?? 0).toDouble();
-    final customers = employee['customers'] ?? employee['customer_count'] ?? 0;
+    final revenue = (employee['total_revenue'] ?? employee['revenue'] ?? 0).toDouble();
+    final transactions = employee['transactions_count'] ?? employee['customers'] ?? employee['customer_count'] ?? 0;
     final retentionRate = (employee['retention_rate'] ?? 0).toDouble();
 
     return Card(
@@ -234,8 +234,8 @@ class StaffLeaderboardScreen extends StatelessWidget {
                       child: _buildMetricItem(
                         context,
                         icon: Icons.people,
-                        label: 'Customers',
-                        value: customers.toString(),
+                        label: 'Transactions',
+                        value: transactions.toString(),
                         color: Colors.blue,
                       ),
                     ),

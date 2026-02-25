@@ -411,6 +411,7 @@ def get_branch_comparison():
         
         # Complaints
         from app.models import Complaint
+        from app.models.complaint import ComplaintStatus
         complaints = Complaint.query.filter_by(branch_id=branch.id).count()
         open_complaints = Complaint.query.filter_by(branch_id=branch.id, status=ComplaintStatus.OPEN).count()
 

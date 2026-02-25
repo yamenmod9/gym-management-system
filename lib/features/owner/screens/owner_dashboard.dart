@@ -437,21 +437,31 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
             );
           }
           final employee = provider.employeePerformance[index - 1];
-          final name = employee['name'] ?? employee['employee_name'] ?? 'Unknown';
+          final name = employee['full_name'] ?? employee['staff_name'] ?? employee['name'] ?? employee['employee_name'] ?? employee['username'] ?? 'Unknown';
           final role = employee['role'] ?? 'Employee';
-          final performance = employee['performance_score'] ?? 0;
+          final revenue = (employee['total_revenue'] ?? employee['revenue'] ?? 0).toDouble();
+          final transactions = employee['transactions_count'] ?? 0;
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: ListTile(
-              leading: CircleAvatar(child: Text(name[0].toUpperCase())),
+              leading: CircleAvatar(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?')),
               title: Text(name),
-              subtitle: Text(role),
-              trailing: Chip(
-                label: Text('$performance'),
-                backgroundColor: Colors.purple.withOpacity(0.1),
-                labelStyle: const TextStyle(color: Colors.purple, fontWeight: FontWeight.bold),
+              subtitle: Text('$role • ${employee['branch_name'] ?? ''}'),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    NumberHelper.formatCurrency(revenue),
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 13),
+                  ),
+                  Text(
+                    '$transactions txns',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  ),
+                ],
               ),
             ),
           );

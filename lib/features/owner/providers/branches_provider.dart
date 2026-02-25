@@ -30,7 +30,14 @@ class BranchesProvider extends ChangeNotifier {
         if (response.data is List) {
           _branches = response.data;
         } else if (response.data['data'] != null) {
-          _branches = response.data['data'];
+          final d = response.data['data'];
+          if (d is Map) {
+            _branches = List<dynamic>.from(d['items'] ?? []);
+          } else if (d is List) {
+            _branches = d;
+          } else {
+            _branches = [];
+          }
         } else if (response.data['branches'] != null) {
           _branches = response.data['branches'];
         } else if (response.data['items'] != null) {
