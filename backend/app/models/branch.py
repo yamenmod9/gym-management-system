@@ -35,6 +35,16 @@ class Branch(db.Model):
     def __repr__(self):
         return f'<Branch {self.name} ({self.code})>'
 
+    @property
+    def staff_count(self):
+        """Count of staff members at this branch"""
+        return self.staff.count()
+
+    @property
+    def customers_count(self):
+        """Count of customers at this branch"""
+        return self.customers.count()
+
     def to_dict(self):
         """Convert to dictionary"""
         return {

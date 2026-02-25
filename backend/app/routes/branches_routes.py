@@ -249,15 +249,17 @@ def get_branch_performance(branch_id):
             )
         ).all()
         
-        if staff_transactions:
-            staff_revenue = sum(t.amount - t.discount for t in staff_transactions)
-            staff_performance.append({
-                'staff_id': staff_member.id,
-                'staff_name': staff_member.username,
-                'transactions_count': len(staff_transactions),
-                'total_revenue': staff_revenue
-            })
-    
+        staff_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in staff_transactions)) if staff_transactions else 0.0
+        staff_performance.append({
+            'staff_id': staff_member.id,
+            'staff_name': staff_member.username,
+            'full_name': staff_member.full_name,
+            'role': staff_member.role.value,
+            'is_active': staff_member.is_active,
+            'transactions_count': len(staff_transactions),
+            'total_revenue': staff_revenue
+        })
+
     return success_response({
         'branch_id': branch_id,
         'branch_name': branch.name,

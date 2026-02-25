@@ -7,6 +7,7 @@ from flask_jwt_extended import jwt_required
 from app.models import Transaction, Subscription, Customer, Branch, User
 from app.models.transaction import PaymentMethod
 from app.models.subscription import SubscriptionStatus
+from app.models.complaint import ComplaintStatus
 from app.utils import success_response, error_response, get_current_user, role_required
 from app.models.user import UserRole
 from app.extensions import db
@@ -92,7 +93,7 @@ def get_revenue_report():
     revenue_by_branch_list = [
         {
             'branch_name': name,
-            'revenue': revenue
+            'revenue': float(revenue)
         }
         for name, revenue in revenue_by_branch.items()
     ]
@@ -100,7 +101,7 @@ def get_revenue_report():
     revenue_by_service_list = [
         {
             'service_name': name,
-            'revenue': revenue
+            'revenue': float(revenue)
         }
         for name, revenue in revenue_by_service.items()
     ]
@@ -265,7 +266,7 @@ def get_weekly_report():
         'total_transactions': len(transactions),
         'average_daily_revenue': total_revenue / 7,
         'daily_breakdown': [
-            {'date': date, 'revenue': revenue}
+            {'date': date, 'revenue': float(revenue)}
             for date, revenue in sorted(daily_revenue.items())
         ]
     })
@@ -320,7 +321,7 @@ def get_monthly_report():
     transactions = query.all()
     
     # Calculate metrics
-    total_revenue = sum(t.amount - t.discount for t in transactions)
+    total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
     total_transactions = len(transactions)
     
     # New subscriptions this month
@@ -420,11 +421,19 @@ def get_branch_comparison():
             (max(0, 20 - open_complaints * 2))  # Penalty for complaints
         ))
         
+        # Staff count
+        staff_count = User.query.filter_by(branch_id=branch.id, is_active=True).count()
+
         branch_data.append({
+            'id': branch.id,
             'branch_id': branch.id,
+            'name': branch.name,
             'branch_name': branch.name,
+            'city': branch.city,
+            'is_active': branch.is_active,
             'customers': customers,
             'active_subscriptions': active_subs,
+            'staff_count': staff_count,
             'revenue': revenue,
             'complaints': complaints,
             'open_complaints': open_complaints,
@@ -478,7 +487,9 @@ def get_employee_performance():
     # Get staff for branch
     staff_query = User.query.filter(User.role.in_([
         UserRole.BRANCH_MANAGER,
-        UserRole.FRONT_DESK
+        UserRole.FRONT_DESK,
+        UserRole.CENTRAL_ACCOUNTANT,
+        UserRole.BRANCH_ACCOUNTANT
     ]))
     
     if branch_id:
