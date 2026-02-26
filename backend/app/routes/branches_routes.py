@@ -34,10 +34,28 @@ def get_branches():
     
     items, total, pages, current_page = paginate(query, page, per_page)
     
-    schema = BranchSchema()
-    return success_response(
-        format_pagination_response(items, total, pages, current_page, schema)
-    )
+    # Enhanced: Add more details for each branch
+    branch_list = []
+    from app.models.user import UserRole, User
+    from app.models.subscription import SubscriptionStatus
+    for branch in items:
+        # Find branch manager
+        manager = User.query.filter_by(branch_id=branch.id, role=UserRole.BRANCH_MANAGER).first()
+        manager_name = manager.full_name if manager else None
+        # Capacity: count of active subscriptions
+        active_subs = branch.subscriptions.filter_by(status=SubscriptionStatus.ACTIVE).count()
+        branch_dict = branch.to_dict()
+        branch_dict.update({
+            'manager': manager_name,
+            'active_subscriptions': active_subs
+        })
+        branch_list.append(branch_dict)
+    return success_response({
+        'items': branch_list,
+        'total': total,
+        'pages': pages,
+        'current_page': current_page
+    })
 
 
 @branches_bp.route('/<int:branch_id>', methods=['GET'])

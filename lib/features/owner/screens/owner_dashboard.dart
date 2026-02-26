@@ -366,6 +366,19 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
 
   // Other specific tab build methods...
   Widget _buildBranchesTab(BuildContext context, OwnerDashboardProvider provider) {
+    if (provider.branchComparison.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.store_outlined, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('No branches found', style: TextStyle(fontSize: 16, color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: () => provider.refresh(),
       child: ListView.builder(
@@ -376,12 +389,22 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           final id = branch['id'] ?? branch['branch_id'] ?? 0;
           final name = branch['name'] ?? branch['branch_name'] ?? 'Unknown';
           final revenue = (branch['revenue'] ?? 0).toDouble();
-          final customers = branch['customers'] ?? branch['customer_count'] ?? 0;
+          final customers = branch['customers'] ?? branch['customers_count'] ?? branch['customer_count'] ?? 0;
+          final activeSubs = branch['active_subscriptions'] ?? branch['capacity'] ?? 0;
+          final staffCount = branch['staff_count'] ?? 0;
+          final score = branch['performance_score'];
+          final city = branch['city'] ?? '';
+          final isActive = branch['is_active'] ?? true;
+          final address = branch['address'] ?? '';
+          final phone = branch['phone'] ?? '';
+          final manager = branch['manager'] ?? '';
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: ListTile(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            elevation: 2,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
               onTap: () {
                 Navigator.push(
                   context,
@@ -393,20 +416,101 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                   ),
                 );
               },
-              leading: CircleAvatar(
-                backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                child: Icon(Icons.store, color: Theme.of(context).primaryColor),
-              ),
-              title: Text(name),
-              subtitle: Text('$customers Customers'),
-              trailing: Text(
-                NumberHelper.formatCurrency(revenue),
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                          child: Icon(Icons.store, color: Theme.of(context).primaryColor, size: 26),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                              if (city.isNotEmpty || address.isNotEmpty)
+                                Text(
+                                  address.isNotEmpty ? address : city,
+                                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              if (manager.isNotEmpty)
+                                Row(
+                                  children: [
+                                    Icon(Icons.person, size: 13, color: Colors.grey[500]),
+                                    const SizedBox(width: 4),
+                                    Text(manager, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (score != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: score >= 70 ? Colors.green.withOpacity(0.1) : score >= 40 ? Colors.orange.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '$score%',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: score >= 70 ? Colors.green : score >= 40 ? Colors.orange : Colors.red,
+                              ),
+                            ),
+                          ),
+                        if (!isActive)
+                          const Chip(label: Text('Inactive'), backgroundColor: Colors.grey),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildBranchStat(Icons.people, '$customers', 'Customers'),
+                        _buildBranchStat(Icons.card_membership, '$activeSubs', 'Active Subs'),
+                        _buildBranchStat(Icons.badge, '$staffCount', 'Staff'),
+                        if (revenue > 0) _buildBranchStat(Icons.attach_money, NumberHelper.formatCurrency(revenue), 'Revenue'),
+                      ],
+                    ),
+                    if (phone.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.phone, size: 14, color: Colors.grey[500]),
+                          const SizedBox(width: 6),
+                          Text(phone, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           );
         },
       ),
+    );
+  }
+
+  Widget _buildBranchStat(IconData icon, String value, String label) {
+    return Column(
+      children: [
+        Icon(icon, size: 20, color: Colors.grey[600]),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+      ],
     );
   }
 
@@ -438,28 +542,87 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           }
           final employee = provider.employeePerformance[index - 1];
           final name = employee['full_name'] ?? employee['staff_name'] ?? employee['name'] ?? employee['employee_name'] ?? employee['username'] ?? 'Unknown';
-          final role = employee['role'] ?? 'Employee';
+          final role = (employee['role'] ?? 'Employee').toString().replaceAll('_', ' ');
           final revenue = (employee['total_revenue'] ?? employee['revenue'] ?? 0).toDouble();
           final transactions = employee['transactions_count'] ?? 0;
+          final branchName = employee['branch_name'] ?? '';
+
+          Color roleColor;
+          switch (role.toLowerCase()) {
+            case 'branch manager':
+              roleColor = Colors.purple;
+              break;
+            case 'front desk':
+              roleColor = Colors.blue;
+              break;
+            case 'central accountant':
+              roleColor = Colors.teal;
+              break;
+            default:
+              roleColor = Colors.grey;
+          }
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: ListTile(
-              leading: CircleAvatar(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?')),
-              title: Text(name),
-              subtitle: Text('$role • ${employee['branch_name'] ?? ''}'),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
                 children: [
-                  Text(
-                    NumberHelper.formatCurrency(revenue),
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 13),
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: roleColor.withOpacity(0.1),
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: roleColor, fontSize: 18),
+                    ),
                   ),
-                  Text(
-                    '$transactions txns',
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: roleColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(role, style: TextStyle(fontSize: 11, color: roleColor, fontWeight: FontWeight.w500)),
+                            ),
+                            if (branchName.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  branchName,
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        NumberHelper.formatCurrency(revenue),
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 14),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$transactions transactions',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -518,6 +681,21 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   }
 
   Widget _buildComplaintsTab(BuildContext context, OwnerDashboardProvider provider) {
+    if (provider.complaints.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
+            SizedBox(height: 16),
+            Text('No complaints', style: TextStyle(fontSize: 16, color: Colors.grey)),
+            SizedBox(height: 8),
+            Text('All clear!', style: TextStyle(fontSize: 13, color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: () => provider.refresh(),
       child: ListView.builder(
@@ -525,22 +703,69 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         itemCount: provider.complaints.length,
         itemBuilder: (context, index) {
           final c = provider.complaints[index];
-          final status = c['status'] ?? 'pending';
-          final isResolved = status == 'resolved';
+          final status = c['status'] ?? 'open';
+          final isResolved = status == 'closed' || status == 'resolved';
+          final isInProgress = status == 'in_progress';
+          final statusColor = isResolved ? Colors.green : isInProgress ? Colors.blue : Colors.orange;
+          final statusIcon = isResolved ? Icons.check_circle : isInProgress ? Icons.hourglass_top : Icons.error_outline;
+          final description = c['description'] ?? '';
+
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: ListTile(
-              leading: Icon(
-                isResolved ? Icons.check_circle : Icons.error_outline,
-                color: isResolved ? Colors.green : Colors.orange,
-              ),
-              title: Text(c['title'] ?? 'Complaint'),
-              subtitle: Text(c['branch_name'] ?? 'Unknown Branch'),
-              trailing: Chip(
-                label: Text(status),
-                backgroundColor: isResolved ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
-                labelStyle: TextStyle(color: isResolved ? Colors.green : Colors.orange),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(statusIcon, color: statusColor, size: 22),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          c['title'] ?? 'Complaint',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          status.replaceAll('_', ' '),
+                          style: TextStyle(color: statusColor, fontWeight: FontWeight.w600, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, size: 14, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Text(c['branch_name'] ?? 'Unknown Branch', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                      if (c['customer_name'] != null) ...[
+                        const SizedBox(width: 12),
+                        Icon(Icons.person, size: 14, color: Colors.grey[500]),
+                        const SizedBox(width: 4),
+                        Text(c['customer_name'], style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                      ],
+                    ],
+                  ),
+                ],
               ),
             ),
           );

@@ -11,6 +11,7 @@ class BranchManagerProvider extends ChangeNotifier {
 
   Map<String, dynamic>? _branchPerformance;
   List<dynamic> _attendance = [];
+  List<dynamic> _staff = [];
   List<dynamic> _complaints = [];
   Map<String, dynamic>? _revenueByService;
   Map<String, dynamic>? _dailyOperations;
@@ -30,6 +31,7 @@ class BranchManagerProvider extends ChangeNotifier {
   String? get error => _error;
   Map<String, dynamic>? get branchPerformance => _branchPerformance;
   List<dynamic> get attendance => _attendance;
+  List<dynamic> get staff => _staff;
   List<dynamic> get complaints => _complaints;
   Map<String, dynamic>? get revenueByService => _revenueByService;
   Map<String, dynamic>? get dailyOperations => _dailyOperations;
@@ -43,6 +45,7 @@ class BranchManagerProvider extends ChangeNotifier {
       await Future.wait([
         _loadBranchManagerDashboard(),
         _loadComplaints(),
+        _loadStaff(),
       ]);
       _error = null;
     } catch (e) {
@@ -188,6 +191,57 @@ class BranchManagerProvider extends ChangeNotifier {
         _branchPerformance!['active_members'] = activeSubs.length;
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadStaff() async {
+    try {
+      debugPrint('👥 Loading staff for branch $branchId...');
+      // Try /api/users/employees first (auto-filters by branch for managers)
+      final endpoints = [
+        '/api/users/employees',
+        '/api/users/staff',
+        '/api/users',
+      ];
+
+      for (final endpoint in endpoints) {
+        try {
+          final response = await _apiService.get(endpoint);
+          if (response.statusCode == 200 && response.data != null) {
+            List<dynamic> rawList = [];
+            if (response.data is List) {
+              rawList = response.data;
+            } else if (response.data['data'] != null) {
+              final d = response.data['data'];
+              if (d is Map) {
+                rawList = List<dynamic>.from(d['items'] ?? []);
+              } else if (d is List) {
+                rawList = d;
+              }
+            } else if (response.data['users'] != null) {
+              rawList = response.data['users'];
+            } else if (response.data['employees'] != null) {
+              rawList = response.data['employees'];
+            } else if (response.data['staff'] != null) {
+              rawList = response.data['staff'];
+            } else if (response.data['items'] != null) {
+              rawList = response.data['items'];
+            }
+
+            if (rawList.isNotEmpty) {
+              _staff = rawList;
+              debugPrint('✅ Staff loaded: ${_staff.length} from $endpoint');
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ Staff endpoint $endpoint failed: $e');
+          continue;
+        }
+      }
+      debugPrint('⚠️ No staff found from any endpoint');
+    } catch (e) {
+      debugPrint('❌ Error loading staff: $e');
+    }
   }
 
   Future<void> _loadComplaints() async {

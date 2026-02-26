@@ -273,34 +273,126 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
   }
 
   Widget _buildStaffTab(BranchManagerProvider provider) {
-    final attendance = provider.attendance;
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-      itemCount: attendance.isEmpty ? 1 : attendance.length,
-      itemBuilder: (context, index) {
-        if (attendance.isEmpty) {
-          return const Center(child: Text('No attendance records'));
-        }
-        final record = attendance[index];
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.only(bottom: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.blue.withOpacity(0.1),
-              child: const Icon(Icons.person, color: Colors.blue),
+    final staffList = provider.staff;
+    if (staffList.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.people_outlined, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('No staff members found', style: TextStyle(fontSize: 16, color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => provider.loadDashboardData(),
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        itemCount: staffList.length,
+        itemBuilder: (context, index) {
+          final member = staffList[index];
+          final name = member['full_name'] ?? member['username'] ?? 'Unknown';
+          final role = (member['role'] ?? 'employee').toString().replaceAll('_', ' ');
+          final email = member['email'] ?? '';
+          final phone = member['phone'] ?? '';
+          final isActive = member['is_active'] ?? true;
+
+          Color roleColor;
+          switch (role.toLowerCase()) {
+            case 'branch manager':
+              roleColor = Colors.purple;
+              break;
+            case 'front desk':
+              roleColor = Colors.blue;
+              break;
+            case 'central accountant':
+            case 'branch accountant':
+              roleColor = Colors.teal;
+              break;
+            default:
+              roleColor = Colors.grey;
+          }
+
+          return Card(
+            elevation: 2,
+            margin: const EdgeInsets.only(bottom: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: roleColor.withOpacity(0.1),
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: roleColor, fontSize: 18),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: roleColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(role, style: TextStyle(fontSize: 11, color: roleColor, fontWeight: FontWeight.w500)),
+                            ),
+                            if (!isActive) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text('Inactive', style: TextStyle(fontSize: 11, color: Colors.red)),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (email.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.email, size: 13, color: Colors.grey[500]),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(email, style: TextStyle(fontSize: 12, color: Colors.grey[600]), overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (phone.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(Icons.phone, size: 13, color: Colors.grey[500]),
+                              const SizedBox(width: 4),
+                              Text(phone, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            title: Text(record['employee_name'] ?? 'Unknown Staff'),
-            subtitle: Text(record['time'] ?? 'Unknown Time'),
-            trailing: Chip(
-              label: Text(record['status'] ?? 'Present'),
-              backgroundColor: Colors.green.withOpacity(0.1),
-              labelStyle: const TextStyle(color: Colors.green),
-            ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -317,7 +409,7 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
       itemCount: complaints.length,
       itemBuilder: (context, index) {
         final c = complaints[index];
-        final isPending = c['status'] == 'pending';
+        final isPending = c['status'] == 'pending' || c['status'] == 'open' || c['status'] == 'in_progress';
         return Card(
           elevation: 2,
           margin: const EdgeInsets.only(bottom: 8),
@@ -331,7 +423,7 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
                 size: 20,
               ),
             ),
-            title: Text(c['subject'] ?? 'Complaint'),
+            title: Text(c['title'] ?? c['subject'] ?? 'Complaint'),
             subtitle: Text(
               c['description'] ?? 'No description',
               maxLines: 2,
