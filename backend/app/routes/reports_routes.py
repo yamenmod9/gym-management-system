@@ -365,24 +365,34 @@ def get_branch_comparison():
     Compare performance across all branches
     
     Query params:
-        - month: Month for comparison (YYYY-MM, default: current month)
+        - start_date: Start date (YYYY-MM-DD)
+        - end_date: End date (YYYY-MM-DD)
+        - month: Month for comparison (YYYY-MM, fallback if no start/end)
     """
+    start_str = request.args.get('start_date')
+    end_str = request.args.get('end_date')
     month_str = request.args.get('month')
     
-    if month_str:
+    if start_str and end_str:
+        try:
+            month_start = datetime.strptime(start_str, '%Y-%m-%d')
+            month_end = datetime.strptime(end_str, '%Y-%m-%d')
+        except ValueError:
+            return error_response('Invalid date format. Use YYYY-MM-DD', 400)
+    elif month_str:
         try:
             month_date = datetime.strptime(month_str, '%Y-%m')
         except ValueError:
             return error_response('Invalid month format. Use YYYY-MM', 400)
+        month_start = month_date.replace(day=1)
+        if month_date.month == 12:
+            month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
     else:
-        month_date = datetime.utcnow().replace(day=1)
-    
-    # Calculate month range
-    month_start = month_date.replace(day=1)
-    if month_date.month == 12:
-        month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
-    else:
-        month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
+        # Default: last 90 days (captures more data than just current month)
+        month_end = datetime.utcnow()
+        month_start = month_end - timedelta(days=90)
     
     branches = Branch.query.filter_by(is_active=True).all()
     
@@ -456,9 +466,13 @@ def get_employee_performance():
     
     Query params:
         - branch_id: Filter by branch (required for branch manager)
-        - month: Month (YYYY-MM, default: current month)
+        - start_date: Start date (YYYY-MM-DD)
+        - end_date: End date (YYYY-MM-DD)
+        - month: Month (YYYY-MM, fallback if no start/end)
     """
     branch_id = request.args.get('branch_id', type=int)
+    start_str = request.args.get('start_date')
+    end_str = request.args.get('end_date')
     month_str = request.args.get('month')
     
     current_user = get_current_user()
@@ -470,20 +484,26 @@ def get_employee_performance():
     if not branch_id and current_user.role != UserRole.OWNER:
         return error_response('branch_id is required', 400)
     
-    if month_str:
+    if start_str and end_str:
+        try:
+            month_start = datetime.strptime(start_str, '%Y-%m-%d')
+            month_end = datetime.strptime(end_str, '%Y-%m-%d')
+        except ValueError:
+            return error_response('Invalid date format. Use YYYY-MM-DD', 400)
+    elif month_str:
         try:
             month_date = datetime.strptime(month_str, '%Y-%m')
         except ValueError:
             return error_response('Invalid month format. Use YYYY-MM', 400)
+        month_start = month_date.replace(day=1)
+        if month_date.month == 12:
+            month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
     else:
-        month_date = datetime.utcnow().replace(day=1)
-    
-    # Calculate month range
-    month_start = month_date.replace(day=1)
-    if month_date.month == 12:
-        month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
-    else:
-        month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
+        # Default: last 90 days
+        month_end = datetime.utcnow()
+        month_start = month_end - timedelta(days=90)
     
     # Get staff for branch
     staff_query = User.query.filter(User.role.in_([

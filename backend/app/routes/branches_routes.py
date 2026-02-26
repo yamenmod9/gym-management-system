@@ -38,16 +38,35 @@ def get_branches():
     branch_list = []
     from app.models.user import UserRole, User
     from app.models.subscription import SubscriptionStatus
+    from app.models.transaction import Transaction
+    from sqlalchemy import func, and_
+    from datetime import datetime, timedelta
+    
+    # Revenue period: last 90 days
+    revenue_start = datetime.utcnow() - timedelta(days=90)
+    
     for branch in items:
         # Find branch manager
         manager = User.query.filter_by(branch_id=branch.id, role=UserRole.BRANCH_MANAGER).first()
         manager_name = manager.full_name if manager else None
-        # Capacity: count of active subscriptions
+        # Count of active subscriptions
         active_subs = branch.subscriptions.filter_by(status=SubscriptionStatus.ACTIVE).count()
+        # Revenue from transactions in last 90 days
+        revenue_result = db.session.query(
+            func.coalesce(func.sum(Transaction.amount - func.coalesce(Transaction.discount, 0)), 0)
+        ).filter(
+            and_(
+                Transaction.branch_id == branch.id,
+                Transaction.created_at >= revenue_start
+            )
+        ).scalar()
+        revenue = float(revenue_result or 0)
+        
         branch_dict = branch.to_dict()
         branch_dict.update({
             'manager': manager_name,
-            'active_subscriptions': active_subs
+            'active_subscriptions': active_subs,
+            'revenue': revenue,
         })
         branch_list.append(branch_dict)
     return success_response({

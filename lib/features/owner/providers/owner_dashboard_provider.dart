@@ -211,9 +211,17 @@ class OwnerDashboardProvider extends ChangeNotifier {
     try {
       debugPrint('🏢 Loading branch comparison...');
 
+      final params = <String, dynamic>{
+        'start_date': _startDate.toIso8601String().split('T')[0],
+        'end_date': _endDate.toIso8601String().split('T')[0],
+      };
+
       // Primary: /api/reports/branch-comparison
       try {
-        final response = await _apiService.get(ApiEndpoints.reportsBranchComparison);
+        final response = await _apiService.get(
+          ApiEndpoints.reportsBranchComparison,
+          queryParameters: params,
+        );
         debugPrint('🏢 Branch Comparison status: ${response.statusCode}');
         if (response.statusCode == 200 && response.data != null) {
           if (response.data is List) {
