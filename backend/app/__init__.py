@@ -36,6 +36,9 @@ def create_app(config_name='default'):
     # Register CLI commands
     register_cli_commands(app)
     
+    # Run database schema migrations
+    _ensure_db_schema(app)
+    
     # Health check endpoint
     @app.route('/')
     def index():
@@ -51,6 +54,26 @@ def create_app(config_name='default'):
         return jsonify({'status': 'healthy'})
     
     return app
+
+
+def _ensure_db_schema(app):
+    """Ensure database schema matches model definitions (auto-migration)"""
+    with app.app_context():
+        from sqlalchemy import text, inspect as sa_inspect
+        from app.extensions import db
+
+        try:
+            inspector = sa_inspect(db.engine)
+            if 'transactions' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('transactions')]
+                if 'discount' not in columns:
+                    db.session.execute(text(
+                        'ALTER TABLE transactions ADD COLUMN discount NUMERIC(10, 2) NOT NULL DEFAULT 0'
+                    ))
+                    db.session.commit()
+                    app.logger.info('Auto-migration: added discount column to transactions table')
+        except Exception as e:
+            app.logger.warning(f'Schema migration check: {e}')
 
 
 def register_error_handlers(app):
