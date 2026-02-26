@@ -125,6 +125,8 @@ def get_active_customers_count(branch_id=None):
 def compare_branches_performance(start_date=None, end_date=None):
     """Compare revenue performance across all branches"""
     from app.models.branch import Branch
+    from app.models.user import User
+    from app.models.complaint import Complaint, ComplaintStatus
     
     branches = Branch.query.filter_by(is_active=True).all()
     performance = []
@@ -133,11 +135,39 @@ def compare_branches_performance(start_date=None, end_date=None):
         revenue = calculate_branch_revenue(branch.id, start_date, end_date)
         active_customers = get_active_customers_count(branch.id)
         
+        # Additional fields for frontend dashboards
+        from app.models.customer import Customer
+        customers = Customer.query.filter_by(branch_id=branch.id, is_active=True).count()
+        active_subs = Subscription.query.filter_by(
+            branch_id=branch.id,
+            status=SubscriptionStatus.ACTIVE
+        ).count()
+        staff_count = User.query.filter_by(branch_id=branch.id, is_active=True).count()
+        open_complaints = Complaint.query.filter_by(
+            branch_id=branch.id,
+            status=ComplaintStatus.OPEN
+        ).count()
+        
+        # Simple performance score
+        performance_score = min(100, int(
+            (active_subs / max(customers, 1) * 50) +
+            (revenue / 100000 * 30) +
+            (max(0, 20 - open_complaints * 2))
+        ))
+        
         performance.append({
             'branch_id': branch.id,
             'branch_name': branch.name,
+            'name': branch.name,
+            'city': branch.city,
+            'is_active': branch.is_active,
             'revenue': revenue,
-            'active_customers': active_customers
+            'active_customers': active_customers,
+            'customers': customers,
+            'active_subscriptions': active_subs,
+            'staff_count': staff_count,
+            'open_complaints': open_complaints,
+            'performance_score': performance_score
         })
     
     # Sort by revenue descending

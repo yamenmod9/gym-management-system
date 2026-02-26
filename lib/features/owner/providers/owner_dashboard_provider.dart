@@ -106,11 +106,13 @@ class OwnerDashboardProvider extends ChangeNotifier {
           final alerts = d['alerts'];
           if (alerts is Map) {
             // Convert map of alert types to a flat list for the UI
-            _alerts = alerts.entries.map<Map<String, dynamic>>((e) => {
-              'title': _alertTitle(e.key),
-              'description': '${e.value} item(s)',
-              'risk_level': (e.value is int && e.value > 5) ? 'high' : 'medium',
-              'count': e.value,
+            _alerts = alerts.entries.map<Map<String, dynamic>>((e) {
+              return <String, dynamic>{
+                'title': _alertTitle(e.key),
+                'description': '${e.value} item(s)',
+                'risk_level': (e.value is int && e.value > 5) ? 'high' : 'medium',
+                'count': e.value,
+              };
             }).where((a) => (a['count'] as int? ?? 0) > 0).toList();
           }
           // Also enrich revenue data from owner dashboard if not already set
@@ -279,20 +281,21 @@ class OwnerDashboardProvider extends ChangeNotifier {
         return;
       }
 
-      // Fallback: /api/users
-      final usersResp = await _apiService.get('/api/users', queryParameters: params);
+      // Fallback: /api/users/employees (returns flat list with branch_name)
+      final usersResp = await _apiService.get('/api/users/employees', queryParameters: params);
       if (usersResp.statusCode == 200 && usersResp.data != null) {
-        List<dynamic> users;
+        List<dynamic> users = [];
         if (usersResp.data is List) {
           users = usersResp.data;
-        } else {
+        } else if (usersResp.data is Map) {
           final d = usersResp.data['data'];
-          if (d is Map) {
-            users = List<dynamic>.from(d['items'] ?? []);
-          } else if (d is List) {
+          if (d is List) {
             users = d;
+          } else if (d is Map) {
+            users = List<dynamic>.from(d['items'] ?? []);
           } else {
-            users = usersResp.data['users'] ?? usersResp.data['items'] ?? [];
+            final raw = usersResp.data['users'] ?? usersResp.data['items'];
+            if (raw is List) users = raw;
           }
         }
         _employeePerformance = users.where((u) {

@@ -93,7 +93,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
                           _buildStatCard(
                             context,
                             title: 'Complaints',
-                            value: '0', // TODO: Get from API
+                            value: '${provider.complaintsCount}',
                             icon: Icons.report_problem,
                             color: Colors.red,
                           ),

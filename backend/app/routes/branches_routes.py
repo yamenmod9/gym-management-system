@@ -208,19 +208,19 @@ def get_branch_performance(branch_id):
         )
     ).all()
     
-    total_revenue = sum(t.amount - t.discount for t in transactions)
-    
+    total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+
     # Revenue by service
     from collections import defaultdict
     revenue_by_service = defaultdict(float)
     for t in transactions:
         if t.subscription and t.subscription.service:
             service_name = t.subscription.service.name
-            revenue_by_service[service_name] += (t.amount - t.discount)
-    
+            revenue_by_service[service_name] += float(t.amount) - float(t.discount or 0)
+
     # Average subscription value
-    avg_subscription_value = total_revenue / len(transactions) if transactions else 0
-    
+    avg_subscription_value = total_revenue / len(transactions) if transactions else 0.0
+
     # Check-ins count (entry logs)
     from app.models import EntryLog
     check_ins_count = EntryLog.query.filter(
@@ -260,6 +260,9 @@ def get_branch_performance(branch_id):
             'total_revenue': staff_revenue
         })
 
+    # Capacity: active subscriptions as proxy, could be overridden per branch
+    capacity = active_subscriptions
+
     return success_response({
         'branch_id': branch_id,
         'branch_name': branch.name,
@@ -270,6 +273,7 @@ def get_branch_performance(branch_id):
         'expired_subscriptions': expired_subscriptions,
         'frozen_subscriptions': frozen_subscriptions,
         'total_revenue': total_revenue,
+        'capacity': capacity,
         'revenue_by_service': dict(revenue_by_service),
         'average_subscription_value': avg_subscription_value,
         'check_ins_count': check_ins_count,

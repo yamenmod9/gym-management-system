@@ -43,7 +43,7 @@ def get_expenses():
     query = Expense.query
     
     # Role-based filtering
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.ACCOUNTANT]:
         query = query.filter(Expense.branch_id == current_user.branch_id)
     elif branch_id:
         query = query.filter(Expense.branch_id == branch_id)
@@ -92,7 +92,7 @@ def get_expenses():
 
 @finance_bp.route('/cash-differences', methods=['GET'])
 @jwt_required()
-@role_required([UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT])
+@role_required([UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT, UserRole.ACCOUNTANT])
 def get_cash_differences():
     """
     Get cash difference records from daily closings
@@ -112,10 +112,13 @@ def get_cash_differences():
     query = DailyClosing.query
     
     # Role-based filtering
-    if current_user.role == UserRole.BRANCH_ACCOUNTANT:
+    if current_user.role in [UserRole.BRANCH_ACCOUNTANT]:
         query = query.filter(DailyClosing.branch_id == current_user.branch_id)
-    elif branch_id:
-        query = query.filter(DailyClosing.branch_id == branch_id)
+    elif current_user.role in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.ACCOUNTANT]:
+        if branch_id:
+            query = query.filter(DailyClosing.branch_id == branch_id)
+    else:
+        query = query.filter(DailyClosing.branch_id == current_user.branch_id)
     
     # Date range filter
     if date_from:
@@ -147,15 +150,15 @@ def get_cash_differences():
             'branch_id': closing.branch_id,
             'branch_name': closing.branch.name if closing.branch else 'N/A',
             'date': closing.closing_date.isoformat(),
-            'expected_cash': closing.expected_cash,
-            'actual_cash': closing.actual_cash,
-            'difference': closing.cash_difference,
+            'expected_cash': float(closing.expected_cash) if closing.expected_cash else 0.0,
+            'actual_cash': float(closing.actual_cash) if closing.actual_cash else 0.0,
+            'difference': float(closing.cash_difference) if closing.cash_difference else 0.0,
             'notes': closing.notes,
-            'recorded_by': closing.closer.username if closing.closer else 'N/A'
+            'recorded_by': closing.closed_by_user.username if closing.closed_by_user else 'N/A'
         })
         
-        total_difference += closing.cash_difference
-    
+        total_difference += float(closing.cash_difference) if closing.cash_difference else 0.0
+
     return success_response({
         'data': cash_differences,
         'total_difference': total_difference
@@ -197,7 +200,7 @@ def get_daily_sales():
     )
     
     # Role-based filtering
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.ACCOUNTANT]:
         query = query.filter(Transaction.branch_id == current_user.branch_id)
     elif branch_id:
         query = query.filter(Transaction.branch_id == branch_id)

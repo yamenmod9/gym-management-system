@@ -16,6 +16,7 @@ class ReceptionProvider extends ChangeNotifier {
   List<ServiceModel> _services = [];
   List<CustomerModel> _recentCustomers = [];
   int _activeSubscriptionsCount = 0;
+  int _complaintsCount = 0;
 
   ReceptionProvider(this._apiService, this.branchId);
 
@@ -33,6 +34,7 @@ class ReceptionProvider extends ChangeNotifier {
   List<ServiceModel> get services => _services;
   List<CustomerModel> get recentCustomers => _recentCustomers;
   int get activeSubscriptionsCount => _activeSubscriptionsCount;
+  int get complaintsCount => _complaintsCount;
 
   Future<void> loadInitialData() async {
     _isLoading = true;
@@ -44,6 +46,7 @@ class ReceptionProvider extends ChangeNotifier {
         _loadServices(),
         _loadRecentCustomers(),
         _loadActiveSubscriptions(),
+        _loadComplaintsCount(),
       ]);
       _error = null;
     } catch (e) {
@@ -167,6 +170,39 @@ class ReceptionProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('❌ Error loading active subscriptions: $e');
       _activeSubscriptionsCount = 0;
+    }
+  }
+
+  Future<void> _loadComplaintsCount() async {
+    try {
+      debugPrint('📝 Loading complaints count for branch $branchId...');
+      final response = await _apiService.get(
+        ApiEndpoints.complaints,
+        queryParameters: {
+          'branch_id': branchId,
+        },
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        int count = 0;
+        if (response.data['data'] != null) {
+          final data = response.data['data'];
+          if (data is Map && data['items'] != null && data['items'] is List) {
+            count = (data['items'] as List).length;
+          } else if (data is List) {
+            count = data.length;
+          } else if (data is Map && data['total'] != null) {
+            count = data['total'] as int;
+          }
+        } else if (response.data['complaints'] != null && response.data['complaints'] is List) {
+          count = (response.data['complaints'] as List).length;
+        }
+        _complaintsCount = count;
+        debugPrint('✅ Complaints count loaded: $count');
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading complaints count: $e');
+      _complaintsCount = 0;
     }
   }
 
