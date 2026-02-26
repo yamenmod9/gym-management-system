@@ -1,0 +1,57 @@
+=================================================
+   COPY THIS TO CLAUDE SONNET 4.5
+=================================================
+
+I have a Flask API on PythonAnywhere that's being blocked by CORS when accessed from my Flutter web app.
+
+CURRENT SITUATION:
+- Backend: https://yamenmod91.pythonanywhere.com/api
+- Flutter web app: http://localhost:xxxxx
+- Error: CORS policy blocking requests
+- Desktop/mobile apps work fine (no CORS)
+
+THE ERROR:
+"Access to XMLHttpRequest has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present"
+
+WHAT I NEED:
+1. How to install flask-cors
+2. Exact code to add CORS to my Flask app
+3. Configuration for PythonAnywhere
+4. Support for:
+   - All origins (dev) or specific origins (prod)
+   - Authorization header (JWT tokens)
+   - Content-Type: application/json
+   - Methods: GET, POST, PUT, DELETE, OPTIONS
+
+MY FLASK APP STRUCTURE:
+```python
+from flask import Flask, jsonify
+from flask_jwt_extended import JWTManager, jwt_required
+
+app = Flask(__name__)
+jwt = JWTManager(app)
+
+@app.route('/api/subscriptions/activate', methods=['POST'])
+@jwt_required()
+def activate_subscription():
+    # logic here
+    return jsonify({"status": "success"})
+```
+
+REQUIREMENTS:
+- Must work with PythonAnywhere
+- Must support preflight OPTIONS requests
+- Must allow JWT Authorization header
+- Easy to enable/disable
+
+Please provide:
+1. pip install command
+2. Import statement
+3. Code to add to Flask app
+4. PythonAnywhere-specific config (if needed)
+5. How to test it works
+
+Make it production-ready but allow all origins for now (I'll restrict later).
+
+=================================================
+

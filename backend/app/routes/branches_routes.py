@@ -34,10 +34,47 @@ def get_branches():
     
     items, total, pages, current_page = paginate(query, page, per_page)
     
-    schema = BranchSchema()
-    return success_response(
-        format_pagination_response(items, total, pages, current_page, schema)
-    )
+    # Enhanced: Add more details for each branch
+    branch_list = []
+    from app.models.user import UserRole, User
+    from app.models.subscription import SubscriptionStatus
+    from app.models.transaction import Transaction
+    from sqlalchemy import func, and_
+    from datetime import datetime, timedelta
+    
+    # Revenue period: last 90 days
+    revenue_start = datetime.utcnow() - timedelta(days=90)
+    
+    for branch in items:
+        # Find branch manager
+        manager = User.query.filter_by(branch_id=branch.id, role=UserRole.BRANCH_MANAGER).first()
+        manager_name = manager.full_name if manager else None
+        # Count of active subscriptions
+        active_subs = branch.subscriptions.filter_by(status=SubscriptionStatus.ACTIVE).count()
+        # Revenue from transactions in last 90 days
+        revenue_result = db.session.query(
+            func.coalesce(func.sum(Transaction.amount - func.coalesce(Transaction.discount, 0)), 0)
+        ).filter(
+            and_(
+                Transaction.branch_id == branch.id,
+                Transaction.created_at >= revenue_start
+            )
+        ).scalar()
+        revenue = float(revenue_result or 0)
+        
+        branch_dict = branch.to_dict()
+        branch_dict.update({
+            'manager': manager_name,
+            'active_subscriptions': active_subs,
+            'revenue': revenue,
+        })
+        branch_list.append(branch_dict)
+    return success_response({
+        'items': branch_list,
+        'total': total,
+        'pages': pages,
+        'current_page': current_page
+    })
 
 
 @branches_bp.route('/<int:branch_id>', methods=['GET'])
@@ -219,8 +256,8 @@ def get_branch_performance(branch_id):
             revenue_by_service[service_name] += float(t.amount) - float(t.discount or 0)
 
     # Average subscription value
-    avg_subscription_value = total_revenue / len(transactions) if transactions else 0
-    
+    avg_subscription_value = total_revenue / len(transactions) if transactions else 0.0
+
     # Check-ins count (entry logs)
     from app.models import EntryLog
     check_ins_count = EntryLog.query.filter(
@@ -249,16 +286,20 @@ def get_branch_performance(branch_id):
             )
         ).all()
         
-        if staff_transactions:
-            staff_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in staff_transactions))
-            staff_performance.append({
-                'staff_id': staff_member.id,
-                'staff_name': staff_member.username,
-                'full_name': staff_member.full_name,
-                'transactions_count': len(staff_transactions),
-                'total_revenue': staff_revenue
-            })
-    
+        staff_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in staff_transactions)) if staff_transactions else 0.0
+        staff_performance.append({
+            'staff_id': staff_member.id,
+            'staff_name': staff_member.username,
+            'full_name': staff_member.full_name,
+            'role': staff_member.role.value,
+            'is_active': staff_member.is_active,
+            'transactions_count': len(staff_transactions),
+            'total_revenue': staff_revenue
+        })
+
+    # Capacity: active subscriptions as proxy, could be overridden per branch
+    capacity = active_subscriptions
+
     return success_response({
         'branch_id': branch_id,
         'branch_name': branch.name,
@@ -269,6 +310,7 @@ def get_branch_performance(branch_id):
         'expired_subscriptions': expired_subscriptions,
         'frozen_subscriptions': frozen_subscriptions,
         'total_revenue': total_revenue,
+        'capacity': capacity,
         'revenue_by_service': dict(revenue_by_service),
         'average_subscription_value': avg_subscription_value,
         'check_ins_count': check_ins_count,

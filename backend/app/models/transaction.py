@@ -40,9 +40,11 @@ class Transaction(db.Model):
     branch = db.relationship('Branch', back_populates='transactions')
     
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True, index=True)
-    
+    customer = db.relationship('Customer', backref='transactions')
+
     subscription_id = db.Column(db.Integer, db.ForeignKey('subscriptions.id'), nullable=True, index=True)
-    
+    subscription = db.relationship('Subscription', backref='transactions')
+
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     created_by_user = db.relationship('User', back_populates='transactions')
     

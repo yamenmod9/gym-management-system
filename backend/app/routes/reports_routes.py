@@ -7,6 +7,7 @@ from flask_jwt_extended import jwt_required
 from app.models import Transaction, Subscription, Customer, Branch, User
 from app.models.transaction import PaymentMethod
 from app.models.subscription import SubscriptionStatus
+from app.models.complaint import ComplaintStatus
 from app.utils import success_response, error_response, get_current_user, role_required
 from app.models.user import UserRole
 from app.extensions import db
@@ -62,35 +63,37 @@ def get_revenue_report():
     transactions = query.all()
     
     # Calculate total revenue
-    total_revenue = sum(t.amount - t.discount for t in transactions)
-    
+    total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+
     # Revenue by branch
     revenue_by_branch = defaultdict(float)
     for t in transactions:
         if t.branch:
-            revenue_by_branch[t.branch.name] += (t.amount - t.discount)
-    
+            revenue_by_branch[t.branch.name] += float(t.amount) - float(t.discount or 0)
+
     # Revenue by service
     revenue_by_service = defaultdict(float)
     for t in transactions:
         if t.subscription and t.subscription.service:
             service_name = t.subscription.service.name
-            revenue_by_service[service_name] += (t.amount - t.discount)
-    
-    # Revenue by payment method
+            revenue_by_service[service_name] += float(t.amount) - float(t.discount or 0)
+
+    # Revenue by payment method (keys match PaymentMethod enum values)
     revenue_by_payment_method = {
         'cash': 0.0,
-        'card': 0.0,
-        'online': 0.0
+        'network': 0.0,
+        'transfer': 0.0
     }
     for t in transactions:
-        revenue_by_payment_method[t.payment_method.value] += (t.amount - t.discount)
-    
+        key = t.payment_method.value
+        if key in revenue_by_payment_method:
+            revenue_by_payment_method[key] += float(t.amount) - float(t.discount or 0)
+
     # Format response
     revenue_by_branch_list = [
         {
             'branch_name': name,
-            'revenue': revenue
+            'revenue': float(revenue)
         }
         for name, revenue in revenue_by_branch.items()
     ]
@@ -98,7 +101,7 @@ def get_revenue_report():
     revenue_by_service_list = [
         {
             'service_name': name,
-            'revenue': revenue
+            'revenue': float(revenue)
         }
         for name, revenue in revenue_by_service.items()
     ]
@@ -155,18 +158,20 @@ def get_daily_report():
     
     # Calculate metrics
     total_transactions = len(transactions)
-    total_revenue = sum(t.amount - t.discount for t in transactions)
-    total_discount = sum(t.discount for t in transactions)
-    
-    # Payment method breakdown
+    total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+    total_discount = float(sum(float(t.discount or 0) for t in transactions))
+
+    # Payment method breakdown (keys match PaymentMethod enum values)
     payment_breakdown = {
         'cash': 0.0,
-        'card': 0.0,
-        'online': 0.0
+        'network': 0.0,
+        'transfer': 0.0
     }
     for t in transactions:
-        payment_breakdown[t.payment_method.value] += (t.amount - t.discount)
-    
+        key = t.payment_method.value
+        if key in payment_breakdown:
+            payment_breakdown[key] += float(t.amount) - float(t.discount or 0)
+
     # New subscriptions today
     sub_query = Subscription.query.filter(
         func.date(Subscription.start_date) == report_date
@@ -190,8 +195,8 @@ def get_daily_report():
             {
                 'id': t.id,
                 'customer_name': t.customer.full_name if t.customer else 'N/A',
-                'amount': t.amount,
-                'discount': t.discount,
+                'amount': float(t.amount),
+                'discount': float(t.discount or 0),
                 'payment_method': t.payment_method.value,
                 'time': t.created_at.strftime('%H:%M:%S')
             }
@@ -250,10 +255,10 @@ def get_weekly_report():
     daily_revenue = defaultdict(float)
     for t in transactions:
         day = t.created_at.date()
-        daily_revenue[day.isoformat()] += (t.amount - t.discount)
-    
-    total_revenue = sum(t.amount - t.discount for t in transactions)
-    
+        daily_revenue[day.isoformat()] += float(t.amount) - float(t.discount or 0)
+
+    total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+
     return success_response({
         'week_start': week_start.isoformat(),
         'week_end': week_end.isoformat(),
@@ -261,7 +266,7 @@ def get_weekly_report():
         'total_transactions': len(transactions),
         'average_daily_revenue': total_revenue / 7,
         'daily_breakdown': [
-            {'date': date, 'revenue': revenue}
+            {'date': date, 'revenue': float(revenue)}
             for date, revenue in sorted(daily_revenue.items())
         ]
     })
@@ -316,7 +321,7 @@ def get_monthly_report():
     transactions = query.all()
     
     # Calculate metrics
-    total_revenue = sum(t.amount - t.discount for t in transactions)
+    total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
     total_transactions = len(transactions)
     
     # New subscriptions this month
@@ -360,24 +365,34 @@ def get_branch_comparison():
     Compare performance across all branches
     
     Query params:
-        - month: Month for comparison (YYYY-MM, default: current month)
+        - start_date: Start date (YYYY-MM-DD)
+        - end_date: End date (YYYY-MM-DD)
+        - month: Month for comparison (YYYY-MM, fallback if no start/end)
     """
+    start_str = request.args.get('start_date')
+    end_str = request.args.get('end_date')
     month_str = request.args.get('month')
     
-    if month_str:
+    if start_str and end_str:
+        try:
+            month_start = datetime.strptime(start_str, '%Y-%m-%d')
+            month_end = datetime.strptime(end_str, '%Y-%m-%d')
+        except ValueError:
+            return error_response('Invalid date format. Use YYYY-MM-DD', 400)
+    elif month_str:
         try:
             month_date = datetime.strptime(month_str, '%Y-%m')
         except ValueError:
             return error_response('Invalid month format. Use YYYY-MM', 400)
+        month_start = month_date.replace(day=1)
+        if month_date.month == 12:
+            month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
     else:
-        month_date = datetime.utcnow().replace(day=1)
-    
-    # Calculate month range
-    month_start = month_date.replace(day=1)
-    if month_date.month == 12:
-        month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
-    else:
-        month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
+        # Default: last 90 days (captures more data than just current month)
+        month_end = datetime.utcnow()
+        month_start = month_end - timedelta(days=90)
     
     branches = Branch.query.filter_by(is_active=True).all()
     
@@ -393,8 +408,8 @@ def get_branch_comparison():
             )
         ).all()
         
-        revenue = sum(t.amount - t.discount for t in transactions)
-        
+        revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
+
         # Customers
         customers = Customer.query.filter_by(branch_id=branch.id, is_active=True).count()
         
@@ -406,6 +421,7 @@ def get_branch_comparison():
         
         # Complaints
         from app.models import Complaint
+        from app.models.complaint import ComplaintStatus
         complaints = Complaint.query.filter_by(branch_id=branch.id).count()
         open_complaints = Complaint.query.filter_by(branch_id=branch.id, status=ComplaintStatus.OPEN).count()
 
@@ -416,11 +432,19 @@ def get_branch_comparison():
             (max(0, 20 - open_complaints * 2))  # Penalty for complaints
         ))
         
+        # Staff count
+        staff_count = User.query.filter_by(branch_id=branch.id, is_active=True).count()
+
         branch_data.append({
+            'id': branch.id,
             'branch_id': branch.id,
+            'name': branch.name,
             'branch_name': branch.name,
+            'city': branch.city,
+            'is_active': branch.is_active,
             'customers': customers,
             'active_subscriptions': active_subs,
+            'staff_count': staff_count,
             'revenue': revenue,
             'complaints': complaints,
             'open_complaints': open_complaints,
@@ -442,9 +466,13 @@ def get_employee_performance():
     
     Query params:
         - branch_id: Filter by branch (required for branch manager)
-        - month: Month (YYYY-MM, default: current month)
+        - start_date: Start date (YYYY-MM-DD)
+        - end_date: End date (YYYY-MM-DD)
+        - month: Month (YYYY-MM, fallback if no start/end)
     """
     branch_id = request.args.get('branch_id', type=int)
+    start_str = request.args.get('start_date')
+    end_str = request.args.get('end_date')
     month_str = request.args.get('month')
     
     current_user = get_current_user()
@@ -456,25 +484,33 @@ def get_employee_performance():
     if not branch_id and current_user.role != UserRole.OWNER:
         return error_response('branch_id is required', 400)
     
-    if month_str:
+    if start_str and end_str:
+        try:
+            month_start = datetime.strptime(start_str, '%Y-%m-%d')
+            month_end = datetime.strptime(end_str, '%Y-%m-%d')
+        except ValueError:
+            return error_response('Invalid date format. Use YYYY-MM-DD', 400)
+    elif month_str:
         try:
             month_date = datetime.strptime(month_str, '%Y-%m')
         except ValueError:
             return error_response('Invalid month format. Use YYYY-MM', 400)
+        month_start = month_date.replace(day=1)
+        if month_date.month == 12:
+            month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
     else:
-        month_date = datetime.utcnow().replace(day=1)
-    
-    # Calculate month range
-    month_start = month_date.replace(day=1)
-    if month_date.month == 12:
-        month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
-    else:
-        month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
+        # Default: last 90 days
+        month_end = datetime.utcnow()
+        month_start = month_end - timedelta(days=90)
     
     # Get staff for branch
     staff_query = User.query.filter(User.role.in_([
         UserRole.BRANCH_MANAGER,
-        UserRole.FRONT_DESK
+        UserRole.FRONT_DESK,
+        UserRole.CENTRAL_ACCOUNTANT,
+        UserRole.BRANCH_ACCOUNTANT
     ]))
     
     if branch_id:
