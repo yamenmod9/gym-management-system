@@ -59,6 +59,9 @@ class Subscription(db.Model):
     remaining_sessions = db.Column(db.Integer, nullable=True)  # For session/training subscriptions
     total_sessions = db.Column(db.Integer, nullable=True)  # Original session count
     
+    # Who created this subscription (staff member)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

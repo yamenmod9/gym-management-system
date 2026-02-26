@@ -32,6 +32,14 @@ class Branch(db.Model):
     complaints = db.relationship('Complaint', back_populates='branch', lazy='dynamic')
     daily_closings = db.relationship('DailyClosing', back_populates='branch', lazy='dynamic')
 
+    @property
+    def staff_count(self):
+        return self.staff.count()
+
+    @property
+    def customers_count(self):
+        return self.customers.count()
+
     def __repr__(self):
         return f'<Branch {self.name} ({self.code})>'
 

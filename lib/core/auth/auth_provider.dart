@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'auth_service.dart';
+import 'biometric_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
+  final BiometricService _biometricService;
   
   bool _isAuthenticated = false;
   bool _isLoading = true;
@@ -10,8 +12,13 @@ class AuthProvider extends ChangeNotifier {
   String? _userId;
   String? _username;
   String? _branchId;
+
+  // Biometric state
+  bool _isBiometricAvailable = false;
+  bool _isBiometricEnabled = false;
+  bool _canBiometricLogin = false;
   
-  AuthProvider(this._authService) {
+  AuthProvider(this._authService, this._biometricService) {
     _checkAuthStatus();
   }
   
@@ -22,6 +29,12 @@ class AuthProvider extends ChangeNotifier {
   String? get userId => _userId;
   String? get username => _username;
   String? get branchId => _branchId;
+
+  // Biometric getters
+  bool get isBiometricAvailable => _isBiometricAvailable;
+  bool get isBiometricEnabled => _isBiometricEnabled;
+  bool get canBiometricLogin => _canBiometricLogin;
+  BiometricService get biometricService => _biometricService;
   
   // Check authentication status
   Future<void> _checkAuthStatus() async {
@@ -36,9 +49,19 @@ class AuthProvider extends ChangeNotifier {
       _username = await _authService.getUsername();
       _branchId = await _authService.getBranchId();
     }
+
+    // Check biometric state
+    await _refreshBiometricState();
     
     _isLoading = false;
     notifyListeners();
+  }
+
+  /// Refresh cached biometric flags.
+  Future<void> _refreshBiometricState() async {
+    _isBiometricAvailable = await _biometricService.isBiometricAvailable();
+    _isBiometricEnabled = await _biometricService.isBiometricEnabled();
+    _canBiometricLogin = await _biometricService.canBiometricLogin();
   }
   
   // Login
@@ -51,10 +74,63 @@ class AuthProvider extends ChangeNotifier {
       _userId = result['user_id']?.toString();
       _username = result['username']?.toString();
       _branchId = result['branch_id']?.toString();
+
+      // If biometric is enabled, update stored credentials
+      // so the latest password is always stored.
+      if (_isBiometricEnabled) {
+        await _biometricService.enableBiometric(
+          username: username,
+          password: password,
+        );
+      }
+
       notifyListeners();
     }
     
     return result;
+  }
+
+  // ────────────────── Biometric login flow ──────────────────
+
+  /// Perform biometric authentication and then log in automatically
+  /// using stored credentials.
+  Future<Map<String, dynamic>> biometricLogin() async {
+    // 1. Prompt the user for biometric
+    final authenticated = await _biometricService.authenticate(
+      reason: 'Authenticate to log in to Gym Management',
+    );
+    if (!authenticated) {
+      return {'success': false, 'message': 'Biometric authentication failed or was cancelled.'};
+    }
+
+    // 2. Retrieve stored credentials
+    final creds = await _biometricService.getStoredCredentials();
+    if (creds == null) {
+      return {'success': false, 'message': 'No stored credentials found. Please log in with your password.'};
+    }
+
+    // 3. Perform a normal login
+    return login(creds['username']!, creds['password']!);
+  }
+
+  // ────────────────── Biometric settings ──────────────────
+
+  /// Enable biometric login.  Must pass the current (plaintext) credentials
+  /// so they can be securely stored.
+  Future<void> enableBiometric({
+    required String username,
+    required String password,
+  }) async {
+    await _biometricService.enableBiometric(username: username, password: password);
+    await _refreshBiometricState();
+    notifyListeners();
+  }
+
+  /// Disable biometric login and wipe stored credentials.
+  Future<void> disableBiometric() async {
+    await _biometricService.disableBiometric();
+    await _refreshBiometricState();
+    notifyListeners();
   }
   
   // Logout
@@ -65,6 +141,8 @@ class AuthProvider extends ChangeNotifier {
     _userId = null;
     _username = null;
     _branchId = null;
+    // NOTE: We intentionally do NOT clear biometric credentials on logout.
+    // That way the user can still use biometric to log back in.
     notifyListeners();
   }
   

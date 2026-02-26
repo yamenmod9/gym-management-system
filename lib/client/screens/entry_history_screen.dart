@@ -131,8 +131,30 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
 
   Widget _buildEntryCard(BuildContext context, EntryHistoryModel entry) {
     final dateTime = entry.dateTime;
-    final dateFormat = DateFormat('MMM dd, yyyy');
+    final dateFormat = DateFormat('dd MMM yyyy');
     final timeFormat = DateFormat('hh:mm a');
+
+    // Pick icon based on entry type
+    IconData entryIcon;
+    switch (entry.entryType) {
+      case 'QR_SCAN':
+        entryIcon = Icons.qr_code_scanner;
+        break;
+      case 'BARCODE':
+        entryIcon = Icons.qr_code;
+        break;
+      case 'FINGERPRINT':
+        entryIcon = Icons.fingerprint;
+        break;
+      case 'MANUAL':
+        entryIcon = Icons.person;
+        break;
+      default:
+        entryIcon = Icons.login;
+    }
+
+    final bool isApproved = entry.isApproved;
+    final Color statusColor = isApproved ? Colors.green : Colors.red;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -141,16 +163,16 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon
+            // Entry type icon
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.2),
+                color: statusColor.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                Icons.location_on,
-                color: Theme.of(context).primaryColor,
+                entryIcon,
+                color: statusColor,
                 size: 24,
               ),
             ),
@@ -161,25 +183,53 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Branch and service
-                  Text(
-                    entry.branch,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                  // Entry type label + status
+                  Row(
+                    children: [
+                      Text(
+                        entry.entryTypeLabel,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
                         ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          isApproved ? 'Approved' : 'Denied',
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
+
+                  // Branch
                   Row(
                     children: [
                       Icon(
-                        Icons.fitness_center,
+                        Icons.location_on,
                         size: 16,
                         color: Theme.of(context).textTheme.bodySmall?.color,
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        entry.service,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                      Expanded(
+                        child: Text(
+                          entry.branch,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
@@ -216,37 +266,37 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
             ),
 
             // Coins used
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Theme.of(context).primaryColor,
+            if (entry.coinsUsed > 0)
+              Container(
+                margin: const EdgeInsets.only(left: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.monetization_on,
+                      size: 16,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '-${entry.coinsUsed}',
+                      style: TextStyle(
+                        color: Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.monetization_on,
-                    size: 16,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    entry.coinsUsed.toString(),
-                    style: TextStyle(
-                      color: Theme.of(context).primaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),

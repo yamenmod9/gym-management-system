@@ -65,9 +65,9 @@ class SmartAlertsScreen extends StatelessWidget {
           }
 
           // Group alerts by type
-          final criticalAlerts = alerts.where((a) => a['priority'] == 'critical' || a['severity'] == 'high').toList();
-          final warningAlerts = alerts.where((a) => a['priority'] == 'warning' || a['severity'] == 'medium').toList();
-          final infoAlerts = alerts.where((a) => a['priority'] == 'info' || a['severity'] == 'low').toList();
+          final criticalAlerts = alerts.where((a) => a['priority'] == 'critical' || a['severity'] == 'high' || a['risk_level'] == 'high').toList();
+          final warningAlerts = alerts.where((a) => a['priority'] == 'warning' || a['severity'] == 'medium' || a['risk_level'] == 'medium').toList();
+          final infoAlerts = alerts.where((a) => a['priority'] == 'info' || a['severity'] == 'low' || a['risk_level'] == 'low').toList();
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -193,7 +193,8 @@ class SmartAlertsScreen extends StatelessWidget {
 
   Widget _buildAlertCard(BuildContext context, Map<String, dynamic> alert, Color color) {
     final type = alert['type'] ?? alert['alert_type'] ?? 'general';
-    final message = alert['message'] ?? alert['description'] ?? 'No description';
+    final title = alert['title'] ?? alert['message'] ?? 'Alert';
+    final message = alert['description'] ?? alert['message'] ?? 'No description';
     final branchName = alert['branch_name'] ?? alert['branch'] ?? 'All Branches';
     final timestamp = alert['created_at'] ?? alert['timestamp'];
 
@@ -209,12 +210,16 @@ class SmartAlertsScreen extends StatelessWidget {
           child: Icon(_getAlertIcon(type), color: color),
         ),
         title: Text(
-          message,
+          title,
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (message != title) ...[
+              const SizedBox(height: 4),
+              Text(message, style: TextStyle(color: Colors.grey[700])),
+            ],
             const SizedBox(height: 4),
             Row(
               children: [

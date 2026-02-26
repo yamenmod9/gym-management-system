@@ -19,12 +19,57 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+  bool _biometricAttempted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-trigger biometric on screen load if available (once only)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tryAutoBiometric();
+    });
+  }
 
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  /// Automatically show the biometric prompt when the login screen opens,
+  /// if biometric login is available. Guarded so it only fires once.
+  Future<void> _tryAutoBiometric() async {
+    if (_biometricAttempted) return;
+    _biometricAttempted = true;
+
+    final authProvider = context.read<AuthProvider>();
+    if (authProvider.canBiometricLogin) {
+      await _handleBiometricLogin();
+    }
+  }
+
+  Future<void> _handleBiometricLogin() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final authProvider = context.read<AuthProvider>();
+    final result = await authProvider.biometricLogin();
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (result['success'] != true) {
+        setState(() {
+          _errorMessage = result['message'] ?? 'Biometric login failed';
+        });
+      }
+      // On success, the router will handle navigation automatically.
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -248,6 +293,54 @@ class _LoginScreenState extends State<LoginScreen> {
                                       style: TextStyle(fontSize: 16),
                                     ),
                             ),
+                          ),
+
+                          // ── Biometric Login Button ──
+                          Consumer<AuthProvider>(
+                            builder: (context, auth, _) {
+                              if (!auth.canBiometricLogin) {
+                                return const SizedBox.shrink();
+                              }
+                              return Column(
+                                children: [
+                                  const SizedBox(height: 20),
+                                  Row(
+                                    children: [
+                                      const Expanded(child: Divider()),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        child: Text(
+                                          'or',
+                                          style: TextStyle(
+                                            color: Colors.grey[500],
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                      const Expanded(child: Divider()),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: OutlinedButton.icon(
+                                      onPressed: _isLoading ? null : _handleBiometricLogin,
+                                      icon: const Icon(Icons.fingerprint, size: 28),
+                                      label: const Text(
+                                        'Login with Biometrics',
+                                        style: TextStyle(fontSize: 16),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(
+                                          color: Theme.of(context).colorScheme.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ),

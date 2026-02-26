@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'core/api/api_service.dart';
 import 'core/auth/auth_service.dart';
 import 'core/auth/auth_provider.dart';
+import 'core/auth/biometric_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'routes/app_router.dart';
@@ -23,6 +24,7 @@ class MyApp extends StatelessWidget {
     // Initialize core services
     final apiService = ApiService();
     final authService = AuthService(apiService);
+    final biometricService = BiometricService();
 
     return MultiProvider(
       providers: [
@@ -31,7 +33,7 @@ class MyApp extends StatelessWidget {
           value: apiService,
         ),
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(authService),
+          create: (_) => AuthProvider(authService, biometricService),
         ),
 
         // Feature providers

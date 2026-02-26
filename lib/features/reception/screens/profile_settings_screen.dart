@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../shared/widgets/biometric_settings_section.dart';
 
 class ProfileSettingsScreen extends StatelessWidget {
   const ProfileSettingsScreen({super.key});
@@ -142,6 +143,10 @@ class ProfileSettingsScreen extends StatelessWidget {
               ],
             ),
           ),
+
+          // Security / Biometric Section
+          const BiometricSettingsSection(),
+
           const SizedBox(height: 24),
 
           // Logout Button
