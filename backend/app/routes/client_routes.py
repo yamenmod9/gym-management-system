@@ -333,20 +333,22 @@ def get_client_history():
     # Format entries with proper structure for Flutter client
     entries = []
     for entry in items:
-        entry_dict = entry.to_dict()
-        
-        # Ensure all required fields are present
+        # Derive service name from subscription -> service relationship if available
+        service_name = 'Gym Access'
+        if entry.subscription and entry.subscription.service:
+            service_name = entry.subscription.service.name
+
         entry_data = {
-            'id': entry_dict.get('id'),
+            'id': entry.id,
             'date': entry.entry_time.strftime('%Y-%m-%d') if entry.entry_time else '',
             'time': entry.entry_time.strftime('%H:%M:%S') if entry.entry_time else '',
             'datetime': entry.entry_time.isoformat() if entry.entry_time else '',
             'branch': entry.branch.name if entry.branch else 'Unknown',
-            'branch_id': entry_dict.get('branch_id'),
-            'service': entry.service.name if entry.service else 'Gym Access',
-            'service_id': entry_dict.get('service_id'),
-            'coins_used': entry_dict.get('coins_used', 1),
-            'entry_type': entry_dict.get('entry_type', 'scan')
+            'branch_id': entry.branch_id,
+            'service': service_name,
+            'coins_used': entry.coins_deducted or 0,
+            'entry_type': entry.entry_type.value if entry.entry_type else 'QR_SCAN',
+            'entry_status': entry.entry_status.value if entry.entry_status else 'APPROVED'
         }
         entries.append(entry_data)
     
