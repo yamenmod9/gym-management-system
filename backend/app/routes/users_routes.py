@@ -18,7 +18,7 @@ users_bp = Blueprint('users', __name__, url_prefix='/api/users')
 
 @users_bp.route('', methods=['GET'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def get_users():
     """Get all users (paginated)"""
     page = request.args.get('page', 1, type=int)
@@ -50,7 +50,7 @@ def get_users():
 @users_bp.route('/employees', methods=['GET'])
 @users_bp.route('/staff', methods=['GET'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def get_employees():
     """Get all staff members (alias for /api/users)"""
     from app.utils import get_current_user
@@ -93,7 +93,7 @@ def get_employees():
 
 @users_bp.route('/<int:user_id>', methods=['GET'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def get_user(user_id):
     """Get user by ID"""
     user = db.session.get(User, user_id)
@@ -106,7 +106,7 @@ def get_user(user_id):
 
 @users_bp.route('', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def create_user():
     """Create new user"""
     try:
@@ -125,7 +125,7 @@ def create_user():
 
 @users_bp.route('/<int:user_id>', methods=['PUT'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def update_user(user_id):
     """Update user"""
     try:
@@ -144,7 +144,7 @@ def update_user(user_id):
 
 @users_bp.route('/<int:user_id>', methods=['DELETE'])
 @jwt_required()
-@role_required(UserRole.OWNER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER)
 def delete_user(user_id):
     """Deactivate user (soft delete)"""
     user = db.session.get(User, user_id)

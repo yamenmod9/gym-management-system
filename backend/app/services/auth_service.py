@@ -49,11 +49,12 @@ class AuthService:
         if User.query.filter_by(email=data['email']).first():
             return None, "Email already exists"
         
-        # Validate owner uniqueness
+        # Validate owner uniqueness (disabled for multi-gym SaaS - super admin can create multiple owners)
+        # role = UserRole(data['role'])
+        # if role == UserRole.OWNER:
+        #     if not User.validate_owner_uniqueness():
+        #         return None, "Owner account already exists. Only ONE owner is allowed."
         role = UserRole(data['role'])
-        if role == UserRole.OWNER:
-            if not User.validate_owner_uniqueness():
-                return None, "Owner account already exists. Only ONE owner is allowed."
         
         # Validate branch requirement for branch-specific roles
         branch_specific_roles = [

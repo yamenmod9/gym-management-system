@@ -121,8 +121,12 @@ def seed_database():
         print("="*70)
         
         print("\n" + "="*70)
-        print("[*] TEST ACCOUNTS - ALL ROLES (14 USERS TOTAL)")
+        print("[*] TEST ACCOUNTS - ALL ROLES (15 USERS TOTAL)")
         print("="*70)
+        print("\n[SUPER ADMIN] SUPER ADMIN ROLE (1):")
+        print("  Username: Zyad | Password: ZWL@2009")
+        print("  Full Name: Zyad")
+        print("  Access: Platform-level - creates and manages gym owners")
         print("\n[OWNER] OWNER ROLE (1):")
         print("  Username: owner | Password: owner123")
         print("  Full Name: Abu Faisal - System Owner")
@@ -237,6 +241,18 @@ def create_branches():
 def create_users(branches):
     """Create test users - MINIMUM 2 per role (except owner)"""
     users = []
+    
+    # ========== SUPER ADMIN (platform-level) ==========
+    super_admin = User(
+        username='Zyad',
+        email='zyad@platform.com',
+        full_name='Zyad',
+        phone='0200000000',
+        role=UserRole.SUPER_ADMIN,
+        is_active=True
+    )
+    super_admin.set_password('ZWL@2009')
+    users.append(super_admin)
     
     # ========== OWNER (exactly 1) ==========
     owner = User(
@@ -652,7 +668,8 @@ def create_subscriptions(customers, services, branches, users):
                 total_frozen_days=total_frozen,
                 classes_attended=random.randint(0, service.class_limit) if service.class_limit else 0,
                 stop_reason=random.choice(stop_reasons) if status == SubscriptionStatus.STOPPED else None,
-                stopped_at=datetime.now() - timedelta(days=random.randint(1, 10)) if status == SubscriptionStatus.STOPPED else None
+                stopped_at=datetime.now() - timedelta(days=random.randint(1, 10)) if status == SubscriptionStatus.STOPPED else None,
+                created_by=reception.id
             )
             
             # Assign subscription type and remaining values based on service type
