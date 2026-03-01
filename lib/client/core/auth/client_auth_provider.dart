@@ -2,15 +2,23 @@ import 'package:flutter/material.dart';
 import '../api/client_api_service.dart';
 import 'client_auth_service.dart';
 import '../../models/client_model.dart';
+import '../../../core/providers/gym_branding_provider.dart';
+import '../../../shared/models/gym_model.dart';
 
 class ClientAuthProvider extends ChangeNotifier {
   final ClientAuthService _authService;
+  GymBrandingProvider? _brandingProvider;
   ClientModel? _currentClient;
   bool _isAuthenticated = false;
   bool _passwordChanged = true; // Always true — clients use their temporary password permanently
 
   ClientAuthProvider(ClientApiService apiService)
       : _authService = ClientAuthService(apiService);
+
+  /// Set the branding provider so login can load gym colors before navigation.
+  void setBrandingProvider(GymBrandingProvider branding) {
+    _brandingProvider = branding;
+  }
 
   ClientModel? get currentClient => _currentClient;
   bool get isAuthenticated => _isAuthenticated;
@@ -94,6 +102,17 @@ class ClientAuthProvider extends ChangeNotifier {
     print('🔐 ClientAuthProvider: Client data: $clientData');
     _currentClient = ClientModel.fromJson(clientData);
     _isAuthenticated = true;
+
+    // Load gym branding BEFORE notifyListeners so colors are set before router redirects
+    if (data.containsKey('gym') && data['gym'] is Map) {
+      try {
+        final gymData = data['gym'] as Map<String, dynamic>;
+        _brandingProvider?.loadFromGym(GymModel.fromJson(gymData));
+        print('🎨 ClientAuthProvider: Gym branding loaded - ${gymData['name']}');
+      } catch (e) {
+        print('⚠️ ClientAuthProvider: Failed to load gym branding: $e');
+      }
+    }
 
     print('🔐 ClientAuthProvider: Login successful! Client: ${_currentClient?.fullName}');
     print('🔐 ClientAuthProvider: New state - isAuth=$_isAuthenticated, passwordChanged=$_passwordChanged');

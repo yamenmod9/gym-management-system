@@ -20,6 +20,7 @@ class GymClientApp extends StatefulWidget {
 class _GymClientAppState extends State<GymClientApp> {
   late final ClientApiService _apiService;
   late final ClientAuthProvider _authProvider;
+  late final GymBrandingProvider _brandingProvider;
   late final ClientRouter _router;
 
   @override
@@ -27,6 +28,8 @@ class _GymClientAppState extends State<GymClientApp> {
     super.initState();
     _apiService = ClientApiService();
     _authProvider = ClientAuthProvider(_apiService);
+    _brandingProvider = GymBrandingProvider();
+    _authProvider.setBrandingProvider(_brandingProvider);
     _router = ClientRouter(_authProvider);
     
     // Initialize auth state
@@ -43,8 +46,8 @@ class _GymClientAppState extends State<GymClientApp> {
         ChangeNotifierProvider<ClientAuthProvider>.value(
           value: _authProvider,
         ),
-        ChangeNotifierProvider(
-          create: (_) => GymBrandingProvider(),
+        ChangeNotifierProvider<GymBrandingProvider>.value(
+          value: _brandingProvider,
         ),
       ],
       child: Consumer<GymBrandingProvider>(
