@@ -22,6 +22,7 @@ from app.models import (
     Expense, ExpenseStatus, Complaint, ComplaintType, ComplaintStatus,
     Fingerprint, FreezeHistory, DailyClosing, EntryLog
 )
+from app.models.gym import Gym
 
 # Set seed for reproducible results (can be commented out for true randomness)
 random.seed(42)
@@ -63,6 +64,18 @@ def seed_database():
         # Create users
         print("  ↳ Creating users...")
         users = create_users(branches)
+
+        # Create gyms for owner users
+        print("  ↳ Creating gyms for owners...")
+        for u in users:
+            if u.role == UserRole.OWNER:
+                gym = Gym(
+                    name=f"{u.full_name}'s Gym",
+                    owner_id=u.id,
+                    is_setup_complete=False,
+                )
+                db.session.add(gym)
+        db.session.commit()
         
         # Create services
         print("  ↳ Creating services...")
@@ -669,7 +682,6 @@ def create_subscriptions(customers, services, branches, users):
                 classes_attended=random.randint(0, service.class_limit) if service.class_limit else 0,
                 stop_reason=random.choice(stop_reasons) if status == SubscriptionStatus.STOPPED else None,
                 stopped_at=datetime.now() - timedelta(days=random.randint(1, 10)) if status == SubscriptionStatus.STOPPED else None,
-                created_by=reception.id
             )
             
             # Assign subscription type and remaining values based on service type

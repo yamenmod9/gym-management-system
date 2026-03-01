@@ -136,17 +136,17 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
 
     // Pick icon based on entry type
     IconData entryIcon;
-    switch (entry.entryType) {
-      case 'QR_SCAN':
+    switch (entry.entryType.toLowerCase()) {
+      case 'qr_scan':
         entryIcon = Icons.qr_code_scanner;
         break;
-      case 'BARCODE':
+      case 'barcode':
         entryIcon = Icons.qr_code;
         break;
-      case 'FINGERPRINT':
+      case 'fingerprint':
         entryIcon = Icons.fingerprint;
         break;
-      case 'MANUAL':
+      case 'manual':
         entryIcon = Icons.person;
         break;
       default:

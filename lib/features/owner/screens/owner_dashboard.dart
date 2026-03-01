@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/providers/gym_branding_provider.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../shared/widgets/stat_card.dart';
@@ -35,11 +36,15 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final dashboardProvider = context.watch<OwnerDashboardProvider>();
+    final branding = context.watch<GymBrandingProvider>();
+    final gymName = branding.isSetupComplete && branding.gymId != null
+        ? branding.gymName
+        : 'Owner Dashboard';
 
     return Scaffold(
       extendBody: true,
       appBar: AppBar(
-        title: const Text('Owner Dashboard'),
+        title: Text(gymName),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [

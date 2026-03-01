@@ -162,4 +162,79 @@ class ClientTheme {
       ),
     );
   }
+
+  /// Build a themed variant using the gym's branding colors.
+  static ThemeData buildBrandedTheme(Color primary, Color secondary) {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: darkGrey,
+      primaryColor: primary,
+      appBarTheme: AppBarTheme(
+        backgroundColor: mediumGrey,
+        foregroundColor: textWhite,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      cardTheme: CardThemeData(
+        color: mediumGrey,
+        elevation: 4,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primary,
+          foregroundColor: textWhite,
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: lightGrey,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primary, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        hintStyle: TextStyle(color: textGrey),
+      ),
+      iconTheme: IconThemeData(color: primary),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: primary,
+        foregroundColor: textWhite,
+      ),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: mediumGrey,
+        selectedItemColor: primary,
+        unselectedItemColor: textGrey,
+        type: BottomNavigationBarType.fixed,
+        elevation: 8,
+      ),
+      dividerTheme: DividerThemeData(color: lightGrey, thickness: 1),
+      colorScheme: ColorScheme.dark(
+        primary: primary,
+        secondary: secondary,
+        surface: mediumGrey,
+        background: darkGrey,
+        error: Colors.red,
+        onPrimary: textWhite,
+        onSecondary: textWhite,
+        onSurface: textWhite,
+        onBackground: textWhite,
+        onError: textWhite,
+      ),
+    );
+  }
 }

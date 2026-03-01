@@ -1,0 +1,517 @@
+import 'dart:ui';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/auth/auth_provider.dart';
+import '../../../shared/models/owner_model.dart';
+import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/error_display.dart';
+import '../../../shared/widgets/stat_card.dart';
+import '../providers/super_admin_provider.dart';
+import 'create_gym_screen.dart';
+import 'super_admin_settings_screen.dart';
+
+class SuperAdminDashboard extends StatefulWidget {
+  const SuperAdminDashboard({super.key});
+
+  @override
+  State<SuperAdminDashboard> createState() => _SuperAdminDashboardState();
+}
+
+class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
+  int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SuperAdminProvider>().loadDashboardData();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final provider = context.watch<SuperAdminProvider>();
+
+    return Scaffold(
+      extendBody: true,
+      appBar: AppBar(
+        title: const Text('Platform Admin'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => provider.refresh(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const SuperAdminSettingsScreen(),
+              ),
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.person),
+            onSelected: (value) {
+              if (value == 'logout') authProvider.logout();
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('Logout'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      body: provider.isLoading
+          ? const LoadingIndicator(message: 'Loading Platform Data...')
+          : provider.error != null
+              ? ErrorDisplay(
+                  message: provider.error!,
+                  onRetry: () => provider.refresh(),
+                )
+              : _buildCurrentTab(context, provider),
+      bottomNavigationBar: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color:
+                    Theme.of(context).colorScheme.surface.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: NavigationBar(
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: (index) {
+                  setState(() => _selectedIndex = index);
+                },
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                height: 65,
+                labelBehavior:
+                    NavigationDestinationLabelBehavior.alwaysShow,
+                indicatorColor:
+                    Theme.of(context).primaryColor.withOpacity(0.15),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.dashboard_outlined),
+                    selectedIcon: Icon(Icons.dashboard),
+                    label: 'Overview',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.manage_accounts_outlined),
+                    selectedIcon: Icon(Icons.manage_accounts),
+                    label: 'Owners',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: _selectedIndex == 1
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const CreateGymScreen()),
+                ).then((_) => provider.refresh());
+              },
+              icon: const Icon(Icons.person_add),
+              label: const Text('New Owner'),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildCurrentTab(
+      BuildContext context, SuperAdminProvider provider) {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildOverviewTab(context, provider);
+      case 1:
+        return _buildOwnersTab(context, provider);
+      default:
+        return _buildOverviewTab(context, provider);
+    }
+  }
+
+  Widget _buildOverviewTab(
+      BuildContext context, SuperAdminProvider provider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Welcome header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                  Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color:
+                    Theme.of(context).colorScheme.primary.withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.admin_panel_settings,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Platform Administration',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Create and manage gym owner accounts',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(color: Colors.grey[400]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          Text(
+            'Platform Overview',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.8,
+            children: [
+              StatCard(
+                title: 'Total Owners',
+                value: '${provider.totalOwners}',
+                icon: Icons.manage_accounts,
+                color: const Color(0xFFF59E0B),
+              ),
+              StatCard(
+                title: 'Active Owners',
+                value: '${provider.activeOwners}',
+                icon: Icons.check_circle,
+                color: const Color(0xFF10B981),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Recent Owners',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              TextButton.icon(
+                onPressed: () => setState(() => _selectedIndex = 1),
+                icon: const Icon(Icons.arrow_forward, size: 16),
+                label: const Text('View All'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          if (provider.owners.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  children: [
+                    Icon(Icons.manage_accounts_outlined,
+                        size: 64, color: Colors.grey[600]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No owners yet',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(color: Colors.grey[500]),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Create the first gym owner account to get started',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ...provider.owners
+                .take(5)
+                .map((owner) => _buildOwnerCard(context, owner, provider)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOwnersTab(
+      BuildContext context, SuperAdminProvider provider) {
+    if (provider.owners.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.manage_accounts_outlined,
+                size: 80, color: Colors.grey[600]),
+            const SizedBox(height: 24),
+            Text(
+              'No Owners Yet',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(color: Colors.grey[400]),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap + to create the first gym owner',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      itemCount: provider.owners.length,
+      itemBuilder: (context, index) =>
+          _buildOwnerCard(context, provider.owners[index], provider),
+    );
+  }
+
+  Widget _buildOwnerCard(
+      BuildContext context, OwnerModel owner, SuperAdminProvider provider) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Avatar
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: Theme.of(context)
+                  .colorScheme
+                  .primary
+                  .withOpacity(0.15),
+              child: Text(
+                owner.fullName.isNotEmpty
+                    ? owner.fullName[0].toUpperCase()
+                    : '?',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          owner.fullName,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: owner.isActive
+                              ? Colors.green.withOpacity(0.15)
+                              : Colors.red.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          owner.isActive ? 'Active' : 'Inactive',
+                          style: TextStyle(
+                            color:
+                                owner.isActive ? Colors.green : Colors.red,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '@${owner.username}',
+                    style: TextStyle(
+                        fontSize: 13, color: Colors.grey[500]),
+                  ),
+                  if (owner.email != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      owner.email!,
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                  if (owner.lastLogin != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.access_time,
+                            size: 12, color: Colors.grey[500]),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Last login: ${_formatDate(owner.lastLogin!)}',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey[500]),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // Toggle active button
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) async {
+                if (value == 'toggle') {
+                  final result =
+                      await provider.toggleOwnerStatus(owner.id);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(result['message'] as String),
+                        backgroundColor: result['success'] == true
+                            ? Colors.green
+                            : Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'toggle',
+                  child: Row(
+                    children: [
+                      Icon(
+                        owner.isActive
+                            ? Icons.block
+                            : Icons.check_circle,
+                        color: owner.isActive ? Colors.red : Colors.green,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                          owner.isActive ? 'Deactivate' : 'Activate'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+}

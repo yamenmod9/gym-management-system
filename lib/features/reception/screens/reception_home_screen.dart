@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../../../shared/widgets/error_display.dart';
+import '../../../core/providers/gym_branding_provider.dart';
 import '../../../core/utils/helpers.dart';
 import '../providers/reception_provider.dart';
 import '../widgets/register_customer_dialog.dart';
@@ -28,10 +29,14 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ReceptionProvider>();
+    final branding = context.watch<GymBrandingProvider>();
+    final gymName = branding.isSetupComplete && branding.gymId != null
+        ? branding.gymName
+        : 'Dashboard';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: Text(gymName),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

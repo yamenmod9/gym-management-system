@@ -3,6 +3,7 @@ Database models initialization
 """
 from .user import User, UserRole
 from .branch import Branch
+from .gym import Gym
 from .customer import Customer, Gender
 from .service import Service, ServiceType
 from .subscription import Subscription, SubscriptionStatus
@@ -19,6 +20,7 @@ __all__ = [
     'User',
     'UserRole',
     'Branch',
+    'Gym',
     'Customer',
     'Gender',
     'Service',

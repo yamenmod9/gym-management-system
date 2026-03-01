@@ -6,6 +6,7 @@ import 'core/auth/auth_provider.dart';
 import 'core/auth/biometric_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
+import 'core/providers/gym_branding_provider.dart';
 import 'routes/app_router.dart';
 import 'features/owner/providers/owner_dashboard_provider.dart';
 import 'features/branch_manager/providers/branch_manager_provider.dart';
@@ -75,15 +76,32 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => AccountantProvider(apiService),
         ),
+
+        // Gym Branding Provider — drives dynamic theming per gym
+        ChangeNotifierProvider(
+          create: (_) => GymBrandingProvider(),
+        ),
       ],
-      child: Consumer<AuthProvider>(
-        builder: (context, authProvider, _) {
-          final router = AppRouter(authProvider);
+      child: Consumer2<AuthProvider, GymBrandingProvider>(
+        builder: (context, authProvider, branding, _) {
+          final router = AppRouter(authProvider, branding);
+
+          // If the gym has branding configured, use it; otherwise fallback to role theme
+          final theme = branding.isSetupComplete && branding.gymId != null
+              ? AppTheme.getThemeByGymBranding(
+                  primaryColor: branding.primaryColor,
+                  secondaryColor: branding.secondaryColor,
+                )
+              : AppTheme.getThemeByRole(authProvider.userRole);
+
+          final title = branding.isSetupComplete && branding.gymId != null
+              ? branding.gymName
+              : AppConstants.appName;
 
           return MaterialApp.router(
-            title: AppConstants.appName,
+            title: title,
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.getThemeByRole(authProvider.userRole),
+            theme: theme,
             routerConfig: router.router,
           );
         },

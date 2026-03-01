@@ -5,6 +5,7 @@ from datetime import datetime
 from flask_jwt_extended import create_access_token, create_refresh_token
 from app.extensions import db
 from app.models.user import User, UserRole
+from app.models.gym import Gym
 
 
 class AuthService:
@@ -32,11 +33,19 @@ class AuthService:
         access_token = create_access_token(identity=str(user.id))
         refresh_token = create_refresh_token(identity=str(user.id))
         
-        return {
+        result = {
             'access_token': access_token,
             'refresh_token': refresh_token,
             'user': user.to_dict()
-        }, None
+        }
+
+        # Include gym data for owners
+        if user.role == UserRole.OWNER:
+            gym = Gym.query.filter_by(owner_id=user.id).first()
+            if gym:
+                result['gym'] = gym.to_dict()
+
+        return result, None
     
     @staticmethod
     def create_user(data):
@@ -80,7 +89,17 @@ class AuthService:
         
         db.session.add(user)
         db.session.commit()
-        
+
+        # Auto-create a Gym record for new owners
+        if role == UserRole.OWNER:
+            gym = Gym(
+                name=f"{data['full_name']}'s Gym",
+                owner_id=user.id,
+                is_setup_complete=False,
+            )
+            db.session.add(gym)
+            db.session.commit()
+
         return user, None
     
     @staticmethod

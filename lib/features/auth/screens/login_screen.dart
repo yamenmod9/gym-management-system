@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/providers/gym_branding_provider.dart';
+import '../../../shared/models/gym_model.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -67,9 +69,20 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _errorMessage = result['message'] ?? 'Biometric login failed';
         });
+      } else {
+        _loadGymBranding(result);
       }
       // On success, the router will handle navigation automatically.
     }
+  }
+
+  /// Populate GymBrandingProvider when the login response includes gym data.
+  void _loadGymBranding(Map<String, dynamic> loginResult) {
+    final gymJson = loginResult['gym'] as Map<String, dynamic>?;
+    if (gymJson == null) return;
+
+    final branding = context.read<GymBrandingProvider>();
+    branding.loadFromGym(GymModel.fromJson(gymJson));
   }
 
   Future<void> _handleLogin() async {
@@ -92,6 +105,8 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       if (result['success'] == true) {
+        // Load gym branding if the backend returned gym data (owners)
+        _loadGymBranding(result);
         // Navigation handled by router
       } else {
         setState(() {
@@ -126,29 +141,57 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Logo/Icon with modern styling
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.fitness_center,
-                        size: 80,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                    // Logo/Icon — uses gym branding if available
+                    Builder(
+                      builder: (context) {
+                        final branding = context.watch<GymBrandingProvider>();
+                        final hasLogo = branding.logoUrl != null && branding.logoUrl!.isNotEmpty;
+                        return Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: hasLogo
+                              ? ClipOval(
+                                  child: Image.network(
+                                    branding.logoUrl!,
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Icon(
+                                      Icons.fitness_center,
+                                      size: 80,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.fitness_center,
+                                  size: 80,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 32),
 
-                    // App Name
-                    Text(
-                      AppConstants.appName,
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                      textAlign: TextAlign.center,
+                    // App Name — dynamic from gym branding
+                    Builder(
+                      builder: (context) {
+                        final branding = context.watch<GymBrandingProvider>();
+                        final displayName = branding.isSetupComplete && branding.gymId != null
+                            ? branding.gymName
+                            : AppConstants.appName;
+                        return Text(
+                          displayName,
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                          textAlign: TextAlign.center,
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
                     Text(

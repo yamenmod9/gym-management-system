@@ -4,6 +4,7 @@ import 'client/core/api/client_api_service.dart';
 import 'client/core/auth/client_auth_provider.dart';
 import 'client/core/theme/client_theme.dart';
 import 'client/routes/client_router.dart';
+import 'core/providers/gym_branding_provider.dart';
 
 void main() {
   runApp(const GymClientApp());
@@ -42,12 +43,27 @@ class _GymClientAppState extends State<GymClientApp> {
         ChangeNotifierProvider<ClientAuthProvider>.value(
           value: _authProvider,
         ),
+        ChangeNotifierProvider(
+          create: (_) => GymBrandingProvider(),
+        ),
       ],
-      child: MaterialApp.router(
-        title: 'Gym Client',
-        debugShowCheckedModeBanner: false,
-        theme: ClientTheme.darkTheme,
-        routerConfig: _router.router,
+      child: Consumer<GymBrandingProvider>(
+        builder: (context, branding, _) {
+          // Use gym branding colors if setup is complete; otherwise default client theme
+          final theme = branding.isSetupComplete && branding.gymId != null
+              ? ClientTheme.buildBrandedTheme(branding.primaryColor, branding.secondaryColor)
+              : ClientTheme.darkTheme;
+          final title = branding.isSetupComplete && branding.gymId != null
+              ? branding.gymName
+              : 'Gym Client';
+
+          return MaterialApp.router(
+            title: title,
+            debugShowCheckedModeBanner: false,
+            theme: theme,
+            routerConfig: _router.router,
+          );
+        },
       ),
     );
   }

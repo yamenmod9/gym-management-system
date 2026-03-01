@@ -44,17 +44,18 @@ class EntryHistoryModel {
     }
   }
 
-  bool get isApproved => entryStatus == 'APPROVED';
+  bool get isApproved =>
+      entryStatus.toLowerCase() == 'approved';
 
   String get entryTypeLabel {
-    switch (entryType) {
-      case 'QR_SCAN':
+    switch (entryType.toLowerCase()) {
+      case 'qr_scan':
         return 'QR Code';
-      case 'BARCODE':
+      case 'barcode':
         return 'Barcode';
-      case 'FINGERPRINT':
+      case 'fingerprint':
         return 'Fingerprint';
-      case 'MANUAL':
+      case 'manual':
         return 'Manual';
       default:
         return 'Entry';

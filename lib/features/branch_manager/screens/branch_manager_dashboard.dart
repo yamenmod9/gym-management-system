@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/providers/gym_branding_provider.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../shared/widgets/stat_card.dart';
@@ -31,11 +32,15 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final provider = context.watch<BranchManagerProvider>();
+    final branding = context.watch<GymBrandingProvider>();
+    final gymName = branding.isSetupComplete && branding.gymId != null
+        ? branding.gymName
+        : 'Branch Manager';
 
     return Scaffold(
       extendBody: true,
       appBar: AppBar(
-        title: const Text('Branch Manager'),
+        title: Text(gymName),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [

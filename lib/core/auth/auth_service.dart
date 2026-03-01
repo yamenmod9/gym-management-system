@@ -85,6 +85,9 @@ class AuthService {
             await _storage.write(key: _branchIdKey, value: branchId.toString());
           }
           
+          // Extract gym data (returned for owner users)
+          final gymData = data['gym'] as Map<String, dynamic>?;
+
           return {
             'success': true,
             'token': token,
@@ -92,6 +95,7 @@ class AuthService {
             'user_id': userId,
             'username': userUsername,
             'branch_id': branchId,
+            if (gymData != null) 'gym': gymData,
           };
         }
       }

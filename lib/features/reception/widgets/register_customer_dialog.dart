@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../shared/widgets/loading_indicator.dart';
+import '../../../core/providers/gym_branding_provider.dart';
 import '../providers/reception_provider.dart';
 
 class RegisterCustomerDialog extends StatefulWidget {
@@ -33,6 +34,20 @@ class _RegisterCustomerDialogState extends State<RegisterCustomerDialog> {
     super.dispose();
   }
 
+  /// Build the customer email using the gym's domain.
+  /// If the user typed just a name (no @), append @gymname.com.
+  /// If they typed a full email, use it as-is.
+  /// If empty, return null.
+  String? _buildEmail() {
+    final text = _emailController.text.trim();
+    if (text.isEmpty) return null;
+    if (text.contains('@')) return text;
+
+    // Auto-append gym domain
+    final branding = context.read<GymBrandingProvider>();
+    return '$text@${branding.emailDomain}';
+  }
+
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -63,7 +78,7 @@ class _RegisterCustomerDialogState extends State<RegisterCustomerDialog> {
         age: int.parse(_ageController.text),
         gender: _gender,
         phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-        email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+        email: _buildEmail(),
         qrCode: null, // QR code will be generated from customer ID after registration
       );
 
@@ -248,14 +263,28 @@ class _RegisterCustomerDialogState extends State<RegisterCustomerDialog> {
                       ),
                       const SizedBox(height: 12),
 
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.email, size: 20),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        keyboardType: TextInputType.emailAddress,
+                      Builder(
+                        builder: (context) {
+                          final branding = context.watch<GymBrandingProvider>();
+                          final domain = branding.emailDomain;
+                          return TextFormField(
+                            controller: _emailController,
+                            decoration: InputDecoration(
+                              labelText: 'Email',
+                              hintText: 'name@$domain',
+                              prefixIcon: const Icon(Icons.email, size: 20),
+                              suffixText: '@$domain',
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            ),
+                            keyboardType: TextInputType.emailAddress,
+                            onChanged: (value) {
+                              // Auto-append gym domain if user types just a username
+                              if (value.isNotEmpty && !value.contains('@')) {
+                                // Don't modify while typing — hint shows the domain
+                              }
+                            },
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
 

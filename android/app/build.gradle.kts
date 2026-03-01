@@ -44,6 +44,12 @@ android {
             versionNameSuffix = "-staff"
             resValue("string", "app_name", "Gym Staff")
         }
+        create("superAdmin") {
+            dimension = "app"
+            applicationIdSuffix = ".superadmin"
+            versionNameSuffix = "-superadmin"
+            resValue("string", "app_name", "Platform Admin")
+        }
     }
 
     buildTypes {
