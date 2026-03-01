@@ -1,5 +1,9 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../core/api/api_service.dart';
 import '../../../core/providers/gym_branding_provider.dart';
@@ -31,9 +35,9 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
   final _gymNameFormKey = GlobalKey<FormState>();
 
   // Step 2 — Logo
-  String? _selectedLogoUrl;
-  // In a real implementation you'd use image_picker to pick a file and upload.
-  // For now we accept a URL or show a placeholder illustrating the flow.
+  File? _selectedLogoFile;
+  String? _uploadedLogoUrl; // set after uploading to backend
+  bool _isUploadingLogo = false;
 
   // Step 3 — Colors
   Color _selectedPrimary = const Color(0xFFDC2626);
@@ -100,6 +104,11 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
       final branding = context.read<GymBrandingProvider>();
       final apiService = context.read<ApiService>();
 
+      // Upload logo file first if one was picked but not yet uploaded
+      if (_selectedLogoFile != null && _uploadedLogoUrl == null) {
+        _uploadedLogoUrl = await _uploadLogo(apiService);
+      }
+
       // Build hex strings from selected colors
       final primaryHex = '#${_selectedPrimary.value.toRadixString(16).substring(2).toUpperCase()}';
       final secondaryHex = '#${_selectedSecondary.value.toRadixString(16).substring(2).toUpperCase()}';
@@ -109,7 +118,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
         'name': _gymNameController.text.trim(),
         'primary_color': primaryHex,
         'secondary_color': secondaryHex,
-        if (_selectedLogoUrl != null) 'logo_url': _selectedLogoUrl,
+        if (_uploadedLogoUrl != null) 'logo_url': _uploadedLogoUrl,
         'is_setup_complete': true,
       });
 
@@ -124,7 +133,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
           gymName: _gymNameController.text.trim(),
           primaryColor: _selectedPrimary,
           secondaryColor: _selectedSecondary,
-          logoUrl: _selectedLogoUrl,
+          logoUrl: _uploadedLogoUrl,
           isSetupComplete: true,
         );
       }
@@ -340,6 +349,91 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
     );
   }
 
+  // ──────────── Logo picking & uploading ────────────
+
+  Future<void> _pickLogo(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    setState(() {
+      _selectedLogoFile = File(picked.path);
+      _uploadedLogoUrl = null; // reset — will upload on submit
+    });
+  }
+
+  void _showPickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickLogo(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take a Photo'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickLogo(ImageSource.camera);
+              },
+            ),
+            if (_selectedLogoFile != null)
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Remove Logo', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _selectedLogoFile = null;
+                    _uploadedLogoUrl = null;
+                  });
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Upload the selected file to the backend and return the server URL.
+  Future<String?> _uploadLogo(ApiService apiService) async {
+    if (_selectedLogoFile == null) return null;
+
+    try {
+      final formData = FormData.fromMap({
+        'logo': await MultipartFile.fromFile(
+          _selectedLogoFile!.path,
+          filename: _selectedLogoFile!.path.split(Platform.pathSeparator).last,
+        ),
+      });
+
+      final response = await apiService.post(
+        '/api/gyms/upload-logo',
+        data: formData,
+      );
+
+      final data = response.data;
+      if (data['success'] == true) {
+        return (data['data'] as Map<String, dynamic>)['logo_url'] as String?;
+      }
+    } catch (e) {
+      debugPrint('Logo upload failed: $e');
+    }
+    return null;
+  }
+
   // ─────────────────────────────────────────────────────────────
   // STEP 2 — Logo
   // ─────────────────────────────────────────────────────────────
@@ -368,13 +462,9 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
           ),
           const SizedBox(height: 40),
 
-          // Logo upload area
+          // Logo preview / upload area
           GestureDetector(
-            onTap: () {
-              // TODO: Implement image_picker when the dependency is added
-              // For now, show a placeholder dialog
-              _showLogoUrlDialog();
-            },
+            onTap: _showPickerOptions,
             child: Container(
               width: 180,
               height: 180,
@@ -387,13 +477,14 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
                   strokeAlign: BorderSide.strokeAlignOutside,
                 ),
               ),
-              child: _selectedLogoUrl != null
+              child: _selectedLogoFile != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(24),
-                      child: Image.network(
-                        _selectedLogoUrl!,
+                      child: Image.file(
+                        _selectedLogoFile!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildUploadPlaceholder(context),
+                        width: 180,
+                        height: 180,
                       ),
                     )
                   : _buildUploadPlaceholder(context),
@@ -402,12 +493,12 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
 
           const SizedBox(height: 16),
           TextButton.icon(
-            onPressed: () => _showLogoUrlDialog(),
+            onPressed: _showPickerOptions,
             icon: Icon(
-              _selectedLogoUrl != null ? Icons.edit : Icons.cloud_upload,
+              _selectedLogoFile != null ? Icons.edit : Icons.cloud_upload,
               size: 18,
             ),
-            label: Text(_selectedLogoUrl != null ? 'Change Logo' : 'Upload Logo'),
+            label: Text(_selectedLogoFile != null ? 'Change Logo' : 'Choose Logo'),
           ),
 
           const SizedBox(height: 24),
@@ -455,36 +546,6 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
           ),
         ),
       ],
-    );
-  }
-
-  void _showLogoUrlDialog() {
-    final controller = TextEditingController(text: _selectedLogoUrl);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Logo URL'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'https://example.com/logo.png',
-            labelText: 'Image URL',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() => _selectedLogoUrl = controller.text.trim().isEmpty ? null : controller.text.trim());
-              Navigator.pop(ctx);
-            },
-            child: const Text('Set Logo'),
-          ),
-        ],
-      ),
     );
   }
 
