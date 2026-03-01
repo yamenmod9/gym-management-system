@@ -68,4 +68,8 @@ class ApiEndpoints {
   static const String dashboardAccountant = '/api/dashboards/accountant';
   static const String dashboardBranchManager = '/api/dashboards/branch-manager';
   static String dashboardBranch(int branchId) => '/api/dashboards/branch/$branchId';
+
+  // User / Staff Endpoints
+  static const String users = '/api/users';
+  static String userById(int id) => '/api/users/$id';
 }

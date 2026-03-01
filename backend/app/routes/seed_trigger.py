@@ -1,5 +1,6 @@
 """
 Temporary seed trigger - creates gyms table and records for existing owners.
+Also runs lightweight schema migrations (add missing columns).
 Remove after initial setup is complete.
 """
 from flask import Blueprint
@@ -10,14 +11,32 @@ from app.models.user import User, UserRole
 seed_trigger_bp = Blueprint('seed_trigger', __name__)
 
 
+def _add_column_if_missing(table, column, col_type='VARCHAR(255)'):
+    """Add a column to an existing table if it doesn't exist (SQLite)."""
+    try:
+        db.session.execute(db.text(f"SELECT {column} FROM {table} LIMIT 1"))
+    except Exception:
+        db.session.rollback()
+        db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+        db.session.commit()
+        return True
+    return False
+
+
 @seed_trigger_bp.route('/api/admin/run-seed', methods=['POST'])
 def run_seed():
-    """Create gyms table and add gym records for existing owners."""
+    """Create gyms table and add gym records for existing owners.
+    Also runs lightweight migrations for new columns."""
     try:
-        # Create the gyms table if it doesn't exist
+        # Create any new tables
         db.create_all()
 
-        # Find owners without gyms
+        # ── Schema migrations ──────────────────────────────
+        migrations = []
+        if _add_column_if_missing('fingerprints', 'template_hash'):
+            migrations.append('fingerprints.template_hash')
+
+        # ── Seed gym records ──────────────────────────────
         owners = User.query.filter_by(role=UserRole.OWNER).all()
         created = 0
         for owner in owners:
@@ -36,6 +55,7 @@ def run_seed():
             'success': True,
             'message': f'Created {created} gym records for owners',
             'total_owners': len(owners),
+            'migrations': migrations,
         }
     except Exception as e:
         db.session.rollback()

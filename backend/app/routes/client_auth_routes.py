@@ -53,6 +53,11 @@ def client_login():
         status=SubscriptionStatus.ACTIVE
     ).first()
     
+    # Get gym branding (single-tenant: one gym in the system)
+    from app.models.gym import Gym
+    gym = Gym.query.first()
+    gym_data = gym.to_dict() if gym else None
+
     return success_response({
         'access_token': access_token,
         'token_type': 'Bearer',
@@ -66,7 +71,8 @@ def client_login():
             'branch_id': customer.branch_id,
             'branch_name': customer.branch.name if customer.branch else None,
             'has_active_subscription': active_subscription is not None
-        }
+        },
+        'gym': gym_data,
     }, 'Login successful')
 
 

@@ -68,6 +68,24 @@ def register_fingerprint():
     
     if existing:
         return error_response("Customer already has an active fingerprint", 400)
+
+    # ── Duplicate biometric check ──────────────────────────────
+    # Compute a deterministic hash of just the biometric data
+    # and verify it isn't already registered to another customer.
+    template_hash = Fingerprint.generate_template_hash(data['unique_data'])
+
+    duplicate = Fingerprint.query.filter(
+        Fingerprint.template_hash == template_hash,
+        Fingerprint.customer_id != customer.id,
+        Fingerprint.is_active == True,
+    ).first()
+
+    if duplicate:
+        return error_response(
+            "This fingerprint is already registered to another customer "
+            f"(Customer #{duplicate.customer_id} - {duplicate.customer.full_name})",
+            400,
+        )
     
     # Generate fingerprint hash (simulated)
     fingerprint_hash = Fingerprint.generate_fingerprint_hash(
@@ -78,6 +96,7 @@ def register_fingerprint():
     fingerprint = Fingerprint(
         customer_id=customer.id,
         fingerprint_hash=fingerprint_hash,
+        template_hash=template_hash,
         is_active=True
     )
     

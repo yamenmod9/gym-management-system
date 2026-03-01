@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/auth/client_auth_provider.dart';
+import '../../core/providers/gym_branding_provider.dart';
+import '../../shared/models/gym_model.dart';
 import 'package:go_router/go_router.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -23,6 +25,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     super.dispose();
   }
 
+  void _loadGymBranding(Map<String, dynamic> loginData) {
+    final gymJson = loginData['gym'] as Map<String, dynamic>?;
+    if (gymJson == null) return;
+    final branding = context.read<GymBrandingProvider>();
+    branding.loadFromGym(GymModel.fromJson(gymJson));
+  }
+
   Future<void> _login() async {
     final identifier = _identifierController.text.trim();
     final password = _passwordController.text.trim();
@@ -43,9 +52,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       print('🔐 WelcomeScreen: Starting login...');
       final authProvider = context.read<ClientAuthProvider>();
 
-      await authProvider.login(identifier, password);
+      final data = await authProvider.login(identifier, password);
 
       if (!mounted) return;
+
+      // Load gym branding if present
+      _loadGymBranding(data);
 
       print('🔐 WelcomeScreen: Login completed successfully');
       print('🔐 WelcomeScreen: isAuth=${authProvider.isAuthenticated}');

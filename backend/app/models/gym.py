@@ -29,14 +29,24 @@ class Gym(db.Model):
 
     def to_dict(self):
         """Serialize to dictionary matching Flutter GymModel.fromJson expectations."""
+        from flask import request as flask_request
         owner = self.owner
+
+        # Build full logo URL so Flutter can use Image.network() directly
+        logo = self.logo_url
+        if logo and logo.startswith('/'):
+            try:
+                logo = flask_request.url_root.rstrip('/') + logo
+            except RuntimeError:
+                pass  # Outside request context — keep relative
+
         return {
             'id': self.id,
             'name': self.name,
             'owner_id': self.owner_id,
             'owner_name': owner.full_name if owner else None,
             'owner_username': owner.username if owner else None,
-            'logo_url': self.logo_url,
+            'logo_url': logo,
             'primary_color': self.primary_color,
             'secondary_color': self.secondary_color,
             'is_setup_complete': self.is_setup_complete,

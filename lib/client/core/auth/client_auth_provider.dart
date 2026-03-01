@@ -30,7 +30,7 @@ class ClientAuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> login(String identifier, String password) async {
+  Future<Map<String, dynamic>> login(String identifier, String password) async {
     print('🔐 ClientAuthProvider: Starting login...');
     print('🔐 ClientAuthProvider: Current state - isAuth=$_isAuthenticated, passwordChanged=$_passwordChanged');
 
@@ -104,6 +104,8 @@ class ClientAuthProvider extends ChangeNotifier {
     // Wait a bit to ensure listeners are notified
     await Future.delayed(const Duration(milliseconds: 100));
     print('🔐 ClientAuthProvider: Login process complete');
+
+    return data;
   }
 
   Future<void> changePassword(String currentPassword, String newPassword) async {

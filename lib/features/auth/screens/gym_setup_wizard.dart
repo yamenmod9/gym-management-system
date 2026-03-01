@@ -352,19 +352,38 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
   // ──────────── Logo picking & uploading ────────────
 
   Future<void> _pickLogo(ImageSource source) async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: source,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
-    );
-    if (picked == null) return;
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
 
-    setState(() {
-      _selectedLogoFile = File(picked.path);
-      _uploadedLogoUrl = null; // reset — will upload on submit
-    });
+      final file = File(picked.path);
+      if (!await file.exists()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Selected file not found'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _selectedLogoFile = file;
+        _uploadedLogoUrl = null; // reset — will upload on submit
+      });
+    } catch (e) {
+      debugPrint('Image picker error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick image: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   void _showPickerOptions() {
@@ -485,6 +504,19 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
                         fit: BoxFit.cover,
                         width: 180,
                         height: 180,
+                        errorBuilder: (_, error, ___) {
+                          debugPrint('Logo Image.file error: $error');
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.broken_image, size: 48, color: Colors.red[400]),
+                                const SizedBox(height: 8),
+                                Text('Cannot display image', style: TextStyle(color: Colors.red[400], fontSize: 12)),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     )
                   : _buildUploadPlaceholder(context),

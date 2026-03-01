@@ -9,6 +9,7 @@ import '../../../shared/widgets/stat_card.dart';
 import '../../../shared/widgets/date_range_picker.dart';
 import '../../../core/utils/helpers.dart';
 import '../providers/owner_dashboard_provider.dart';
+import '../widgets/add_staff_dialog.dart';
 import 'smart_alerts_screen.dart';
 import 'staff_leaderboard_screen.dart';
 import 'branch_detail_screen.dart';
@@ -524,28 +525,50 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       onRefresh: () => provider.refresh(),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-        itemCount: provider.employeePerformance.length + 1,
+        itemCount: provider.employeePerformance.length + 2, // +2 for header buttons
         itemBuilder: (context, index) {
           if (index == 0) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const StaffLeaderboardScreen()),
-                  );
-                },
-                icon: const Icon(Icons.emoji_events),
-                label: const Text('View Full Leaderboard'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const StaffLeaderboardScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.emoji_events, size: 18),
+                      label: const Text('Leaderboard'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _showAddStaffDialog(context),
+                      icon: const Icon(Icons.person_add, size: 18),
+                      label: const Text('Add Staff'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: Colors.green,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             );
           }
-          final employee = provider.employeePerformance[index - 1];
+          if (index == 1) {
+            return const SizedBox(height: 4);
+          }
+          final employee = provider.employeePerformance[index - 2];
           final name = employee['full_name'] ?? employee['staff_name'] ?? employee['name'] ?? employee['employee_name'] ?? employee['username'] ?? 'Unknown';
           final role = (employee['role'] ?? 'Employee').toString().replaceAll('_', ' ');
           final revenue = (employee['total_revenue'] ?? employee['revenue'] ?? 0).toDouble();
@@ -774,6 +797,19 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
               ),
             ),
           );
+        },
+      ),
+    );
+  }
+
+  void _showAddStaffDialog(BuildContext context) {
+    final apiService = context.read<OwnerDashboardProvider>().apiService;
+    showDialog(
+      context: context,
+      builder: (_) => AddStaffDialog(
+        apiService: apiService,
+        onStaffCreated: () {
+          context.read<OwnerDashboardProvider>().refresh();
         },
       ),
     );
