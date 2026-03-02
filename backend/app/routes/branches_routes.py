@@ -178,7 +178,7 @@ def get_branch_performance(branch_id):
     
     # Check access
     current_user = get_current_user()
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
         if current_user.branch_id and branch_id != current_user.branch_id:
             return error_response("Access denied", 403)
     

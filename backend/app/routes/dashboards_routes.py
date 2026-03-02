@@ -221,7 +221,7 @@ def get_expiring_subscriptions_alert():
     user = get_current_user()
     
     # Branch-specific roles can only see their branch
-    if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
         branch_id = user.branch_id
     
     subscriptions = get_expiring_subscriptions(days, branch_id)

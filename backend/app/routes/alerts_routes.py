@@ -137,7 +137,7 @@ def get_alerts():
 
 @alerts_bp.route('/smart', methods=['GET'])
 @jwt_required()
-@role_required([UserRole.OWNER])
+@role_required([UserRole.SUPER_ADMIN, UserRole.OWNER])
 def get_smart_alerts():
     """
     Get smart alerts for owner dashboard
