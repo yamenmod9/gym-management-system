@@ -14,6 +14,7 @@ import 'smart_alerts_screen.dart';
 import 'staff_leaderboard_screen.dart';
 import 'branch_detail_screen.dart';
 import 'owner_settings_screen.dart';
+import '../../../core/localization/app_strings.dart';
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
@@ -40,7 +41,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     final branding = context.watch<GymBrandingProvider>();
     final gymName = branding.isSetupComplete && branding.gymId != null
         ? branding.gymName
-        : 'Owner Dashboard';
+        : S.ownerDashboard;
 
     return Scaffold(
       extendBody: true,
@@ -91,7 +92,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                   children: [
                     Icon(Icons.logout, color: Colors.black54),
                     SizedBox(width: 8),
-                    Text('Logout'),
+                    Text(S.logout),
                   ],
                 ),
               ),
@@ -100,7 +101,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         ],
       ),
       body: dashboardProvider.isLoading
-          ? const LoadingIndicator(message: 'Loading Dashboard...')
+          ? const LoadingIndicator(message: S.loadingDashboard)
           : dashboardProvider.error != null
               ? ErrorDisplay(
                   message: dashboardProvider.error!,
@@ -148,27 +149,27 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                   NavigationDestination(
                     icon: Icon(Icons.dashboard_outlined),
                     selectedIcon: Icon(Icons.dashboard),
-                    label: 'Overview',
+                    label: S.overview,
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.store_outlined),
                     selectedIcon: Icon(Icons.store),
-                    label: 'Branches',
+                    label: S.branches,
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.people_outlined),
                     selectedIcon: Icon(Icons.people),
-                    label: 'Staff',
+                    label: S.staff,
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.assessment_outlined),
                     selectedIcon: Icon(Icons.assessment),
-                    label: 'Finance',
+                    label: S.finance,
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.report_problem_outlined),
                     selectedIcon: Icon(Icons.report_problem),
-                    label: 'Issues',
+                    label: S.issues,
                   ),
                 ],
               ),
@@ -204,10 +205,10 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildWelcomeCard(context, authProvider.username ?? 'Owner'),
+            _buildWelcomeCard(context, authProvider.username ?? S.owner),
             const SizedBox(height: 20),
             Text(
-              'Key Metrics',
+              S.keyMetrics,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -221,7 +222,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Recent Alerts',
+                    S.recentAlerts,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   TextButton(
@@ -231,7 +232,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                         MaterialPageRoute(builder: (context) => const SmartAlertsScreen()),
                       );
                     },
-                    child: const Text('View All'),
+                    child: const Text(S.viewAll),
                   ),
                 ],
               ),
@@ -270,7 +271,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Welcome back,',
+            S.welcomeBack,
             style: TextStyle(
               color: Colors.white.withOpacity(0.9),
               fontSize: 16,
@@ -306,25 +307,25 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       childAspectRatio: 1.5,
       children: [
         StatCard(
-          title: 'Total Revenue',
+          title: S.totalRevenue,
           value: NumberHelper.formatCurrency(totalRevenue),
           icon: Icons.attach_money,
           color: Colors.green,
         ),
         StatCard(
-          title: 'Active Subs',
+          title: S.activeSubs,
           value: NumberHelper.formatNumber(activeSubscriptions),
           icon: Icons.card_membership,
           color: Colors.blue,
         ),
         StatCard(
-          title: 'Total Customers',
+          title: S.totalCustomers,
           value: NumberHelper.formatNumber(totalCustomers),
           icon: Icons.people,
           color: Colors.orange,
         ),
         StatCard(
-          title: 'Branches',
+          title: S.branches,
           value: NumberHelper.formatNumber(totalBranches),
           icon: Icons.store,
           color: Colors.purple,
@@ -356,7 +357,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
               size: 20,
             ),
           ),
-          title: Text(alert['title'] ?? alert['message'] ?? 'Alert'),
+          title: Text(alert['title'] ?? alert['message'] ?? S.alert),
           subtitle: Text(alert['description'] ?? ''),
           trailing: const Icon(Icons.chevron_right, size: 16),
           onTap: () {
@@ -379,7 +380,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           children: [
             Icon(Icons.store_outlined, size: 64, color: Colors.grey),
             SizedBox(height: 16),
-            Text('No branches found', style: TextStyle(fontSize: 16, color: Colors.grey)),
+            Text(S.noBranchesFound, style: TextStyle(fontSize: 16, color: Colors.grey)),
           ],
         ),
       );
@@ -393,7 +394,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         itemBuilder: (context, index) {
           final branch = provider.branchComparison[index];
           final id = branch['id'] ?? branch['branch_id'] ?? 0;
-          final name = branch['name'] ?? branch['branch_name'] ?? 'Unknown';
+          final name = branch['name'] ?? branch['branch_name'] ?? S.unknown;
           final revenue = (branch['revenue'] ?? 0).toDouble();
           final customers = branch['customers'] ?? branch['customers_count'] ?? branch['customer_count'] ?? 0;
           final activeSubs = branch['active_subscriptions'] ?? branch['capacity'] ?? 0;
@@ -474,7 +475,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                             ),
                           ),
                         if (!isActive)
-                          const Chip(label: Text('Inactive'), backgroundColor: Colors.grey),
+                          const Chip(label: Text(S.inactive), backgroundColor: Colors.grey),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -483,10 +484,10 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildBranchStat(Icons.people, '$customers', 'Customers'),
-                        _buildBranchStat(Icons.card_membership, '$activeSubs', 'Active Subs'),
-                        _buildBranchStat(Icons.badge, '$staffCount', 'Staff'),
-                        if (revenue > 0) _buildBranchStat(Icons.attach_money, NumberHelper.formatCurrency(revenue), 'Revenue'),
+                        _buildBranchStat(Icons.people, '$customers', S.customers),
+                        _buildBranchStat(Icons.card_membership, '$activeSubs', S.activeSubs),
+                        _buildBranchStat(Icons.badge, '$staffCount', S.staff),
+                        if (revenue > 0) _buildBranchStat(Icons.attach_money, NumberHelper.formatCurrency(revenue), S.revenue),
                       ],
                     ),
                     if (phone.isNotEmpty) ...[
@@ -541,7 +542,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                         );
                       },
                       icon: const Icon(Icons.emoji_events, size: 18),
-                      label: const Text('Leaderboard'),
+                      label: const Text(S.leaderboard),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -553,7 +554,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                     child: ElevatedButton.icon(
                       onPressed: () => _showAddStaffDialog(context),
                       icon: const Icon(Icons.person_add, size: 18),
-                      label: const Text('Add Staff'),
+                      label: const Text(S.addStaff),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         backgroundColor: Colors.green,
@@ -569,7 +570,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
             return const SizedBox(height: 4);
           }
           final employee = provider.employeePerformance[index - 2];
-          final name = employee['full_name'] ?? employee['staff_name'] ?? employee['name'] ?? employee['employee_name'] ?? employee['username'] ?? 'Unknown';
+          final name = employee['full_name'] ?? employee['staff_name'] ?? employee['name'] ?? employee['employee_name'] ?? employee['username'] ?? S.unknown;
           final role = (employee['role'] ?? 'Employee').toString().replaceAll('_', ' ');
           final revenue = (employee['total_revenue'] ?? employee['revenue'] ?? 0).toDouble();
           final transactions = employee['transactions_count'] ?? 0;
@@ -647,7 +648,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '$transactions transactions',
+                        S.transactionsCount(transactions as int),
                         style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       ),
                     ],
@@ -675,31 +676,31 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: [
           SimpleStatCard(
-            label: 'Total Revenue',
+            label: S.totalRevenue,
             value: NumberHelper.formatCurrency(totalRevenue),
             color: Colors.green,
           ),
           const SizedBox(height: 12),
           SimpleStatCard(
-            label: 'Total Expenses',
+            label: S.totalExpenses,
             value: NumberHelper.formatCurrency(totalExpenses),
             color: Colors.red,
           ),
           const SizedBox(height: 12),
           SimpleStatCard(
-            label: 'Net Profit',
+            label: S.netProfit,
             value: NumberHelper.formatCurrency(netProfit),
             color: netProfit >= 0 ? Colors.blue : Colors.red,
           ),
           const SizedBox(height: 12),
           SimpleStatCard(
-            label: 'Active Subscriptions',
+            label: S.activeSubscriptions,
             value: NumberHelper.formatNumber(activeSubscriptions),
             color: Colors.teal,
           ),
           const SizedBox(height: 12),
           SimpleStatCard(
-            label: 'Total Customers',
+            label: S.totalCustomers,
             value: NumberHelper.formatNumber(totalCustomers),
             color: Colors.orange,
           ),
@@ -716,9 +717,9 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           children: [
             Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
             SizedBox(height: 16),
-            Text('No complaints', style: TextStyle(fontSize: 16, color: Colors.grey)),
+            Text(S.noComplaints, style: TextStyle(fontSize: 16, color: Colors.grey)),
             SizedBox(height: 8),
-            Text('All clear!', style: TextStyle(fontSize: 13, color: Colors.grey)),
+            Text(S.allClear, style: TextStyle(fontSize: 13, color: Colors.grey)),
           ],
         ),
       );
@@ -753,7 +754,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          c['title'] ?? 'Complaint',
+                          c['title'] ?? S.complaint,
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                         ),
                       ),
@@ -784,7 +785,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                     children: [
                       Icon(Icons.location_on, size: 14, color: Colors.grey[500]),
                       const SizedBox(width: 4),
-                      Text(c['branch_name'] ?? 'Unknown Branch', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                      Text(c['branch_name'] ?? S.unknownBranch, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                       if (c['customer_name'] != null) ...[
                         const SizedBox(width: 12),
                         Icon(Icons.person, size: 14, color: Colors.grey[500]),

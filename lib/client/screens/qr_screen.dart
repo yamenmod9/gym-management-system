@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
+import '../../core/localization/app_strings.dart';
 import '../core/auth/client_auth_provider.dart';
 import '../core/api/client_api_service.dart';
 
@@ -91,7 +92,7 @@ class _QrScreenState extends State<QrScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('QR code refreshed successfully'),
+              content: Text(S.qrRefreshed),
               backgroundColor: Colors.green,
             ),
           );
@@ -101,7 +102,7 @@ class _QrScreenState extends State<QrScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to refresh: $e'),
+            content: Text(S.failedToRefresh(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -156,7 +157,7 @@ class _QrScreenState extends State<QrScreen> {
             }
           },
         ),
-        title: const Text('My QR Code'),
+        title: const Text(S.myQRCodeTitle),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -183,7 +184,7 @@ class _QrScreenState extends State<QrScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'QR code is valid, but you have no active subscription. Please activate a subscription to use gym services.',
+                            S.qrNoActiveSub,
                             style: TextStyle(
                               color: Colors.orange[800],
                               fontSize: 12,
@@ -228,7 +229,7 @@ class _QrScreenState extends State<QrScreen> {
               
               // Debug info
               Text(
-                'Scannable: ${canScan ? "Yes" : "Expired"}',
+                canScan ? S.scannableYes : S.scannableExpired,
                 style: TextStyle(
                   color: canScan ? Colors.green : Colors.orange,
                   fontSize: 12,
@@ -285,8 +286,8 @@ class _QrScreenState extends State<QrScreen> {
                       const SizedBox(width: 12),
                       Text(
                         isExpired
-                            ? 'QR Code Expired'
-                            : 'Expires in: ${_formatCountdown()}',
+                            ? S.qrCodeExpired
+                            : S.expiresIn(_formatCountdown()),
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               color: isExpired
                                   ? Colors.red
@@ -315,7 +316,7 @@ class _QrScreenState extends State<QrScreen> {
                         ),
                       )
                     : const Icon(Icons.refresh),
-                label: const Text('Refresh QR Code'),
+                label: Text(S.refreshQRCode),
               ),
 
               const SizedBox(height: 32),
@@ -338,17 +339,14 @@ class _QrScreenState extends State<QrScreen> {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          'How to use',
+                          S.howToUse,
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      '• Show this QR code at gym entrance\n'
-                      '• QR code is valid for 1 hour\n'
-                      '• Refresh if expired\n'
-                      '• Keep phone screen bright for scanning',
+                      S.qrInstructions,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
@@ -370,22 +368,22 @@ class _QrScreenState extends State<QrScreen> {
       case 'active':
         color = Colors.green;
         icon = Icons.check_circle;
-        message = 'Active Subscription';
+        message = S.activeSubscriptionStatus;
         break;
       case 'frozen':
         color = Colors.blue;
         icon = Icons.ac_unit;
-        message = 'Subscription Frozen';
+        message = S.subscriptionFrozenStatus;
         break;
       case 'stopped':
         color = Colors.red;
         icon = Icons.cancel;
-        message = 'Subscription Stopped';
+        message = S.subscriptionStoppedStatus;
         break;
       default:
         color = Colors.grey;
         icon = Icons.info;
-        message = 'Inactive';
+        message = S.inactiveStatus;
     }
 
     return Container(

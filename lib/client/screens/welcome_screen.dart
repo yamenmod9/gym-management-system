@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/localization/app_strings.dart';
 import '../core/auth/client_auth_provider.dart';
 import '../../core/providers/gym_branding_provider.dart';
 import '../../shared/models/gym_model.dart';
@@ -39,7 +40,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     if (identifier.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter phone/email and password'),
+          content: Text(S.pleaseEnterCredentials),
           backgroundColor: Colors.orange,
         ),
       );
@@ -67,7 +68,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Login successful!'),
+          content: Text(S.loginSuccessful),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 1),
         ),
@@ -129,7 +130,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
               // Title
               Text(
-                'Gym Member Portal',
+                S.gymMemberPortal,
                 style: Theme.of(context).textTheme.displaySmall,
                 textAlign: TextAlign.center,
               ),
@@ -137,7 +138,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
               // Subtitle
               Text(
-                'Login to access your membership',
+                S.loginToAccess,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Theme.of(context).textTheme.bodySmall?.color,
                     ),
@@ -149,10 +150,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               TextField(
                 controller: _identifierController,
                 decoration: const InputDecoration(
-                  labelText: 'Phone Number or Email',
+                  labelText: S.phoneOrEmail,
                   prefixIcon: Icon(Icons.person),
-                  hintText: 'Enter your phone or email',
-                  helperText: 'Use the credentials provided by reception',
+                  hintText: S.enterPhoneOrEmail,
+                  helperText: S.credentialsFromReception,
                 ),
                 keyboardType: TextInputType.text,
                 enabled: !_isLoading,
@@ -163,9 +164,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               TextField(
                 controller: _passwordController,
                 decoration: InputDecoration(
-                  labelText: 'Password',
+                  labelText: S.password,
                   prefixIcon: const Icon(Icons.lock),
-                  helperText: 'First-time users: Use temporary password from reception',
+                  helperText: S.firstTimeHint,
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword ? Icons.visibility : Icons.visibility_off,
@@ -197,7 +198,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           ),
                         ),
                       )
-                    : const Text('Login'),
+                    : const Text(S.login),
               ),
               const SizedBox(height: 24),
 
@@ -208,7 +209,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'First Time?',
+                      S.firstTime,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
@@ -231,14 +232,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'New Member?',
+                        S.newMember,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Please visit the gym reception to get your login credentials',
+                        S.visitReception,
                         style: Theme.of(context).textTheme.bodyMedium,
                         textAlign: TextAlign.center,
                       ),

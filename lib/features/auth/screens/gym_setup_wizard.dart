@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../core/api/api_service.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../core/providers/gym_branding_provider.dart';
 import '../../../shared/models/gym_model.dart';
 import '../../../shared/widgets/loading_indicator.dart';
@@ -154,7 +155,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
 
   @override
   Widget build(BuildContext context) {
-    final labels = ['Gym Name', 'Logo', 'Brand Colors'];
+    final labels = [S.gymName, S.logo, S.brandColors];
 
     return Scaffold(
       body: SafeArea(
@@ -167,14 +168,14 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Set Up Your Gym',
+                    S.setupYourGym,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Step ${_currentStep + 1} of 3 — ${labels[_currentStep]}',
+                    S.stepOf(_currentStep + 1),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.grey[500],
                         ),
@@ -228,7 +229,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        child: const Text('Back'),
+                        child: const Text(S.back),
                       ),
                     ),
                   if (_currentStep > 0) const SizedBox(width: 16),
@@ -242,7 +243,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
                       child: _isSubmitting
                           ? const SmallLoadingIndicator()
                           : Text(
-                              _currentStep < 2 ? 'Continue' : 'Finish Setup',
+                              _currentStep < 2 ? S.continueText : S.finishSetup,
                               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                             ),
                     ),
@@ -284,7 +285,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
             const SizedBox(height: 32),
 
             Text(
-              'What\'s your gym called?',
+              S.whatsYourGymCalled,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -292,7 +293,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
             ),
             const SizedBox(height: 8),
             Text(
-              'This will appear as the app name for all your staff and customers.',
+              S.gymNameAppears,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[500],
                   ),
@@ -303,8 +304,8 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
             TextFormField(
               controller: _gymNameController,
               decoration: const InputDecoration(
-                labelText: 'Gym Name',
-                hintText: 'e.g. Body Art Fitness',
+                labelText: S.gymName,
+                hintText: S.gymNameHint,
                 prefixIcon: Icon(Icons.store),
               ),
               textAlign: TextAlign.center,
@@ -312,10 +313,10 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
               textCapitalization: TextCapitalization.words,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Please enter your gym name';
+                  return S.pleaseEnterGymName;
                 }
                 if (value.trim().length < 2) {
-                  return 'Name must be at least 2 characters';
+                  return S.nameTooShort;
                 }
                 return null;
               },
@@ -366,7 +367,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
       if (!await file.exists()) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Selected file not found'), backgroundColor: Colors.red),
+            const SnackBar(content: Text(S.fileNotFound), backgroundColor: Colors.red),
           );
         }
         return;
@@ -394,7 +395,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
+              title: const Text(S.chooseFromGallery),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickLogo(ImageSource.gallery);
@@ -402,7 +403,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
             ),
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Take a Photo'),
+              title: const Text(S.takePhoto),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickLogo(ImageSource.camera);
@@ -411,7 +412,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
             if (_selectedLogoFile != null)
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Remove Logo', style: TextStyle(color: Colors.red)),
+                title: const Text(S.removeLogo, style: TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(ctx);
                   setState(() {
@@ -465,7 +466,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
           const SizedBox(height: 40),
 
           Text(
-            'Upload Your Gym Logo',
+            S.uploadGymLogo,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -473,7 +474,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
           ),
           const SizedBox(height: 8),
           Text(
-            'This will be shown on the login screen and app header.',
+            S.logoShownOn,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Colors.grey[500],
                 ),
@@ -512,7 +513,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
                               children: [
                                 Icon(Icons.broken_image, size: 48, color: Colors.red[400]),
                                 const SizedBox(height: 8),
-                                Text('Cannot display image', style: TextStyle(color: Colors.red[400], fontSize: 12)),
+                                Text(S.cannotDisplayImage, style: TextStyle(color: Colors.red[400], fontSize: 12)),
                               ],
                             ),
                           );
@@ -530,7 +531,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
               _selectedLogoFile != null ? Icons.edit : Icons.cloud_upload,
               size: 18,
             ),
-            label: Text(_selectedLogoFile != null ? 'Change Logo' : 'Choose Logo'),
+            label: Text(_selectedLogoFile != null ? S.changeLogo : S.chooseLogo),
           ),
 
           const SizedBox(height: 24),
@@ -548,7 +549,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'You can skip this for now and add a logo later from Settings.',
+                    S.skipLogoHint,
                     style: TextStyle(color: Colors.grey[500], fontSize: 12),
                   ),
                 ),
@@ -571,7 +572,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Tap to upload',
+          S.tapToUpload,
           style: TextStyle(
             color: Colors.grey[500],
             fontSize: 13,
@@ -593,7 +594,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
           const SizedBox(height: 32),
 
           Text(
-            'Choose Your Brand Colors',
+            S.chooseYourBrandColors,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -601,7 +602,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
           ),
           const SizedBox(height: 8),
           Text(
-            'These colors will be used throughout the app for your gym.',
+            S.colorsUsedThroughout,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Colors.grey[500],
                 ),
@@ -611,14 +612,14 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
 
           // Primary color picker
           Text(
-            'Primary Color',
+            S.primaryColor,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
           ),
           const SizedBox(height: 4),
           Text(
-            'Used for buttons, highlights, and accents',
+            S.usedForButtons,
             style: TextStyle(color: Colors.grey[500], fontSize: 13),
           ),
           const SizedBox(height: 16),
@@ -631,14 +632,14 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
 
           // Secondary color picker
           Text(
-            'Secondary Color',
+            S.secondaryColor,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
           ),
           const SizedBox(height: 4),
           Text(
-            'Used for secondary elements and accents',
+            S.usedForSecondary,
             style: TextStyle(color: Colors.grey[500], fontSize: 13),
           ),
           const SizedBox(height: 16),
@@ -668,7 +669,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
             child: Column(
               children: [
                 Text(
-                  'Preview',
+                  S.preview,
                   style: TextStyle(
                     color: Colors.grey[500],
                     fontSize: 12,
@@ -678,7 +679,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
                 const SizedBox(height: 12),
                 Text(
                   _gymNameController.text.trim().isEmpty
-                      ? 'Your Gym'
+                      ? S.yourGym
                       : _gymNameController.text.trim(),
                   style: TextStyle(
                     color: _selectedPrimary,
@@ -696,7 +697,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
                         backgroundColor: _selectedPrimary,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('Primary'),
+                      child: const Text(S.primary),
                     ),
                     const SizedBox(width: 12),
                     OutlinedButton(
@@ -705,7 +706,7 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
                         foregroundColor: _selectedSecondary,
                         side: BorderSide(color: _selectedSecondary),
                       ),
-                      child: const Text('Secondary'),
+                      child: const Text(S.secondary),
                     ),
                   ],
                 ),

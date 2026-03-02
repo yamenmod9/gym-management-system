@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/localization/app_strings.dart';
 import '../core/api/client_api_service.dart';
 import '../models/entry_history_model.dart';
 
@@ -47,7 +48,7 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
       }
     } catch (e) {
       setState(() {
-        _error = 'Entry history feature is not yet available.\n\nPlease check back later or contact support if this issue persists.';
+        _error = S.entryHistoryNotAvailable;
       });
       print('❌ Entry history error: $e');
     } finally {
@@ -71,7 +72,7 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
             }
           },
         ),
-        title: const Text('Entry History'),
+        title: const Text(S.entryHistoryTitle),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -87,7 +88,7 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _loadEntries,
-                        child: const Text('Retry'),
+                        child: const Text(S.retry),
                       ),
                     ],
                   ),
@@ -106,12 +107,12 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'No entry history yet',
+                                S.noEntryHistory,
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Your gym visits will appear here',
+                                S.visitsAppearHere,
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ],
@@ -203,7 +204,7 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          isApproved ? 'Approved' : 'Denied',
+                          isApproved ? S.approvedEntry : S.deniedEntry,
                           style: TextStyle(
                             color: statusColor,
                             fontSize: 12,

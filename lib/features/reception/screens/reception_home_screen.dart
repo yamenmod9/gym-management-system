@@ -9,6 +9,7 @@ import '../widgets/register_customer_dialog.dart';
 import '../widgets/activate_subscription_dialog.dart';
 import 'health_report_screen.dart';
 import 'qr_scanner_screen.dart';
+import '../../../core/localization/app_strings.dart';
 
 class ReceptionHomeScreen extends StatefulWidget {
   const ReceptionHomeScreen({super.key});
@@ -32,7 +33,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
     final branding = context.watch<GymBrandingProvider>();
     final gymName = branding.isSetupComplete && branding.gymId != null
         ? branding.gymName
-        : 'Dashboard';
+        : S.dashboard;
 
     return Scaffold(
       appBar: AppBar(
@@ -45,7 +46,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
         ],
       ),
       body: provider.isLoading
-          ? const LoadingIndicator(message: 'Loading...')
+          ? const LoadingIndicator(message: S.loading)
           : provider.error != null
               ? ErrorDisplay(
                   message: provider.error!,
@@ -58,7 +59,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
                     children: [
                       // Statistics Section
                       Text(
-                        'Dashboard Statistics',
+                        S.dashboardStats,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -76,28 +77,28 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
                         children: [
                           _buildStatCard(
                             context,
-                            title: 'Total Customers',
+                            title: S.totalCustomers,
                             value: '${provider.recentCustomers.length}',
                             icon: Icons.people,
                             color: Colors.blue,
                           ),
                           _buildStatCard(
                             context,
-                            title: 'Active Subscriptions',
+                            title: S.activeSubscriptions,
                             value: '${provider.activeSubscriptionsCount}',
                             icon: Icons.card_membership,
                             color: Colors.green,
                           ),
                           _buildStatCard(
                             context,
-                            title: 'New Today',
+                            title: S.newToday,
                             value: '${_getNewTodayCount(provider)}',
                             icon: Icons.person_add,
                             color: Colors.orange,
                           ),
                           _buildStatCard(
                             context,
-                            title: 'Complaints',
+                            title: S.complaints,
                             value: '${provider.complaintsCount}',
                             icon: Icons.report_problem,
                             color: Colors.red,
@@ -108,7 +109,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
 
                       // Quick Access Buttons
                       Text(
-                        'Quick Actions',
+                        S.quickActions,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -120,7 +121,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
                             child: ElevatedButton.icon(
                               onPressed: () => _showRegisterCustomerDialog(context),
                               icon: const Icon(Icons.person_add),
-                              label: const Text('Register Customer'),
+                              label: Text(S.registerCustomer),
                               style: ElevatedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 backgroundColor: Colors.blue,
@@ -133,7 +134,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
                             child: ElevatedButton.icon(
                               onPressed: () => _showActivateSubscriptionDialog(context),
                               icon: const Icon(Icons.card_membership),
-                              label: const Text('Activate Sub'),
+                              label: Text(S.activateSub),
                               style: ElevatedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 backgroundColor: Colors.green,
@@ -157,7 +158,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
                             );
                           },
                           icon: const Icon(Icons.qr_code_scanner, size: 28),
-                          label: const Text('Scan Customer QR Code'),
+                          label: Text(S.scanCustomerQR),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             backgroundColor: Colors.deepPurple,
@@ -171,13 +172,13 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
                       Row(
                         children: [
                           Text(
-                            'Recent Customers',
+                            S.recentCustomers,
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const Spacer(),
                           TextButton(
                             onPressed: () => provider.refresh(),
-                            child: const Text('Refresh'),
+                            child: Text(S.refresh),
                           ),
                         ],
                       ),
@@ -186,7 +187,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
                         const Card(
                           child: Padding(
                             padding: EdgeInsets.all(16),
-                            child: Center(child: Text('No recent customers')),
+                            child: Center(child: Text(S.noRecentCustomers)),
                           ),
                         )
                       else
@@ -212,7 +213,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
                                   if (customer.phone != null)
                                     Text(customer.phone!),
                                   if (customer.bmi != null)
-                                    Text('BMI: ${customer.bmi!.toStringAsFixed(1)} (${customer.bmiCategory})'),
+                                    Text('${S.bmi}: ${customer.bmi!.toStringAsFixed(1)} (${customer.bmiCategory})'),
                                 ],
                               ),
                               trailing: customer.createdAt != null

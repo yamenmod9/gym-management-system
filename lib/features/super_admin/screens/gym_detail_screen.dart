@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/localization/app_strings.dart';
+import '../../../core/providers/gym_branding_provider.dart';
 import '../../../shared/models/gym_model.dart';
 import 'super_admin_dashboard.dart';
 
@@ -9,8 +11,8 @@ class GymDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = GymBrandingHelper.hexToColor(gym.primaryColor);
-    final secondaryColor = GymBrandingHelper.hexToColor(gym.secondaryColor);
+    final primaryColor = GymBrandingProvider.hexToColor(gym.primaryColor);
+    final secondaryColor = GymBrandingProvider.hexToColor(gym.secondaryColor);
 
     return Scaffold(
       appBar: AppBar(
@@ -82,7 +84,7 @@ class GymDetailScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      gym.isActive ? 'Active' : 'Inactive',
+                      gym.isActive ? S.active : S.inactive,
                       style: TextStyle(
                         color: gym.isActive ? Colors.green : Colors.red,
                         fontWeight: FontWeight.w600,
@@ -97,7 +99,7 @@ class GymDetailScreen extends StatelessWidget {
 
             // Stats
             Text(
-              'Statistics',
+              S.statistics,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -105,11 +107,11 @@ class GymDetailScreen extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildStatTile(context, 'Branches', '${gym.branchCount}', Icons.store, Colors.blue)),
+                Expanded(child: _buildStatTile(context, S.branches, '${gym.branchCount}', Icons.store, Colors.blue)),
                 const SizedBox(width: 12),
-                Expanded(child: _buildStatTile(context, 'Customers', '${gym.customerCount}', Icons.people, Colors.green)),
+                Expanded(child: _buildStatTile(context, S.customers, '${gym.customerCount}', Icons.people, Colors.green)),
                 const SizedBox(width: 12),
-                Expanded(child: _buildStatTile(context, 'Staff', '${gym.staffCount}', Icons.badge, Colors.purple)),
+                Expanded(child: _buildStatTile(context, S.staff, '${gym.staffCount}', Icons.badge, Colors.purple)),
               ],
             ),
 
@@ -117,7 +119,7 @@ class GymDetailScreen extends StatelessWidget {
 
             // Owner Info
             Text(
-              'Owner Information',
+              S.ownerInformation,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -128,9 +130,9 @@ class GymDetailScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _buildInfoRow(context, Icons.person, 'Name', gym.ownerName ?? 'Not assigned'),
+                    _buildInfoRow(context, Icons.person, S.name, gym.ownerName ?? S.notAssigned),
                     const Divider(height: 24),
-                    _buildInfoRow(context, Icons.alternate_email, 'Username', gym.ownerUsername ?? 'N/A'),
+                    _buildInfoRow(context, Icons.alternate_email, S.username, gym.ownerUsername ?? S.na),
                   ],
                 ),
               ),
@@ -140,7 +142,7 @@ class GymDetailScreen extends StatelessWidget {
 
             // Branding
             Text(
-              'Branding',
+              S.branding,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -155,7 +157,7 @@ class GymDetailScreen extends StatelessWidget {
                       children: [
                         const Icon(Icons.palette, size: 20, color: Colors.grey),
                         const SizedBox(width: 12),
-                        const Text('Primary Color'),
+                        const Text(S.primaryColor),
                         const Spacer(),
                         Container(
                           width: 32,
@@ -175,7 +177,7 @@ class GymDetailScreen extends StatelessWidget {
                       children: [
                         const Icon(Icons.palette_outlined, size: 20, color: Colors.grey),
                         const SizedBox(width: 12),
-                        const Text('Secondary Color'),
+                        const Text(S.secondaryColor),
                         const Spacer(),
                         Container(
                           width: 32,
@@ -195,7 +197,7 @@ class GymDetailScreen extends StatelessWidget {
                       children: [
                         const Icon(Icons.email, size: 20, color: Colors.grey),
                         const SizedBox(width: 12),
-                        const Text('Email Domain'),
+                        const Text(S.emailDomain),
                         const Spacer(),
                         Text(
                           '@${gym.emailDomain}',
@@ -210,8 +212,8 @@ class GymDetailScreen extends StatelessWidget {
                     _buildInfoRow(
                       context,
                       Icons.settings,
-                      'Setup Complete',
-                      gym.isSetupComplete ? 'Yes' : 'Pending',
+                      S.setupComplete,
+                      gym.isSetupComplete ? S.yes : S.setupPending,
                     ),
                   ],
                 ),
@@ -228,7 +230,7 @@ class GymDetailScreen extends StatelessWidget {
                   child: _buildInfoRow(
                     context,
                     Icons.calendar_today,
-                    'Created',
+                    S.created,
                     '${gym.createdAt!.day}/${gym.createdAt!.month}/${gym.createdAt!.year}',
                   ),
                 ),

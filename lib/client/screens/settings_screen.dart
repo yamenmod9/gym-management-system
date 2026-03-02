@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/localization/app_strings.dart';
 import '../core/auth/client_auth_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -12,7 +13,7 @@ class SettingsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text(S.settings),
         automaticallyImplyLeading: false,
       ),
       body: ListView(
@@ -40,7 +41,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  client?.fullName ?? 'Guest',
+                  client?.fullName ?? S.guest,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 if (client?.phone != null) ...[
@@ -95,17 +96,17 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Account Section
-          _buildSectionTitle(context, 'Account'),
+          _buildSectionTitle(context, S.account),
           _buildListTile(
             context,
             icon: Icons.person,
-            title: 'Profile Information',
-            subtitle: 'View and edit your profile',
+            title: S.profileInformation,
+            subtitle: S.viewEditProfile,
             onTap: () {
               // TODO: Navigate to profile edit screen
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Profile editing coming soon'),
+                  content: Text(S.profileEditingSoon),
                   backgroundColor: Colors.blue,
                 ),
               );
@@ -114,13 +115,13 @@ class SettingsScreen extends StatelessWidget {
           _buildListTile(
             context,
             icon: Icons.phone,
-            title: 'Contact Information',
-            subtitle: 'Manage your contact details',
+            title: S.contactInformationSetting,
+            subtitle: S.manageContactDetails,
             onTap: () {
               // TODO: Navigate to contact edit screen
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Contact editing coming soon'),
+                  content: Text(S.contactEditingSoon),
                   backgroundColor: Colors.blue,
                 ),
               );
@@ -130,17 +131,17 @@ class SettingsScreen extends StatelessWidget {
           const Divider(),
 
           // Preferences Section
-          _buildSectionTitle(context, 'Preferences'),
+          _buildSectionTitle(context, S.preferences),
           _buildListTile(
             context,
             icon: Icons.notifications,
-            title: 'Notifications',
-            subtitle: 'Manage notification settings',
+            title: S.notifications,
+            subtitle: S.manageNotifications,
             onTap: () {
               // TODO: Navigate to notifications screen
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Notification settings coming soon'),
+                  content: Text(S.notificationsSoon),
                   backgroundColor: Colors.blue,
                 ),
               );
@@ -149,13 +150,13 @@ class SettingsScreen extends StatelessWidget {
           _buildListTile(
             context,
             icon: Icons.language,
-            title: 'Language',
-            subtitle: 'English',
+            title: S.language,
+            subtitle: S.arabicDefault,
             onTap: () {
               // TODO: Navigate to language selection
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Language selection coming soon'),
+                  content: Text(S.languageComingSoon),
                   backgroundColor: Colors.blue,
                 ),
               );
@@ -164,13 +165,13 @@ class SettingsScreen extends StatelessWidget {
           _buildListTile(
             context,
             icon: Icons.dark_mode,
-            title: 'Theme',
-            subtitle: 'Dark mode',
+            title: S.theme,
+            subtitle: S.darkMode,
             onTap: () {
               // TODO: Navigate to theme selection
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Theme selection coming soon'),
+                  content: Text(S.themeSelectionSoon),
                   backgroundColor: Colors.blue,
                 ),
               );
@@ -180,17 +181,17 @@ class SettingsScreen extends StatelessWidget {
           const Divider(),
 
           // Support Section
-          _buildSectionTitle(context, 'Support'),
+          _buildSectionTitle(context, S.support),
           _buildListTile(
             context,
             icon: Icons.help,
-            title: 'Help & Support',
-            subtitle: 'Get help and support',
+            title: S.helpSupport,
+            subtitle: S.getHelpSupport,
             onTap: () {
               // TODO: Navigate to help screen
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Help & Support coming soon'),
+                  content: Text(S.helpSupportComingSoon),
                   backgroundColor: Colors.blue,
                 ),
               );
@@ -199,12 +200,12 @@ class SettingsScreen extends StatelessWidget {
           _buildListTile(
             context,
             icon: Icons.info,
-            title: 'About',
-            subtitle: 'App version and information',
+            title: S.about,
+            subtitle: S.appVersionInfo,
             onTap: () {
               showAboutDialog(
                 context: context,
-                applicationName: 'Gym Client',
+                applicationName: S.gymClient,
                 applicationVersion: '1.0.0',
                 applicationIcon: Icon(
                   Icons.fitness_center,
@@ -212,8 +213,8 @@ class SettingsScreen extends StatelessWidget {
                   color: Theme.of(context).primaryColor,
                 ),
                 children: [
-                  const Text(
-                    'A modern gym management client application.',
+                  Text(
+                    S.modernGymApp,
                   ),
                 ],
               );
@@ -222,13 +223,13 @@ class SettingsScreen extends StatelessWidget {
           _buildListTile(
             context,
             icon: Icons.privacy_tip,
-            title: 'Privacy Policy',
-            subtitle: 'Read our privacy policy',
+            title: S.privacyPolicy,
+            subtitle: S.readPrivacyPolicy,
             onTap: () {
               // TODO: Show privacy policy
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Privacy policy coming soon'),
+                  content: Text(S.privacyPolicySoon),
                   backgroundColor: Colors.blue,
                 ),
               );
@@ -241,24 +242,24 @@ class SettingsScreen extends StatelessWidget {
           _buildListTile(
             context,
             icon: Icons.logout,
-            title: 'Logout',
-            subtitle: 'Sign out (testing only)',
+            title: S.logout,
+            subtitle: S.signOutTestingOnly,
             iconColor: Colors.red,
             onTap: () async {
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('Logout'),
-                  content: const Text('Sign out of your account?'),
+                  title: Text(S.logout),
+                  content: Text(S.signOutQuestion),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(false),
-                      child: const Text('Cancel'),
+                      child: Text(S.cancel),
                     ),
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(true),
                       style: TextButton.styleFrom(foregroundColor: Colors.red),
-                      child: const Text('Logout'),
+                      child: Text(S.logout),
                     ),
                   ],
                 ),

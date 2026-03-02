@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../core/providers/gym_branding_provider.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../../../shared/widgets/error_display.dart';
@@ -35,7 +36,7 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
     final branding = context.watch<GymBrandingProvider>();
     final gymName = branding.isSetupComplete && branding.gymId != null
         ? branding.gymName
-        : 'Branch Manager';
+        : S.branchManagerTitle;
 
     return Scaffold(
       extendBody: true,
@@ -73,7 +74,7 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
                   children: [
                     Icon(Icons.logout, color: Colors.black54),
                     SizedBox(width: 8),
-                    Text('Logout'),
+                    Text(S.logout),
                   ],
                 ),
               ),
@@ -82,7 +83,7 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
         ],
       ),
       body: provider.isLoading
-          ? const LoadingIndicator(message: 'Loading Dashboard...')
+          ? const LoadingIndicator(message: S.loadingDashboard)
           : provider.error != null
               ? ErrorDisplay(
                   message: provider.error!,
@@ -126,21 +127,21 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
                 height: 65,
                 labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                 indicatorColor: Theme.of(context).primaryColor.withOpacity(0.15),
-                destinations: const [
+                destinations: [
                   NavigationDestination(
-                    icon: Icon(Icons.dashboard_outlined),
-                    selectedIcon: Icon(Icons.dashboard),
-                    label: 'Overview',
+                    icon: const Icon(Icons.dashboard_outlined),
+                    selectedIcon: const Icon(Icons.dashboard),
+                    label: S.overview,
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.people_outlined),
-                    selectedIcon: Icon(Icons.people),
-                    label: 'Staff',
+                    icon: const Icon(Icons.people_outlined),
+                    selectedIcon: const Icon(Icons.people),
+                    label: S.staff,
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.report_problem_outlined),
-                    selectedIcon: Icon(Icons.report_problem),
-                    label: 'Complaints',
+                    icon: const Icon(Icons.report_problem_outlined),
+                    selectedIcon: const Icon(Icons.report_problem),
+                    label: S.complaints,
                   ),
                 ],
               ),
@@ -163,7 +164,7 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
               _buildWelcomeCard(context, authProvider.username ?? 'Manager'),
               const SizedBox(height: 20),
               Text(
-                'Performance Overview',
+                S.performanceOverview,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -209,7 +210,7 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Welcome back,',
+            S.welcomeBack,
             style: TextStyle(
               color: Colors.white.withOpacity(0.9),
               fontSize: 16,
@@ -250,25 +251,25 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
       childAspectRatio: 1.5,
       children: [
         StatCard(
-          title: 'Today\'s Revenue',
+          title: S.todaysRevenue,
           value: NumberHelper.formatCurrency(todayRevenue),
           icon: Icons.attach_money,
           color: Colors.green,
         ),
         StatCard(
-          title: 'Active Members',
+          title: S.activeMembers,
           value: NumberHelper.formatNumber(activeMembers),
           icon: Icons.people,
           color: Colors.blue,
         ),
         StatCard(
-          title: 'Total Customers',
+          title: S.totalCustomers,
           value: NumberHelper.formatNumber(totalCustomers),
           icon: Icons.person,
           color: Colors.orange,
         ),
         StatCard(
-          title: expiringCount > 0 ? 'Expiring Soon ($expiringCount)' : 'Pending Issues',
+          title: expiringCount > 0 ? S.expiringSoon(expiringCount) : S.pendingIssues,
           value: NumberHelper.formatNumber(expiringCount > 0 ? expiringCount : pendingComplaints),
           icon: expiringCount > 0 ? Icons.timer_off : Icons.report_problem,
           color: expiringCount > 0 ? Colors.deepOrange : Colors.red,
@@ -286,7 +287,7 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
           children: [
             Icon(Icons.people_outlined, size: 64, color: Colors.grey),
             SizedBox(height: 16),
-            Text('No staff members found', style: TextStyle(fontSize: 16, color: Colors.grey)),
+            Text(S.noStaffFound, style: TextStyle(fontSize: 16, color: Colors.grey)),
           ],
         ),
       );
@@ -299,7 +300,7 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
         itemCount: staffList.length,
         itemBuilder: (context, index) {
           final member = staffList[index];
-          final name = member['full_name'] ?? member['username'] ?? 'Unknown';
+          final name = member['full_name'] ?? member['username'] ?? S.unknown;
           final role = (member['role'] ?? 'employee').toString().replaceAll('_', ' ');
           final email = member['email'] ?? '';
           final phone = member['phone'] ?? '';
@@ -362,7 +363,7 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
                                   color: Colors.red.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Text('Inactive', style: TextStyle(fontSize: 11, color: Colors.red)),
+                                child: const Text(S.inactive, style: TextStyle(fontSize: 11, color: Colors.red)),
                               ),
                             ],
                           ],
@@ -406,7 +407,7 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
     final complaints = provider.complaints;
 
     if (complaints.isEmpty) {
-      return const Center(child: Text('No complaints'));
+      return const Center(child: Text(S.noComplaints));
     }
 
     return ListView.builder(
@@ -428,14 +429,14 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
                 size: 20,
               ),
             ),
-            title: Text(c['title'] ?? c['subject'] ?? 'Complaint'),
+            title: Text(c['title'] ?? c['subject'] ?? S.complaint),
             subtitle: Text(
-              c['description'] ?? 'No description',
+              c['description'] ?? S.noDescription,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             trailing: Chip(
-              label: Text(c['status'] ?? 'Unknown'),
+              label: Text(c['status'] ?? S.unknown),
               backgroundColor: isPending ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
               labelStyle: TextStyle(color: isPending ? Colors.red : Colors.green),
             ),

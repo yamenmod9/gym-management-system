@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/localization/app_strings.dart';
 
 /// Reusable biometric toggle section for all role-specific settings screens.
 ///
@@ -28,7 +29,7 @@ class BiometricSettingsSection extends StatelessWidget {
       children: [
         const SizedBox(height: 24),
         Text(
-          'Security',
+          S.security,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -44,11 +45,11 @@ class BiometricSettingsSection extends StatelessWidget {
                       ? Theme.of(context).colorScheme.primary
                       : null,
                 ),
-                title: const Text('Biometric Login'),
+                title: const Text(S.biometricLogin),
                 subtitle: Text(
                   authProvider.isBiometricEnabled
-                      ? 'Use fingerprint or face to log in'
-                      : 'Quickly log in with fingerprint or face',
+                      ? S.useBiometricToLogin
+                      : S.quicklyLoginWithBiometric,
                 ),
                 value: authProvider.isBiometricEnabled,
                 onChanged: (enabled) {
@@ -84,7 +85,7 @@ class BiometricSettingsSection extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Set Up Biometric Login'),
+        title: const Text(S.setupBiometricLogin),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -95,7 +96,7 @@ class BiometricSettingsSection extends StatelessWidget {
                 if (hasFingerprint) ...[
                   _BiometricTypeCard(
                     icon: Icons.fingerprint,
-                    label: 'Fingerprint',
+                    label: S.fingerprint,
                     color: Theme.of(ctx).colorScheme.primary,
                   ),
                 ],
@@ -103,7 +104,7 @@ class BiometricSettingsSection extends StatelessWidget {
                 if (hasFace) ...[
                   _BiometricTypeCard(
                     icon: Icons.face,
-                    label: 'Face ID',
+                    label: S.faceId,
                     color: Theme.of(ctx).colorScheme.primary,
                   ),
                 ],
@@ -111,7 +112,7 @@ class BiometricSettingsSection extends StatelessWidget {
                 if (!hasFingerprint && !hasFace) ...[
                   _BiometricTypeCard(
                     icon: Icons.verified_user,
-                    label: 'Biometric',
+                    label: S.biometric,
                     color: Theme.of(ctx).colorScheme.primary,
                   ),
                 ],
@@ -120,16 +121,12 @@ class BiometricSettingsSection extends StatelessWidget {
             const SizedBox(height: 20),
             Text(
               hasFingerprint && hasFace
-                  ? 'Your device supports Fingerprint and Face ID. '
-                    'Tap Continue to verify your biometric.'
+                  ? S.deviceSupportsBoth
                   : hasFingerprint
-                      ? 'Your device supports Fingerprint authentication. '
-                        'Tap Continue to verify your fingerprint.'
+                      ? S.deviceSupportsFingerprint
                       : hasFace
-                          ? 'Your device supports Face ID. '
-                            'Tap Continue to verify your face.'
-                          : 'Your device supports biometric authentication. '
-                            'Tap Continue to verify.',
+                          ? S.deviceSupportsFaceId
+                          : S.deviceSupportsBiometric,
               textAlign: TextAlign.center,
               style: Theme.of(ctx).textTheme.bodyMedium,
             ),
@@ -138,7 +135,7 @@ class BiometricSettingsSection extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: const Text(S.cancel),
           ),
           ElevatedButton.icon(
             onPressed: () {
@@ -146,7 +143,7 @@ class BiometricSettingsSection extends StatelessWidget {
               _verifyBiometric(context, authProvider);
             },
             icon: const Icon(Icons.arrow_forward, size: 18),
-            label: const Text('Continue'),
+            label: const Text(S.continueText),
           ),
         ],
       ),
@@ -161,7 +158,7 @@ class BiometricSettingsSection extends StatelessWidget {
     final biometricService = authProvider.biometricService;
 
     final authenticated = await biometricService.authenticate(
-      reason: 'Verify your biometric to enable quick login',
+      reason: S.verifyBiometricToEnable,
     );
 
     if (!context.mounted) return;
@@ -169,7 +166,7 @@ class BiometricSettingsSection extends StatelessWidget {
     if (!authenticated) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Biometric verification failed. Please try again.'),
+          content: Text(S.biometricVerificationFailed),
         ),
       );
       return;
@@ -196,13 +193,12 @@ class BiometricSettingsSection extends StatelessWidget {
             color: Theme.of(ctx).colorScheme.primary,
             size: 48,
           ),
-          title: const Text('Biometric Verified!'),
+          title: const Text(S.biometricVerified),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Enter your password to complete the setup. '
-                'Your credentials will be stored securely on this device.',
+                S.enterPasswordToComplete,
               ),
               const SizedBox(height: 16),
               TextField(
@@ -210,7 +206,7 @@ class BiometricSettingsSection extends StatelessWidget {
                 obscureText: obscure,
                 autofocus: true,
                 decoration: InputDecoration(
-                  labelText: 'Current Password',
+                  labelText: S.currentPassword,
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
@@ -223,7 +219,7 @@ class BiometricSettingsSection extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              child: const Text(S.cancel),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -240,12 +236,12 @@ class BiometricSettingsSection extends StatelessWidget {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Biometric login enabled successfully!'),
+                      content: Text(S.biometricEnabled),
                     ),
                   );
                 }
               },
-              child: const Text('Enable'),
+              child: const Text(S.enable),
             ),
           ],
         ),
@@ -262,15 +258,14 @@ class BiometricSettingsSection extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Disable Biometric Login'),
+        title: const Text(S.disableBiometricLogin),
         content: const Text(
-          'Are you sure you want to disable biometric login? '
-          'You will need to enter your password to log in.',
+          S.disableBiometricConfirm,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: const Text(S.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -279,7 +274,7 @@ class BiometricSettingsSection extends StatelessWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Biometric login disabled'),
+                    content: Text(S.biometricDisabled),
                   ),
                 );
               }
@@ -288,7 +283,7 @@ class BiometricSettingsSection extends StatelessWidget {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Disable'),
+            child: const Text(S.disable),
           ),
         ],
       ),

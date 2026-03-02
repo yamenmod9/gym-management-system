@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'core/api/api_service.dart';
 import 'core/auth/auth_service.dart';
@@ -39,9 +40,16 @@ class SuperAdminApp extends StatelessWidget {
         builder: (context, authProvider, _) {
           final router = SuperAdminRouter(authProvider);
           return MaterialApp.router(
-            title: 'Gym Platform Admin',
+            title: 'مدير منصة النادي',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.superAdminTheme,
+            locale: const Locale('ar'),
+            supportedLocales: const [Locale('ar')],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
             routerConfig: router.router,
           );
         },

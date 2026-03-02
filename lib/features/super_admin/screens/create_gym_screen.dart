@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../providers/super_admin_provider.dart';
 
@@ -57,7 +58,7 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
       if (result['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Owner created successfully'),
+            content: Text(result['message'] ?? S.ownerCreated),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 4),
           ),
@@ -66,7 +67,7 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Failed to create owner'),
+            content: Text(result['message'] ?? S.failedToCreateOwner),
             backgroundColor: Colors.red,
           ),
         );
@@ -78,7 +79,7 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Gym Owner'),
+        title: const Text(S.createGymOwner),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -113,14 +114,14 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Owner Account',
+                            S.ownerAccount,
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Create a login account for the gym owner. They will log in and set up their gym name, logo, branding, branches, and staff themselves.',
+                            S.ownerAccountDescription,
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: Colors.grey[400],
                                 ),
@@ -135,7 +136,7 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
               const SizedBox(height: 32),
 
               Text(
-                'Owner Details',
+                S.ownerDetails,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -145,15 +146,15 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
               TextFormField(
                 controller: _ownerNameController,
                 decoration: const InputDecoration(
-                  labelText: 'Full Name',
-                  hintText: 'e.g. Ahmed Hassan',
+                  labelText: S.fullNameLabel,
+                  hintText: S.fullNameHintOwner,
                   prefixIcon: Icon(Icons.person),
                 ),
                 textInputAction: TextInputAction.next,
                 enabled: !_isLoading,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Full name is required';
+                    return S.fullNameIsRequired;
                   }
                   return null;
                 },
@@ -163,21 +164,21 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
               TextFormField(
                 controller: _ownerUsernameController,
                 decoration: const InputDecoration(
-                  labelText: 'Username',
-                  hintText: 'e.g. ahmed_gym',
+                  labelText: S.usernameLabel,
+                  hintText: S.usernameHintOwner,
                   prefixIcon: Icon(Icons.alternate_email),
                 ),
                 textInputAction: TextInputAction.next,
                 enabled: !_isLoading,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Username is required';
+                    return S.usernameIsRequired;
                   }
                   if (value.trim().length < 3) {
-                    return 'Username must be at least 3 characters';
+                    return S.usernameTooShort;
                   }
                   if (value.contains(' ')) {
-                    return 'Username cannot contain spaces';
+                    return S.usernameNoSpaces;
                   }
                   return null;
                 },
@@ -187,8 +188,8 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
               TextFormField(
                 controller: _ownerPasswordController,
                 decoration: InputDecoration(
-                  labelText: 'Password',
-                  hintText: 'Create a password for the owner',
+                  labelText: S.passwordLabel,
+                  hintText: S.createPasswordHint,
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     icon: Icon(_obscurePassword
@@ -203,10 +204,10 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
                 enabled: !_isLoading,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Password is required';
+                    return S.passwordIsRequired;
                   }
                   if (value.length < 6) {
-                    return 'Password must be at least 6 characters';
+                    return S.passwordTooShort;
                   }
                   return null;
                 },
@@ -216,8 +217,8 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
               TextFormField(
                 controller: _ownerEmailController,
                 decoration: const InputDecoration(
-                  labelText: 'Email (Optional)',
-                  hintText: 'e.g. owner@email.com',
+                  labelText: S.emailOptional,
+                  hintText: S.emailHint,
                   prefixIcon: Icon(Icons.email),
                 ),
                 keyboardType: TextInputType.emailAddress,
@@ -229,8 +230,8 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
               TextFormField(
                 controller: _ownerPhoneController,
                 decoration: const InputDecoration(
-                  labelText: 'Phone (Optional)',
-                  hintText: 'e.g. 01012345678',
+                  labelText: S.phoneOptionalLabel,
+                  hintText: S.phoneHint,
                   prefixIcon: Icon(Icons.phone),
                 ),
                 keyboardType: TextInputType.phone,
@@ -250,7 +251,7 @@ class _CreateGymScreenState extends State<CreateGymScreen> {
                       ? const SmallLoadingIndicator()
                       : const Icon(Icons.person_add),
                   label: Text(
-                    _isLoading ? 'Creating...' : 'Create Owner Account',
+                    _isLoading ? S.creating : S.createOwnerAccount,
                     style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.w600),
                   ),

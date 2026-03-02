@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/api/api_service.dart';
 import '../../../core/api/api_endpoints.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/localization/app_strings.dart';
 
 class QRScannerScreen extends StatefulWidget {
   const QRScannerScreen({super.key});
@@ -110,7 +111,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       customerId = customerId.replaceAll(RegExp(r'[^0-9]'), '');
 
       if (customerId.isEmpty) {
-        _showError('Invalid QR code format');
+        _showError(S.invalidQRFormat);
         return;
       }
 
@@ -130,7 +131,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                 children: [
                   CircularProgressIndicator(),
                   SizedBox(height: 16),
-                  Text('Loading customer...'),
+                  Text(S.loadingCustomer),
                 ],
               ),
             ),
@@ -160,13 +161,13 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                     response.data['data'] ??
                     response.data;
         } else {
-          _showError('Invalid response format');
+          _showError(S.invalidResponseFormat);
           return;
         }
 
         // Ensure we have an ID
         if (customer['id'] == null && customer['customer_id'] == null) {
-          _showError('Customer data missing ID');
+          _showError(S.customerDataMissingId);
           return;
         }
 
@@ -175,7 +176,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
         // Show customer check-in dialog
         await _showCheckInDialog(customer);
       } else {
-        _showError('Customer not found (ID: $customerId)');
+        _showError(S.customerNotFound(int.parse(customerId)));
       }
     } catch (e, stackTrace) {
       debugPrint('❌ Error processing QR code: $e');
@@ -183,7 +184,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog if open
-        _showError('Invalid QR code: ${e.toString()}');
+        _showError('${S.invalidQRFormat}: ${e.toString()}');
       }
     }
   }
@@ -191,7 +192,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   Future<void> _showCheckInDialog(Map<String, dynamic> customer) async {
     final apiService = context.read<ApiService>();
     final customerId = customer['id'] ?? customer['customer_id'];
-    final name = customer['full_name'] ?? customer['name'] ?? 'Unknown';
+    final name = customer['full_name'] ?? customer['name'] ?? S.unknown;
 
     debugPrint('👤 Customer ID: $customerId, Name: $name');
 
@@ -237,40 +238,40 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     final confirmed = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Check-In: $name'),
+        title: Text(S.checkInTitle(name)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Customer ID: $customerId'),
+            Text(S.customerIdLabel(customerId)),
             const SizedBox(height: 8),
             if (activeSubscription != null) ...[
               const Divider(),
               Text(
-                'Active Subscription',
+                S.activeSubscription,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
-              Text('Type: ${activeSubscription['type'] ?? 'N/A'}'),
+              Text(S.subscriptionType(activeSubscription['type']?.toString() ?? S.na)),
               if (activeSubscription['type']?.toString().toLowerCase() == 'coins' ||
                   activeSubscription['remaining_sessions'] != null) ...[
-                Text('Remaining: ${activeSubscription['remaining_sessions'] ?? activeSubscription['coins'] ?? 0}'),
+                Text(S.remaining(activeSubscription['remaining_sessions'] ?? activeSubscription['coins'] ?? 0)),
               ],
               if (activeSubscription['end_date'] != null) ...[
-                Text('Expires: ${activeSubscription['end_date']}'),
+                Text(S.expires(activeSubscription['end_date'].toString())),
               ],
               const SizedBox(height: 16),
-              const Text(
-                'Select action:',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Text(
+                S.selectAction,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ] else ...[
               const SizedBox(height: 8),
-              const Text(
-                'No active subscription found.',
-                style: TextStyle(color: Colors.orange),
+              Text(
+                S.noActiveSubFound,
+                style: const TextStyle(color: Colors.orange),
               ),
             ],
           ],
@@ -278,7 +279,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(null),
-            child: const Text('Cancel'),
+            child: Text(S.cancel),
           ),
           if (activeSubscription != null) ...[
             if (activeSubscription['type']?.toString().toLowerCase() == 'coins' ||
@@ -289,7 +290,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                 ),
-                child: const Text('Deduct 1 Session'),
+                child: Text(S.deduct1Session),
               ),
             ],
             ElevatedButton(
@@ -297,12 +298,12 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
               ),
-              child: const Text('Check-In Only'),
+              child: Text(S.checkInOnly),
             ),
           ] else ...[
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop('view'),
-              child: const Text('View Details'),
+              child: Text(S.viewDetails),
             ),
           ],
         ],
@@ -315,7 +316,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       await _recordCheckIn(customerId, name);
     } else if (confirmed == 'view') {
       // Navigate to customer detail if needed
-      _showSuccess('Customer: $name (ID: $customerId)');
+      _showSuccess(S.customerScanned(name, customerId));
     }
   }
 
@@ -383,13 +384,13 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
         final remaining = (subscription['remaining_sessions'] ?? subscription['coins'] ?? 1) - 1;
         _showSuccess(
-          'Session deducted successfully!\nRemaining: $remaining',
+          S.sessionDeducted(remaining),
           color: Colors.green,
         );
       } else {
         final errorMsg = deductResponse.data?['error'] ??
                         deductResponse.data?['message'] ??
-                        'Failed to deduct session';
+                        S.failedToDeductSession;
         _showError(errorMsg);
       }
     } catch (e, stackTrace) {
@@ -399,7 +400,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       if (mounted) {
         Navigator.of(context).pop(); // Close loading if still open
       }
-      _showError('Failed to deduct session: ${e.toString()}');
+      _showError('${S.failedToDeductSession}: ${e.toString()}');
     }
   }
 
@@ -442,11 +443,11 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       }
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        _showSuccess('$name checked in successfully!', color: Colors.green);
+        _showSuccess(S.checkedInSuccess(name), color: Colors.green);
       } else {
         final errorMsg = response.data?['error'] ??
                         response.data?['message'] ??
-                        'Failed to record check-in';
+                        S.failedToCheckIn;
         _showError(errorMsg);
       }
     } catch (e, stackTrace) {
@@ -456,7 +457,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       if (mounted) {
         Navigator.of(context).pop(); // Close loading if still open
       }
-      _showError('Failed to check in: ${e.toString()}');
+      _showError('${S.failedToCheckIn}: ${e.toString()}');
     }
   }
 
@@ -486,7 +487,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan QR Code'),
+        title: Text(S.scanQRCode),
         actions: [
           IconButton(
             icon: Icon(cameraController.torchEnabled ? Icons.flash_on : Icons.flash_off),
@@ -538,8 +539,8 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Position the QR code within the frame',
-                    style: TextStyle(
+                    S.positionQRInFrame,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -548,8 +549,8 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'The code will be scanned automatically',
-                    style: TextStyle(
+                    S.codeScannedAutomatically,
+                    style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 14,
                     ),

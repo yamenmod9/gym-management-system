@@ -5,6 +5,7 @@ import 'subscription_operations_screen.dart';
 import 'operations_screen.dart';
 import 'customers_list_screen.dart';
 import 'profile_settings_screen.dart';
+import '../../../core/localization/app_strings.dart';
 
 class ReceptionMainScreen extends StatefulWidget {
   const ReceptionMainScreen({super.key});
@@ -75,31 +76,31 @@ class _ReceptionMainScreenState extends State<ReceptionMainScreen> {
                   height: 70,
                   labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                   indicatorColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                  destinations: const [
+                  destinations: [
                   NavigationDestination(
-                    icon: Icon(Icons.home_outlined, size: 22),
-                    selectedIcon: Icon(Icons.home, size: 22),
-                    label: 'Home',
+                    icon: const Icon(Icons.home_outlined, size: 22),
+                    selectedIcon: const Icon(Icons.home, size: 22),
+                    label: S.home,
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.card_membership_outlined, size: 22),
-                    selectedIcon: Icon(Icons.card_membership, size: 22),
-                    label: 'Subs', // Shortened from 'Subscriptions'
+                    icon: const Icon(Icons.card_membership_outlined, size: 22),
+                    selectedIcon: const Icon(Icons.card_membership, size: 22),
+                    label: S.subs,
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.assignment_outlined, size: 22),
-                    selectedIcon: Icon(Icons.assignment, size: 22),
-                    label: 'Ops', // Shortened from 'Operations'
+                    icon: const Icon(Icons.assignment_outlined, size: 22),
+                    selectedIcon: const Icon(Icons.assignment, size: 22),
+                    label: S.ops,
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.people_outlined, size: 22),
-                    selectedIcon: Icon(Icons.people, size: 22),
-                    label: 'Clients', // Changed from 'Customers' for brevity
+                    icon: const Icon(Icons.people_outlined, size: 22),
+                    selectedIcon: const Icon(Icons.people, size: 22),
+                    label: S.clients,
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.person_outlined, size: 22),
-                    selectedIcon: Icon(Icons.person, size: 22),
-                    label: 'Profile',
+                    icon: const Icon(Icons.person_outlined, size: 22),
+                    selectedIcon: const Icon(Icons.person, size: 22),
+                    label: S.profile,
                   ),
                 ],
                 ),

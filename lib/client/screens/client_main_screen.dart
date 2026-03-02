@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../core/localization/app_strings.dart';
 import 'client_overview_tab.dart';
 import 'qr_screen.dart';
 import 'subscription_screen.dart';
@@ -79,27 +80,27 @@ class _ClientMainScreenState extends State<ClientMainScreen> {
                     NavigationDestination(
                       icon: Icon(Icons.dashboard_outlined, size: 22),
                       selectedIcon: Icon(Icons.dashboard, size: 22),
-                      label: 'Home',
+                      label: S.home,
                     ),
                     NavigationDestination(
                       icon: Icon(Icons.qr_code_outlined, size: 22),
                       selectedIcon: Icon(Icons.qr_code, size: 22),
-                      label: 'QR',
+                      label: S.qr,
                     ),
                     NavigationDestination(
                       icon: Icon(Icons.card_membership_outlined, size: 22),
                       selectedIcon: Icon(Icons.card_membership, size: 22),
-                      label: 'Plan',
+                      label: S.plan,
                     ),
                     NavigationDestination(
                       icon: Icon(Icons.history_outlined, size: 22),
                       selectedIcon: Icon(Icons.history, size: 22),
-                      label: 'History',
+                      label: S.history,
                     ),
                     NavigationDestination(
                       icon: Icon(Icons.settings_outlined, size: 22),
                       selectedIcon: Icon(Icons.settings, size: 22),
-                      label: 'Settings',
+                      label: S.settings,
                     ),
                   ],
                 ),

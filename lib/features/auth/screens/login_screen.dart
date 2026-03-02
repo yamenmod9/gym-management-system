@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../core/providers/gym_branding_provider.dart';
 import '../../../shared/models/gym_model.dart';
 import '../../../shared/widgets/loading_indicator.dart';
@@ -67,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (result['success'] != true) {
         setState(() {
-          _errorMessage = result['message'] ?? 'Biometric login failed';
+          _errorMessage = result['message'] ?? S.biometricLoginFailed;
         });
       } else {
         _loadGymBranding(result);
@@ -110,7 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Navigation handled by router
       } else {
         setState(() {
-          _errorMessage = result['message'] ?? 'Login failed';
+          _errorMessage = result['message'] ?? S.loginFailed;
         });
       }
     }
@@ -195,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Management System',
+                      S.managementSystem,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: Colors.grey[600],
                             fontWeight: FontWeight.w500,
@@ -231,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Login Failed',
+                                    S.loginFailed,
                                     style: TextStyle(
                                       color: Theme.of(context).colorScheme.error,
                                       fontWeight: FontWeight.bold,
@@ -275,15 +276,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextFormField(
                             controller: _usernameController,
                             decoration: const InputDecoration(
-                              labelText: 'Username',
-                              hintText: 'Enter your username',
+                              labelText: S.username,
+                              hintText: S.enterUsername,
                               prefixIcon: Icon(Icons.person),
                             ),
                             textInputAction: TextInputAction.next,
                             enabled: !_isLoading,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Username is required';
+                                return S.usernameRequired;
                               }
                               return null;
                             },
@@ -294,8 +295,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextFormField(
                             controller: _passwordController,
                             decoration: InputDecoration(
-                              labelText: 'Password',
-                              hintText: 'Enter your password',
+                              labelText: S.password,
+                              hintText: S.enterPassword,
                               prefixIcon: const Icon(Icons.lock),
                               suffixIcon: IconButton(
                                 icon: Icon(
@@ -316,7 +317,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             onFieldSubmitted: (_) => _handleLogin(),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Password is required';
+                                return S.passwordRequired;
                               }
                               return null;
                             },
@@ -332,7 +333,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: _isLoading
                                   ? const SmallLoadingIndicator()
                                   : const Text(
-                                      'Login',
+                                      S.login,
                                       style: TextStyle(fontSize: 16),
                                     ),
                             ),
@@ -353,7 +354,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       Padding(
                                         padding: const EdgeInsets.symmetric(horizontal: 12),
                                         child: Text(
-                                          'or',
+                                          S.or,
                                           style: TextStyle(
                                             color: Colors.grey[500],
                                             fontSize: 14,
@@ -371,7 +372,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       onPressed: _isLoading ? null : _handleBiometricLogin,
                                       icon: const Icon(Icons.fingerprint, size: 28),
                                       label: const Text(
-                                        'Login with Biometrics',
+                                        S.loginWithBiometrics,
                                         style: TextStyle(fontSize: 16),
                                       ),
                                       style: OutlinedButton.styleFrom(

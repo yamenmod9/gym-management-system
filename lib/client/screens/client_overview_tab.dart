@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/localization/app_strings.dart';
 import '../core/auth/client_auth_provider.dart';
 import '../core/api/client_api_service.dart';
 import '../models/subscription_model.dart';
@@ -62,7 +63,7 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
           });
         } else {
           setState(() {
-            _error = 'No active subscription found';
+            _error = S.noActiveSubFound;
           });
         }
       } else {
@@ -74,7 +75,7 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
     } catch (e) {
       String errorMsg = e.toString();
       if (errorMsg.contains('404')) {
-        errorMsg = 'Subscription endpoint not available.';
+        errorMsg = S.subEndpointNotAvailable;
       }
       setState(() {
         _error = errorMsg;
@@ -105,7 +106,7 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadSubscription,
-              child: const Text('Retry'),
+              child: const Text(S.retry),
             ),
           ],
         ),
@@ -125,7 +126,7 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Dashboard',
+                  S.dashboard,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -151,12 +152,12 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Welcome back,',
+                      S.welcomeBack,
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      client?.fullName ?? 'Guest',
+                      client?.fullName ?? S.guest,
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                     if (client?.branchName != null) ...[
@@ -189,16 +190,16 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
                   context,
                   icon: Icons.warning_amber,
                   color: Colors.orange,
-                  title: 'Expiring Soon',
-                  message: 'Expires in ${_subscription!.daysRemaining} days',
+                  title: S.subExpiringSoon,
+                  message: S.expiresInDays(_subscription!.daysRemaining),
                 ),
               if (_subscription!.isExpired)
                 _buildAlertCard(
                   context,
                   icon: Icons.error,
                   color: Colors.red,
-                  title: 'Expired',
-                  message: 'Please renew your subscription',
+                  title: S.expired,
+                  message: S.pleaseRenew,
                 ),
               if (_subscription!.isRunningLow)
                 _buildAlertCard(
@@ -206,11 +207,11 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
                   icon: Icons.warning_amber,
                   color: Colors.orange,
                   title: _subscription!.displayMetric == 'coins'
-                      ? 'Low Coin Balance'
-                      : 'Few Sessions Left',
+                      ? S.lowCoinBalance
+                      : S.fewSessionsLeft,
                   message: _subscription!.displayMetric == 'coins'
-                      ? 'Only ${_subscription!.remainingCoins} coins remaining'
-                      : 'Only ${_subscription!.displayValue} sessions remaining',
+                      ? S.onlyCoinsRemaining(_subscription!.remainingCoins)
+                      : S.onlySessionsRemaining(_subscription!.displayValue),
                 ),
               const SizedBox(height: 16),
 
@@ -233,7 +234,7 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
               Expanded(
                 child: _buildStatCard(
                   context,
-                  'Remaining Coins',
+                  S.remainingCoins,
                   '${_subscription!.displayValue}',
                   Icons.monetization_on,
                   Colors.amber
@@ -243,7 +244,7 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
               Expanded(
                 child: _buildStatCard(
                   context,
-                  'Time Remaining',
+                  S.timeRemaining,
                   _subscription!.displayLabel,
                   Icons.access_time,
                   Colors.blue
@@ -253,7 +254,7 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
               Expanded(
                 child: _buildStatCard(
                   context,
-                  _subscription!.displayMetric == 'training' ? 'Training Sessions' : 'Sessions Left',
+                  _subscription!.displayMetric == 'training' ? S.trainingSessions : S.sessionsLeft,
                   '${_subscription!.displayValue}',
                   Icons.fitness_center,
                   Colors.green
@@ -263,7 +264,7 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
               Expanded(
                 child: _buildStatCard(
                   context,
-                  'Days Left',
+                  S.daysLeft,
                   '${_subscription!.daysRemaining}',
                   Icons.calendar_today,
                   Colors.blue
@@ -273,7 +274,7 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
             Expanded(
               child: _buildStatCard(
                 context,
-                'Status',
+                S.status,
                 _subscription!.status.toUpperCase(),
                 Icons.check_circle,
                 _subscription!.isActive ? Colors.green : Colors.red
@@ -285,7 +286,7 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
         Card(
           child: ListTile(
             leading: Icon(Icons.card_membership, color: Theme.of(context).primaryColor),
-            title: Text(_subscription!.serviceName ?? 'Membership'),
+            title: Text(_subscription!.serviceName ?? S.membership),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -293,19 +294,19 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
                 const SizedBox(height: 4),
                 if (_subscription!.displayMetric == 'coins') ...[
                   Text(
-                    'Coins balance: ${_subscription!.remainingCoins}${_subscription!.totalCoins != null ? ' / ${_subscription!.totalCoins}' : ''}',
+                    S.coinsBalance('${_subscription!.remainingCoins}${_subscription!.totalCoins != null ? ' / ${_subscription!.totalCoins}' : ''}'),
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ] else if (_subscription!.displayMetric == 'time' &&
                     _subscription!.expiryDate != null) ...[
                   Text(
-                    'Expires: ${_subscription!.expiryDate!.day.toString().padLeft(2, '0')}/${_subscription!.expiryDate!.month.toString().padLeft(2, '0')}/${_subscription!.expiryDate!.year}',
+                    S.expires('${_subscription!.expiryDate!.day.toString().padLeft(2, '0')}/${_subscription!.expiryDate!.month.toString().padLeft(2, '0')}/${_subscription!.expiryDate!.year}'),
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ] else if (_subscription!.displayMetric == 'sessions' ||
                     _subscription!.displayMetric == 'training') ...[
                   Text(
-                    '${_subscription!.displayValue} session${_subscription!.displayValue != 1 ? 's' : ''} remaining${_subscription!.totalSessions != null ? ' / ${_subscription!.totalSessions}' : ''}',
+                    S.sessionRemaining('${_subscription!.displayValue}${_subscription!.totalSessions != null ? ' / ${_subscription!.totalSessions}' : ''}'),
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],

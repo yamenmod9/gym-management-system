@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/localization/app_strings.dart';
 
 class SuperAdminSettingsScreen extends StatelessWidget {
   const SuperAdminSettingsScreen({super.key});
@@ -11,7 +12,7 @@ class SuperAdminSettingsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text(S.settings),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -43,14 +44,14 @@ class SuperAdminSettingsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          authProvider.username ?? 'Super Admin',
+                          authProvider.username ?? S.superAdmin,
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Platform Administrator',
+                          S.platformAdministrator,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: Colors.grey[500],
                               ),
@@ -71,14 +72,14 @@ class SuperAdminSettingsScreen extends StatelessWidget {
               children: [
                 ListTile(
                   leading: const Icon(Icons.info_outline),
-                  title: const Text('App Version'),
+                  title: const Text(S.appVersion),
                   trailing: const Text('1.0.0'),
                 ),
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.storage),
-                  title: const Text('Platform'),
-                  trailing: const Text('Multi-Gym SaaS'),
+                  title: const Text(S.platform),
+                  trailing: const Text(S.multiGymSaas),
                 ),
               ],
             ),
@@ -90,17 +91,17 @@ class SuperAdminSettingsScreen extends StatelessWidget {
           Card(
             child: ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Logout', style: TextStyle(color: Colors.red)),
+              title: const Text(S.logout, style: TextStyle(color: Colors.red)),
               onTap: () {
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Logout'),
-                    content: const Text('Are you sure you want to logout?'),
+                    title: const Text(S.logout),
+                    content: const Text(S.confirmLogout),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Cancel'),
+                        child: const Text(S.cancel),
                       ),
                       ElevatedButton(
                         onPressed: () {
@@ -108,7 +109,7 @@ class SuperAdminSettingsScreen extends StatelessWidget {
                           authProvider.logout();
                         },
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                        child: const Text('Logout'),
+                        child: const Text(S.logout),
                       ),
                     ],
                   ),

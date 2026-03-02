@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../shared/models/owner_model.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../../../shared/widgets/error_display.dart';
@@ -36,7 +37,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return Scaffold(
       extendBody: true,
       appBar: AppBar(
-        title: const Text('Platform Admin'),
+        title: const Text(S.platformAdmin),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -65,7 +66,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   children: [
                     Icon(Icons.logout, color: Colors.white70),
                     SizedBox(width: 8),
-                    Text('Logout'),
+                    Text(S.logout),
                   ],
                 ),
               ),
@@ -74,7 +75,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ],
       ),
       body: provider.isLoading
-          ? const LoadingIndicator(message: 'Loading Platform Data...')
+          ? const LoadingIndicator(message: S.loadingPlatformData)
           : provider.error != null
               ? ErrorDisplay(
                   message: provider.error!,
@@ -123,12 +124,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   NavigationDestination(
                     icon: Icon(Icons.dashboard_outlined),
                     selectedIcon: Icon(Icons.dashboard),
-                    label: 'Overview',
+                    label: S.overview,
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.manage_accounts_outlined),
                     selectedIcon: Icon(Icons.manage_accounts),
-                    label: 'Owners',
+                    label: S.owners,
                   ),
                 ],
               ),
@@ -146,7 +147,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 ).then((_) => provider.refresh());
               },
               icon: const Icon(Icons.person_add),
-              label: const Text('New Owner'),
+              label: const Text(S.newOwner),
             )
           : null,
     );
@@ -213,7 +214,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Platform Administration',
+                        S.platformAdministration,
                         style: Theme.of(context)
                             .textTheme
                             .titleLarge
@@ -221,7 +222,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Create and manage gym owner accounts',
+                        S.createManageOwners,
                         style: Theme.of(context)
                             .textTheme
                             .bodyMedium
@@ -237,7 +238,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           const SizedBox(height: 24),
 
           Text(
-            'Platform Overview',
+            S.platformOverview,
             style: Theme.of(context)
                 .textTheme
                 .titleLarge
@@ -254,13 +255,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             childAspectRatio: 1.8,
             children: [
               StatCard(
-                title: 'Total Owners',
+                title: S.totalOwners,
                 value: '${provider.totalOwners}',
                 icon: Icons.manage_accounts,
                 color: const Color(0xFFF59E0B),
               ),
               StatCard(
-                title: 'Active Owners',
+                title: S.activeOwners,
                 value: '${provider.activeOwners}',
                 icon: Icons.check_circle,
                 color: const Color(0xFF10B981),
@@ -274,7 +275,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Recent Owners',
+                S.recentOwners,
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge
@@ -283,7 +284,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               TextButton.icon(
                 onPressed: () => setState(() => _selectedIndex = 1),
                 icon: const Icon(Icons.arrow_forward, size: 16),
-                label: const Text('View All'),
+                label: const Text(S.viewAll),
               ),
             ],
           ),
@@ -299,7 +300,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         size: 64, color: Colors.grey[600]),
                     const SizedBox(height: 16),
                     Text(
-                      'No owners yet',
+                      S.noOwnersYet,
                       style: Theme.of(context)
                           .textTheme
                           .titleMedium
@@ -307,7 +308,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Create the first gym owner account to get started',
+                      S.createFirstOwner,
                       style: Theme.of(context)
                           .textTheme
                           .bodyMedium
@@ -338,7 +339,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 size: 80, color: Colors.grey[600]),
             const SizedBox(height: 24),
             Text(
-              'No Owners Yet',
+              S.noOwnersYetTab,
               style: Theme.of(context)
                   .textTheme
                   .titleLarge
@@ -346,7 +347,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Tap + to create the first gym owner',
+              S.tapPlusToCreate,
               style: Theme.of(context)
                   .textTheme
                   .bodyMedium
@@ -418,7 +419,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          owner.isActive ? 'Active' : 'Inactive',
+                          owner.isActive ? S.active : S.inactive,
                           style: TextStyle(
                             color:
                                 owner.isActive ? Colors.green : Colors.red,
@@ -451,7 +452,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                             size: 12, color: Colors.grey[500]),
                         const SizedBox(width: 4),
                         Text(
-                          'Last login: ${_formatDate(owner.lastLogin!)}',
+                          S.lastLogin(_formatDate(owner.lastLogin!)),
                           style: TextStyle(
                               fontSize: 11, color: Colors.grey[500]),
                         ),
@@ -494,7 +495,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                          owner.isActive ? 'Deactivate' : 'Activate'),
+                          owner.isActive ? S.deactivate : S.activate),
                     ],
                   ),
                 ),
@@ -509,9 +510,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inMinutes < 60) return S.minutesAgo(diff.inMinutes);
+    if (diff.inHours < 24) return S.hoursAgo(diff.inHours);
+    if (diff.inDays < 7) return S.daysAgo(diff.inDays);
     return '${date.day}/${date.month}/${date.year}';
   }
 }

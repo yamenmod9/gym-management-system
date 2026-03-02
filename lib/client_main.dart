@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'client/core/api/client_api_service.dart';
 import 'client/core/auth/client_auth_provider.dart';
@@ -58,12 +59,19 @@ class _GymClientAppState extends State<GymClientApp> {
               : ClientTheme.darkTheme;
           final title = branding.isSetupComplete && branding.gymId != null
               ? branding.gymName
-              : 'Gym Client';
+              : 'عميل النادي';
 
           return MaterialApp.router(
             title: title,
             debugShowCheckedModeBanner: false,
             theme: theme,
+            locale: const Locale('ar'),
+            supportedLocales: const [Locale('ar')],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
             routerConfig: _router.router,
           );
         },

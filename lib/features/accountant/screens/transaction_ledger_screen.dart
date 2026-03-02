@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../core/utils/helpers.dart';
@@ -117,11 +118,11 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Transaction Ledger'),
+        title: Text(S.transactionLedger),
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_today),
-            tooltip: 'Change date',
+            tooltip: S.changeDate,
             onPressed: _pickDate,
           ),
           IconButton(
@@ -168,7 +169,7 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
                 const Spacer(),
                 if (!_isLoading && _error == null)
                   Text(
-                    '${_filteredTransactions.length} transaction(s)',
+                    S.transactionsCountLabel(_filteredTransactions.length),
                     style: TextStyle(color: Colors.grey[600], fontSize: 13),
                   ),
               ],
@@ -181,19 +182,19 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
               child: Row(
                 children: [
-                  Expanded(child: _buildSummaryChip('Revenue',
+                  Expanded(child: _buildSummaryChip(S.revenue,
                     NumberHelper.formatCurrency((_summary['total_revenue'] ?? 0).toDouble()),
                     Colors.green)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildSummaryChip('Cash',
+                  Expanded(child: _buildSummaryChip(S.cash,
                     NumberHelper.formatCurrency(((_summary['payment_breakdown'] ?? {})['cash'] ?? 0).toDouble()),
                     Colors.teal)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildSummaryChip('Card',
+                  Expanded(child: _buildSummaryChip(S.card,
                     NumberHelper.formatCurrency(((_summary['payment_breakdown'] ?? {})['network'] ?? 0).toDouble()),
                     Colors.blue)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildSummaryChip('Transfer',
+                  Expanded(child: _buildSummaryChip(S.transfer,
                     NumberHelper.formatCurrency(((_summary['payment_breakdown'] ?? {})['transfer'] ?? 0).toDouble()),
                     Colors.purple)),
                 ],
@@ -206,7 +207,7 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search by customer name or ID...',
+                hintText: S.searchByCustomer,
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
@@ -231,7 +232,7 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
               child: Row(
                 children: [
                   Chip(
-                    label: Text('Payment: $_selectedPaymentMethod'),
+                    label: Text(S.paymentFilter(_selectedPaymentMethod ?? S.allMethods)),
                     deleteIcon: const Icon(Icons.close, size: 18),
                     onDeleted: () => setState(() => _selectedPaymentMethod = null),
                   ),
@@ -242,7 +243,7 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
           // Transaction list
           Expanded(
             child: _isLoading
-                ? const LoadingIndicator(message: 'Loading transactions...')
+                ? const LoadingIndicator(message: S.loadingTransactions)
                 : _error != null
                     ? ErrorDisplay(message: _error!, onRetry: _loadTransactions)
                     : _filteredTransactions.isEmpty
@@ -252,13 +253,13 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
                               children: [
                                 Icon(Icons.receipt_long, size: 64, color: Colors.grey[300]),
                                 const SizedBox(height: 16),
-                                Text('No transactions for this date',
+                                Text(S.noTransactionsForDate,
                                   style: TextStyle(fontSize: 16, color: Colors.grey[500])),
                                 const SizedBox(height: 8),
                                 TextButton.icon(
                                   onPressed: _pickDate,
                                   icon: const Icon(Icons.calendar_today, size: 16),
-                                  label: const Text('Pick another date'),
+                                  label: Text(S.pickAnotherDate),
                                 ),
                               ],
                             ),
@@ -304,7 +305,7 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
 
   Widget _buildTransactionCard(dynamic tx) {
     final id = tx['id'] ?? 0;
-    final customerName = tx['customer_name'] ?? 'Walk-in';
+    final customerName = tx['customer_name'] ?? S.walkIn;
     final amount = (tx['amount'] ?? 0).toDouble();
     final discount = (tx['discount'] ?? 0).toDouble();
     final netAmount = amount - discount;
@@ -373,20 +374,20 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
             child: Column(
               children: [
                 const Divider(),
-                _buildDetailRow('Transaction #', '#$id'),
+                _buildDetailRow(S.transactionNumber(id), '#$id'),
                 const SizedBox(height: 6),
-                _buildDetailRow('Gross Amount', NumberHelper.formatCurrency(amount)),
+                _buildDetailRow(S.grossAmount, NumberHelper.formatCurrency(amount)),
                 if (discount > 0) ...[
                   const SizedBox(height: 6),
-                  _buildDetailRow('Discount', '- ${NumberHelper.formatCurrency(discount)}'),
+                  _buildDetailRow(S.discount, '- ${NumberHelper.formatCurrency(discount)}'),
                 ],
                 const SizedBox(height: 6),
-                _buildDetailRow('Net Amount', NumberHelper.formatCurrency(netAmount)),
+                _buildDetailRow(S.netAmount, NumberHelper.formatCurrency(netAmount)),
                 const SizedBox(height: 6),
-                _buildDetailRow('Payment', paymentMethod.toUpperCase()),
+                _buildDetailRow(S.payment, paymentMethod.toUpperCase()),
                 if (time.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  _buildDetailRow('Time', time),
+                  _buildDetailRow(S.time, time),
                 ],
               ],
             ),
@@ -423,24 +424,24 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Filter Transactions'),
+        title: Text(S.filterTransactions),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Payment Method', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(S.paymentMethod, style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _selectedPaymentMethod,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'All Methods',
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                hintText: S.allMethods,
               ),
-              items: const [
-                DropdownMenuItem(value: null, child: Text('All Methods')),
-                DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                DropdownMenuItem(value: 'network', child: Text('Network/Card')),
-                DropdownMenuItem(value: 'transfer', child: Text('Transfer')),
+              items: [
+                DropdownMenuItem(value: null, child: Text(S.allMethods)),
+                DropdownMenuItem(value: 'cash', child: Text(S.cash)),
+                DropdownMenuItem(value: 'network', child: Text(S.networkCard)),
+                DropdownMenuItem(value: 'transfer', child: Text(S.transfer)),
               ],
               onChanged: (value) {
                 _selectedPaymentMethod = value;
@@ -454,14 +455,14 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
               setState(() => _selectedPaymentMethod = null);
               Navigator.pop(ctx);
             },
-            child: const Text('Clear'),
+            child: Text(S.clear),
           ),
           ElevatedButton(
             onPressed: () {
               setState(() {});
               Navigator.pop(ctx);
             },
-            child: const Text('Apply'),
+            child: Text(S.apply),
           ),
         ],
       ),
