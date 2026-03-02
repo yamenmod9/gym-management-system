@@ -149,7 +149,7 @@ def get_daily_report():
     )
     
     # Role-based filtering
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
         query = query.filter(Transaction.branch_id == current_user.branch_id)
     elif branch_id:
         query = query.filter(Transaction.branch_id == branch_id)
@@ -177,7 +177,7 @@ def get_daily_report():
         func.date(Subscription.start_date) == report_date
     )
     
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
         sub_query = sub_query.filter(Subscription.branch_id == current_user.branch_id)
     elif branch_id:
         sub_query = sub_query.filter(Subscription.branch_id == branch_id)

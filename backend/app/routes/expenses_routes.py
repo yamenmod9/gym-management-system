@@ -30,7 +30,7 @@ def get_expenses():
     query = Expense.query
     
     # Branch filtering based on role
-    if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
         if user.branch_id:
             query = query.filter_by(branch_id=user.branch_id)
     elif branch_id:
