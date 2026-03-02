@@ -92,7 +92,7 @@ def get_expenses():
 
 @finance_bp.route('/cash-differences', methods=['GET'])
 @jwt_required()
-@role_required([UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT, UserRole.ACCOUNTANT])
+@role_required([UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT, UserRole.ACCOUNTANT])
 def get_cash_differences():
     """
     Get cash difference records from daily closings
@@ -200,7 +200,7 @@ def get_daily_sales():
     )
     
     # Role-based filtering
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.ACCOUNTANT]:
+    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.ACCOUNTANT]:
         query = query.filter(Transaction.branch_id == current_user.branch_id)
     elif branch_id:
         query = query.filter(Transaction.branch_id == branch_id)

@@ -16,7 +16,7 @@ entry_logs_bp = Blueprint('entry_logs', __name__, url_prefix='/api/entry-logs')
 
 @entry_logs_bp.route('/scan', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.FRONT_DESK, UserRole.BRANCH_MANAGER, UserRole.OWNER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.FRONT_DESK, UserRole.BRANCH_MANAGER, UserRole.OWNER)
 def scan_qr_code():
     """
     Record customer check-in via QR scan or customer ID

@@ -107,7 +107,7 @@ def create_complaint():
 
 @complaints_bp.route('/<int:complaint_id>', methods=['PUT'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def update_complaint(complaint_id):
     """Update complaint status"""
     complaint = db.session.get(Complaint, complaint_id)
@@ -144,7 +144,7 @@ def update_complaint(complaint_id):
 
 @complaints_bp.route('/<int:complaint_id>', methods=['DELETE'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def delete_complaint(complaint_id):
     """Delete complaint"""
     complaint = db.session.get(Complaint, complaint_id)

@@ -20,7 +20,7 @@ dashboards_bp = Blueprint('dashboards', __name__, url_prefix='/api/dashboards')
 
 @dashboards_bp.route('/overview', methods=['GET'])
 @jwt_required()
-@role_required(UserRole.OWNER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER)
 def get_dashboard_overview():
     """Get overall gym system metrics (Owner only)"""
     from app.models import Branch, Customer, Subscription, Transaction
@@ -81,7 +81,7 @@ def get_dashboard_overview():
 
 @dashboards_bp.route('/owner', methods=['GET'])
 @jwt_required()
-@role_required(UserRole.OWNER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER)
 def get_owner_dashboard():
     """Get owner dashboard with smart alerts and analytics"""
     data = DashboardService.get_owner_dashboard()
@@ -90,7 +90,7 @@ def get_owner_dashboard():
 
 @dashboards_bp.route('/accountant', methods=['GET'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT)
 def get_accountant_dashboard():
     """Get accountant dashboard"""
     user = get_current_user()
@@ -108,7 +108,7 @@ def get_accountant_dashboard():
 
 @dashboards_bp.route('/branch/<int:branch_id>', methods=['GET'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def get_branch_dashboard(branch_id):
     """Get branch-specific metrics"""
     from app.models import Branch, Customer, Subscription, Transaction, User, Complaint, Expense
@@ -116,7 +116,7 @@ def get_branch_dashboard(branch_id):
     
     user = get_current_user()
     
-    # Branch managers can only see their own branch
+    # Branch managers can only see their own branch (not super_admin or owner)
     if user.role == UserRole.BRANCH_MANAGER and user.branch_id != branch_id:
         return error_response("Access denied to this branch", 403)
     
@@ -163,7 +163,7 @@ def get_branch_dashboard(branch_id):
 
 @dashboards_bp.route('/branch-manager', methods=['GET'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def get_branch_manager_dashboard():
     """Get branch manager dashboard"""
     user = get_current_user()
@@ -175,7 +175,7 @@ def get_branch_manager_dashboard():
             return error_response("User not assigned to a branch", 403)
     else:
         branch_id = request.args.get('branch_id', type=int)
-        if not branch_id:
+        if not branch_id and user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER]:
             return error_response("branch_id is required", 400)
     
     data = DashboardService.get_branch_manager_dashboard(branch_id)
@@ -184,7 +184,7 @@ def get_branch_manager_dashboard():
 
 @dashboards_bp.route('/reports/revenue', methods=['GET'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT)
 def get_revenue_report():
     """Get revenue report"""
     start_date = request.args.get('start_date', type=str)
@@ -221,7 +221,7 @@ def get_expiring_subscriptions_alert():
     user = get_current_user()
     
     # Branch-specific roles can only see their branch
-    if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
         branch_id = user.branch_id
     
     subscriptions = get_expiring_subscriptions(days, branch_id)
@@ -237,7 +237,7 @@ def get_expiring_subscriptions_alert():
 
 @dashboards_bp.route('/staff-performance', methods=['GET'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def get_staff_performance():
     """Get staff performance metrics"""
     start_date = request.args.get('start_date', type=str)

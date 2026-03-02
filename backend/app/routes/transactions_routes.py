@@ -31,7 +31,7 @@ def get_transactions():
     query = Transaction.query
     
     # Branch filtering based on role
-    if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
         if user.branch_id:
             query = query.filter_by(branch_id=user.branch_id)
     elif branch_id:
@@ -73,7 +73,7 @@ def get_transaction(transaction_id):
 
 @transactions_bp.route('', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK, UserRole.ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK, UserRole.ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT)
 def create_transaction():
     """Create new transaction (for misc payments)"""
     try:

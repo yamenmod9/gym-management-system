@@ -51,7 +51,7 @@ def get_my_gym():
 
 @gyms_bp.route('/setup', methods=['PUT'])
 @jwt_required()
-@role_required(UserRole.OWNER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER)
 def setup_gym():
     """Complete (or update) the gym setup wizard.
     
@@ -94,7 +94,7 @@ def setup_gym():
 
 @gyms_bp.route('/upload-logo', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER)
 def upload_logo():
     """Upload a gym logo image.
 

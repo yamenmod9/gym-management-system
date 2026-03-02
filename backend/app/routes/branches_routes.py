@@ -91,7 +91,7 @@ def get_branch(branch_id):
 
 @branches_bp.route('', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER)
 def create_branch():
     """Create new branch"""
     try:
@@ -117,7 +117,7 @@ def create_branch():
 
 @branches_bp.route('/<int:branch_id>', methods=['PUT'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def update_branch(branch_id):
     """Update branch"""
     branch = db.session.get(Branch, branch_id)
@@ -143,7 +143,7 @@ def update_branch(branch_id):
 
 @branches_bp.route('/<int:branch_id>', methods=['DELETE'])
 @jwt_required()
-@role_required(UserRole.OWNER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER)
 def delete_branch(branch_id):
     """Deactivate branch (soft delete)"""
     branch = db.session.get(Branch, branch_id)
@@ -178,7 +178,7 @@ def get_branch_performance(branch_id):
     
     # Check access
     current_user = get_current_user()
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
         if current_user.branch_id and branch_id != current_user.branch_id:
             return error_response("Access denied", 403)
     

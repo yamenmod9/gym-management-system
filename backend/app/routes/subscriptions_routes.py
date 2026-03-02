@@ -81,7 +81,7 @@ def get_subscription(subscription_id):
 
 @subscriptions_bp.route('', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def create_subscription():
     """Create new subscription"""
     try:
@@ -106,7 +106,7 @@ def create_subscription():
 
 @subscriptions_bp.route('/activate', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def activate_subscription():
     """Activate new subscription (alias for create)"""
     try:
@@ -173,7 +173,7 @@ def activate_subscription():
 
 @subscriptions_bp.route('/<int:subscription_id>/renew', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def renew_subscription(subscription_id):
     """Renew subscription"""
     data = request.json or {}
@@ -192,7 +192,7 @@ def renew_subscription(subscription_id):
 
 @subscriptions_bp.route('/<int:subscription_id>/freeze', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def freeze_subscription(subscription_id):
     """Freeze subscription"""
     try:
@@ -218,7 +218,7 @@ def freeze_subscription(subscription_id):
 
 @subscriptions_bp.route('/<int:subscription_id>/unfreeze', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def unfreeze_subscription(subscription_id):
     """Unfreeze subscription"""
     subscription, error = SubscriptionService.unfreeze_subscription(subscription_id)
@@ -231,7 +231,7 @@ def unfreeze_subscription(subscription_id):
 
 @subscriptions_bp.route('/<int:subscription_id>/stop', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def stop_subscription(subscription_id):
     """Stop subscription"""
     try:
@@ -254,7 +254,7 @@ def stop_subscription(subscription_id):
 # Alternative endpoints for Flutter app - accept subscription_id in body instead of URL
 @subscriptions_bp.route('/renew', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def renew_subscription_body():
     """Renew subscription (body-based)"""
     data = request.get_json()
@@ -275,7 +275,7 @@ def renew_subscription_body():
 
 @subscriptions_bp.route('/freeze', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def freeze_subscription_body():
     """Freeze subscription (body-based)"""
     data = request.get_json()
@@ -305,7 +305,7 @@ def freeze_subscription_body():
 
 @subscriptions_bp.route('/stop', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def stop_subscription_body():
     """Stop subscription (body-based)"""
     data = request.get_json()
@@ -330,7 +330,7 @@ def stop_subscription_body():
 
 @subscriptions_bp.route('/repair-types', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def repair_subscription_types():
     """
     One-time repair endpoint: back-fills subscription_type, remaining_coins,

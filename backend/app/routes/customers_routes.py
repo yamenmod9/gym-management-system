@@ -121,7 +121,7 @@ def get_customer_by_phone(phone):
 
 @customers_bp.route('', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def create_customer():
     """Create new customer"""
     try:
@@ -159,7 +159,7 @@ def create_customer():
 
 @customers_bp.route('/register', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def register_customer():
     """
     Register a new customer (Flutter-compatible endpoint)
@@ -283,7 +283,7 @@ def register_customer():
 
 @customers_bp.route('/<int:customer_id>', methods=['PUT'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def update_customer(customer_id):
     """Update customer"""
     customer = db.session.get(Customer, customer_id)
@@ -369,7 +369,7 @@ def search_customers():
 
 @customers_bp.route('/<int:customer_id>', methods=['DELETE'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def delete_customer(customer_id):
     """Deactivate customer (soft delete)"""
     customer = db.session.get(Customer, customer_id)

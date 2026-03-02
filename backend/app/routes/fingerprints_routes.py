@@ -46,7 +46,7 @@ def get_fingerprints():
 
 @fingerprints_bp.route('/register', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def register_fingerprint():
     """Register new fingerprint for customer"""
     try:
@@ -138,7 +138,7 @@ def validate_fingerprint():
 
 @fingerprints_bp.route('/<int:fingerprint_id>/deactivate', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def deactivate_fingerprint(fingerprint_id):
     """Deactivate fingerprint"""
     fingerprint = db.session.get(Fingerprint, fingerprint_id)
@@ -157,7 +157,7 @@ def deactivate_fingerprint(fingerprint_id):
 
 @fingerprints_bp.route('/<int:fingerprint_id>/reactivate', methods=['POST'])
 @jwt_required()
-@role_required(UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def reactivate_fingerprint(fingerprint_id):
     """Reactivate fingerprint"""
     fingerprint = db.session.get(Fingerprint, fingerprint_id)

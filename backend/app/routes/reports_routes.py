@@ -20,7 +20,7 @@ reports_bp = Blueprint('reports', __name__, url_prefix='/api/reports')
 
 @reports_bp.route('/revenue', methods=['GET'])
 @jwt_required()
-@role_required([UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT])
+@role_required([UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT])
 def get_revenue_report():
     """
     Revenue report with breakdown by branch, service, and payment method
@@ -149,11 +149,11 @@ def get_daily_report():
     )
     
     # Role-based filtering
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
         query = query.filter(Transaction.branch_id == current_user.branch_id)
     elif branch_id:
         query = query.filter(Transaction.branch_id == branch_id)
-    
+
     transactions = query.all()
     
     # Calculate metrics
@@ -177,7 +177,7 @@ def get_daily_report():
         func.date(Subscription.start_date) == report_date
     )
     
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
         sub_query = sub_query.filter(Subscription.branch_id == current_user.branch_id)
     elif branch_id:
         sub_query = sub_query.filter(Subscription.branch_id == branch_id)
@@ -359,7 +359,7 @@ def get_monthly_report():
 
 @reports_bp.route('/branch-comparison', methods=['GET'])
 @jwt_required()
-@role_required([UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT])
+@role_required([UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT])
 def get_branch_comparison():
     """
     Compare performance across all branches
@@ -459,7 +459,7 @@ def get_branch_comparison():
 
 @reports_bp.route('/employee-performance', methods=['GET'])
 @jwt_required()
-@role_required([UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.CENTRAL_ACCOUNTANT])
+@role_required([UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.CENTRAL_ACCOUNTANT])
 def get_employee_performance():
     """
     Employee performance report
@@ -481,7 +481,7 @@ def get_employee_performance():
     if current_user.role == UserRole.BRANCH_MANAGER:
         branch_id = current_user.branch_id
     
-    if not branch_id and current_user.role != UserRole.OWNER:
+    if not branch_id and current_user.role not in [UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.CENTRAL_ACCOUNTANT]:
         return error_response('branch_id is required', 400)
     
     if start_str and end_str:
