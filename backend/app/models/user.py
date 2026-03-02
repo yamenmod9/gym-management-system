@@ -9,6 +9,7 @@ import enum
 
 class UserRole(enum.Enum):
     """User roles in the system"""
+    SUPER_ADMIN = 'super_admin'
     OWNER = 'owner'
     BRANCH_MANAGER = 'branch_manager'
     FRONT_DESK = 'front_desk'

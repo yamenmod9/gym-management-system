@@ -54,8 +54,8 @@ def branch_access_required(fn):
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
-        # Owner and central accountant can access all branches
-        if user.role in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
+        # Owner, super admin, and central accountant can access all branches
+        if user.role in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
             return fn(*args, **kwargs)
         
         # Branch-specific roles must have branch_id
