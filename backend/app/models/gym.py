@@ -21,8 +21,8 @@ class Gym(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationship back to the owner User
-    owner = db.relationship('User', backref=db.backref('gym', uselist=False, lazy='joined'))
+    # Relationship back to the owner User (explicit FK to avoid ambiguity with User.gym_id)
+    owner = db.relationship('User', foreign_keys=[owner_id], backref=db.backref('gym', uselist=False, lazy='joined'))
 
     def __repr__(self):
         return f'<Gym {self.name} (owner={self.owner_id})>'
