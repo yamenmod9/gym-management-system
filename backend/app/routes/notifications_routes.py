@@ -2,7 +2,7 @@
 Push notification routes — register/unregister device tokens and send notifications
 """
 from flask import Blueprint, request
-from flask_jwt_extended import decode_token
+from flask_jwt_extended import decode_token, jwt_required
 from app.extensions import db
 from app.models.device_token import DeviceToken
 from app.models.user import User
