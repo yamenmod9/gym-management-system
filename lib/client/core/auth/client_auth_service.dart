@@ -116,6 +116,27 @@ class ClientAuthService {
     }
   }
 
+  /// Returns the full profile data map (includes client fields + gym).
+  /// Used by [ClientAuthProvider.initialize] to refresh gym branding on startup.
+  Future<Map<String, dynamic>?> getProfileData() async {
+    try {
+      final token = await _apiService.getToken();
+      if (token == null) return null;
+
+      final response = await _apiService.getProfile();
+
+      final isSuccess = (response['status'] == 'success') ||
+                       (response['success'] == true);
+
+      if (isSuccess && response['data'] is Map<String, dynamic>) {
+        return response['data'] as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<bool> isAuthenticated() async {
     final token = await _apiService.getToken();
     return token != null;

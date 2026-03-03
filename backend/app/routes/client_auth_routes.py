@@ -53,9 +53,13 @@ def client_login():
         status=SubscriptionStatus.ACTIVE
     ).first()
     
-    # Get gym branding (single-tenant: one gym in the system)
+    # Get gym branding through customer's branch (multi-tenant compatible)
     from app.models.gym import Gym
-    gym = Gym.query.first()
+    gym = None
+    if customer.branch and hasattr(customer.branch, 'gym_id') and customer.branch.gym_id:
+        gym = Gym.query.get(customer.branch.gym_id)
+    if not gym:
+        gym = Gym.query.first()  # fallback for single-tenant
     gym_data = gym.to_dict() if gym else None
 
     return success_response({
@@ -239,6 +243,15 @@ def verify_activation_code():
     # Update customer last_login equivalent (could add field)
     # For now, just return success
     
+    # Include gym branding so client app shows owner's colors
+    from app.models.gym import Gym
+    gym = None
+    if customer.branch and hasattr(customer.branch, 'gym_id') and customer.branch.gym_id:
+        gym = Gym.query.get(customer.branch.gym_id)
+    if not gym:
+        gym = Gym.query.first()
+    gym_data = gym.to_dict() if gym else None
+
     return success_response({
         'access_token': access_token,
         'token_type': 'Bearer',
@@ -250,7 +263,8 @@ def verify_activation_code():
             'qr_code': customer.qr_code,
             'branch_id': customer.branch_id,
             'branch_name': customer.branch.name if customer.branch else None
-        }
+        },
+        'gym': gym_data,
     }, 'Login successful')
 
 

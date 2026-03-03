@@ -65,11 +65,13 @@ class _GymClientAppState extends State<GymClientApp> {
       ],
       child: Consumer<GymBrandingProvider>(
         builder: (context, branding, _) {
-          // Use gym branding colors if setup is complete; otherwise default client theme
-          final theme = branding.isSetupComplete && branding.gymId != null
+          // Use gym branding colors if a gym is loaded (gymId != null).
+          // The isSetupComplete flag is for the owner's setup wizard flow,
+          // not for gating client theming — clients always see branded colors.
+          final theme = branding.gymId != null
               ? ClientTheme.buildBrandedTheme(branding.primaryColor, branding.secondaryColor)
               : ClientTheme.darkTheme;
-          final title = branding.isSetupComplete && branding.gymId != null
+          final title = branding.gymId != null
               ? branding.gymName
               : 'عميل النادي';
 

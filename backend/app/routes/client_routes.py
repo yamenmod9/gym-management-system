@@ -65,7 +65,16 @@ def get_client_profile():
     response_data['password_changed'] = customer.password_changed
     response_data['qr_code_active'] = active_subscription is not None  # Add QR active status
     response_data['qr_image_url'] = f'/api/client/qr-image'
-    
+
+    # Include gym branding so client app can refresh colors on startup
+    from app.models.gym import Gym
+    gym = None
+    if customer.branch and hasattr(customer.branch, 'gym_id') and customer.branch.gym_id:
+        gym = Gym.query.get(customer.branch.gym_id)
+    if not gym:
+        gym = Gym.query.first()
+    response_data['gym'] = gym.to_dict() if gym else None
+
     return success_response(response_data)
 
 

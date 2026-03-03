@@ -53,22 +53,11 @@ def get_customers():
     # Get paginated customers
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     
-    # ✅ ADD: Include has_active_subscription for each customer
+    # has_active_subscription is already computed inside customer.to_dict()
+    # using the correct SubscriptionStatus.ACTIVE enum comparison.
     customers_data = []
     for customer in pagination.items:
         customer_dict = customer.to_dict(include_temp_password=True)
-        
-        # Check if customer has active subscription
-        has_active_sub = db.session.query(Subscription).filter(
-            Subscription.customer_id == customer.id,
-            Subscription.status == 'active',
-            or_(
-                Subscription.end_date >= datetime.utcnow().date(),
-                Subscription.subscription_type == 'coins'
-            )
-        ).first() is not None
-        
-        customer_dict['has_active_subscription'] = has_active_sub
         customers_data.append(customer_dict)
     
     return success_response({

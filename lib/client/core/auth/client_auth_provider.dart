@@ -33,8 +33,27 @@ class ClientAuthProvider extends ChangeNotifier {
     print('🔐 ClientAuthProvider: isAuthenticated = $_isAuthenticated');
 
     if (_isAuthenticated) {
-      _currentClient = await _authService.getCurrentClient();
-      print('🔐 ClientAuthProvider: Loaded client: ${_currentClient?.fullName}');
+      // Fetch full profile data (includes gym branding)
+      final profileData = await _authService.getProfileData();
+      if (profileData != null) {
+        _currentClient = ClientModel.fromJson(profileData);
+        print('🔐 ClientAuthProvider: Loaded client: ${_currentClient?.fullName}');
+
+        // Refresh gym branding from profile (so owner color changes take effect)
+        if (profileData.containsKey('gym') && profileData['gym'] is Map) {
+          try {
+            final gymData = profileData['gym'] as Map<String, dynamic>;
+            _brandingProvider?.loadFromGym(GymModel.fromJson(gymData));
+            print('🎨 ClientAuthProvider: Gym branding refreshed - ${gymData['name']}');
+          } catch (e) {
+            print('⚠️ ClientAuthProvider: Failed to refresh gym branding: $e');
+          }
+        }
+      } else {
+        // Fallback: load just the client model
+        _currentClient = await _authService.getCurrentClient();
+        print('🔐 ClientAuthProvider: Loaded client (fallback): ${_currentClient?.fullName}');
+      }
     }
 
     print('🔐 ClientAuthProvider: Initialization complete');
