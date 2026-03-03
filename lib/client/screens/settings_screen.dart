@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/localization/app_strings.dart';
 import '../core/auth/client_auth_provider.dart';
+import '../../shared/widgets/notification_settings_section.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -132,20 +133,11 @@ class SettingsScreen extends StatelessWidget {
 
           // Preferences Section
           _buildSectionTitle(context, S.preferences),
-          _buildListTile(
-            context,
-            icon: Icons.notifications,
-            title: S.notifications,
-            subtitle: S.manageNotifications,
-            onTap: () {
-              // TODO: Navigate to notifications screen
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(S.notificationsSoon),
-                  backgroundColor: Colors.blue,
-                ),
-              );
-            },
+
+          // Notification toggle
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: NotificationSettingsSection(),
           ),
           _buildListTile(
             context,

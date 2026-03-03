@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/localization/app_strings.dart';
+import '../../../shared/widgets/notification_settings_section.dart';
 
 class SuperAdminSettingsScreen extends StatelessWidget {
   const SuperAdminSettingsScreen({super.key});
@@ -83,6 +84,14 @@ class SuperAdminSettingsScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Notification settings
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 0),
+            child: NotificationSettingsSection(),
           ),
 
           const SizedBox(height: 16),

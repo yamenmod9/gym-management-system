@@ -212,6 +212,19 @@ class ClientApiService {
     }
   }
 
+  // Generic POST request (used by FCM notification service)
+  Future<Response> post(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    try {
+      return await _dio.post(path, data: data, queryParameters: queryParameters);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // Error handling
   String _handleError(DioException error) {
     if (error.response != null) {

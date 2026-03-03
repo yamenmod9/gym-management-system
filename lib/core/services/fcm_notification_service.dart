@@ -3,7 +3,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Centralized FCM notification service.
-/// Handles permission requests, token management, and foreground message display.
+/// Handles permission requests, token management, foreground message display,
+/// and user-level notification preferences (enable/disable).
 class FcmNotificationService {
   static final FcmNotificationService _instance = FcmNotificationService._();
   factory FcmNotificationService() => _instance;
@@ -12,9 +13,21 @@ class FcmNotificationService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   static const String _fcmTokenKey = 'fcm_device_token';
+  static const String _notifEnabledKey = 'notifications_enabled';
 
   String? _currentToken;
   String? get currentToken => _currentToken;
+
+  /// Which app flavour is running: 'staff', 'client', or 'super_admin'.
+  String? _appType;
+
+  /// Cached reference to the API service so settings screen can
+  /// register/unregister without needing a provider.
+  dynamic _apiService;
+
+  /// Local preference — user opted in to notifications.
+  bool _notificationsEnabled = true;
+  bool get notificationsEnabled => _notificationsEnabled;
 
   bool _initialized = false;
 
@@ -22,10 +35,16 @@ class FcmNotificationService {
   static final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
 
+  // ─── Initialisation ───
+
   /// Initialize FCM: request permission, get token, and listen for refresh.
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
+
+    // Load stored notification preference
+    final storedPref = await _storage.read(key: _notifEnabledKey);
+    _notificationsEnabled = storedPref != 'false'; // default true
 
     // Request permission (Android 13+ & iOS)
     final settings = await _messaging.requestPermission(
@@ -48,6 +67,10 @@ class FcmNotificationService {
       _currentToken = newToken;
       await _storage.write(key: _fcmTokenKey, value: newToken);
       debugPrint('FCM Token refreshed: $newToken');
+      // Re-register new token if notifications are enabled
+      if (_notificationsEnabled && _apiService != null && _appType != null) {
+        registerTokenWithBackend(apiService: _apiService!, appType: _appType!);
+      }
     });
 
     // Foreground messages
@@ -63,6 +86,20 @@ class FcmNotificationService {
     }
   }
 
+  // ─── Backend registration ───
+
+  /// Resolve the correct endpoint path depending on which API service is in
+  /// use.  Staff [ApiService] has baseUrl without `/api`; client
+  /// [ClientApiService] has baseUrl that already includes `/api`.
+  String _resolvePath(String endpoint) {
+    // appType 'client' → ClientApiService whose baseUrl ends with /api
+    if (_appType == 'client') {
+      return endpoint; // e.g. '/notifications/register-device'
+    }
+    // Staff / super_admin → ApiService whose baseUrl is the bare host
+    return '/api$endpoint'; // e.g. '/api/notifications/register-device'
+  }
+
   /// Register the FCM token with the backend after login.
   /// [apiService] — the API service to use (staff or client).
   /// [appType] — 'staff', 'client', or 'super_admin'.
@@ -70,6 +107,15 @@ class FcmNotificationService {
     required dynamic apiService,
     required String appType,
   }) async {
+    // Cache for later (settings toggle, token refresh)
+    _apiService = apiService;
+    _appType = appType;
+
+    if (!_notificationsEnabled) {
+      debugPrint('FCM: Notifications disabled by user — skipping registration');
+      return;
+    }
+
     final token = _currentToken ?? await _messaging.getToken();
     if (token == null) {
       debugPrint('FCM: No token available to register');
@@ -77,8 +123,9 @@ class FcmNotificationService {
     }
 
     try {
+      final path = _resolvePath('/notifications/register-device');
       final response = await apiService.post(
-        '/api/notifications/register-device',
+        path,
         data: {
           'fcm_token': token,
           'app_type': appType,
@@ -96,14 +143,15 @@ class FcmNotificationService {
     }
   }
 
-  /// Unregister the device token on logout.
+  /// Unregister the device token on logout (or when user disables notifications).
   Future<void> unregisterToken({required dynamic apiService}) async {
     final token = _currentToken;
     if (token == null) return;
 
     try {
+      final path = _resolvePath('/notifications/unregister-device');
       await apiService.post(
-        '/api/notifications/unregister-device',
+        path,
         data: {'fcm_token': token},
       );
       debugPrint('FCM: Token unregistered from backend');
@@ -112,10 +160,36 @@ class FcmNotificationService {
     }
   }
 
+  // ─── User preference toggle (settings screen) ───
+
+  /// Enable or disable push notifications from settings.
+  /// When disabled: unregisters the token from the backend so no pushes are
+  /// sent to this device.  When re-enabled: registers the token again.
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    _notificationsEnabled = enabled;
+    await _storage.write(key: _notifEnabledKey, value: enabled.toString());
+
+    if (_apiService == null || _appType == null) return;
+
+    if (enabled) {
+      // Re-request permission in case user had previously denied
+      await _messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      await registerTokenWithBackend(apiService: _apiService!, appType: _appType!);
+    } else {
+      await unregisterToken(apiService: _apiService!);
+    }
+  }
+
   // ─── Private handlers ───
 
   void _handleForegroundMessage(RemoteMessage message) {
     debugPrint('FCM foreground: ${message.notification?.title}');
+
+    if (!_notificationsEnabled) return; // user opted-out
 
     if (message.notification != null) {
       _showInAppNotification(message);

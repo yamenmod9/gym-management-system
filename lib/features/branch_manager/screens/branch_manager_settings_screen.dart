@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../shared/widgets/biometric_settings_section.dart';
+import '../../../shared/widgets/notification_settings_section.dart';
 
 class BranchManagerSettingsScreen extends StatelessWidget {
   const BranchManagerSettingsScreen({super.key});
@@ -147,6 +148,9 @@ class BranchManagerSettingsScreen extends StatelessWidget {
 
           // Security / Biometric Section
           const BiometricSettingsSection(),
+
+          // Notification settings
+          const NotificationSettingsSection(),
 
           const SizedBox(height: 24),
 

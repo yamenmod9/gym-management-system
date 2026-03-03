@@ -702,6 +702,12 @@ class S {
   static const String notifications = 'الإشعارات';
   static const String manageNotifications = 'إدارة إعدادات الإشعارات';
   static const String notificationsSoon = 'إعدادات الإشعارات قريباً';
+  static const String notificationsEnabled = 'الإشعارات مفعّلة';
+  static const String notificationsDisabled = 'الإشعارات معطّلة';
+  static const String enableNotifications = 'تفعيل الإشعارات';
+  static const String receiveNotificationsDesc = 'استقبال إشعارات الاشتراكات والدخول والتنبيهات';
+  static const String notificationsActivated = 'تم تفعيل الإشعارات';
+  static const String notificationsDeactivated = 'تم تعطيل الإشعارات';
   static const String darkMode = 'الوضع الداكن';
   static const String themeSelectionSoon = 'اختيار السمة قريباً';
   static const String support = 'الدعم';
