@@ -1,6 +1,7 @@
 """
 Complaint management routes
 """
+import logging
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from marshmallow import ValidationError
@@ -12,6 +13,8 @@ from app.utils import (
 )
 from app.models.user import UserRole
 from app.extensions import db
+
+logger = logging.getLogger(__name__)
 
 complaints_bp = Blueprint('complaints', __name__, url_prefix='/api/complaints')
 
@@ -117,9 +120,9 @@ def create_complaint():
             f'{complaint.title}',
             {'type': 'new_complaint', 'complaint_id': str(complaint.id)},
         )
-    except Exception:
-        pass
-    
+    except Exception as e:
+        logger.exception('Push notification failed: %s', e)
+
     return success_response(complaint.to_dict(), "Complaint created successfully", 201)
 
 

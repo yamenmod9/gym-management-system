@@ -106,3 +106,28 @@ def unregister_device():
     db.session.commit()
 
     return success_response({'unregistered': count}, 'Device unregistered')
+
+
+@notifications_bp.route('/debug-tokens', methods=['GET'])
+@jwt_required()
+def debug_tokens():
+    """
+    Debug endpoint: list all registered device tokens.
+    Only accessible to authenticated staff/admin users.
+    """
+    from app.models.user import User
+    from flask_jwt_extended import get_jwt_identity
+
+    identity = get_jwt_identity()
+    user = db.session.get(User, int(identity)) if identity else None
+    if not user:
+        return error_response('Staff access required', 403)
+
+    tokens = DeviceToken.query.order_by(DeviceToken.id.desc()).limit(50).all()
+    return success_response({
+        'total': DeviceToken.query.count(),
+        'active': DeviceToken.query.filter_by(is_active=True).count(),
+        'client_active': DeviceToken.query.filter_by(app_type='client', is_active=True).count(),
+        'staff_active': DeviceToken.query.filter_by(app_type='staff', is_active=True).count(),
+        'tokens': [t.to_dict() for t in tokens],
+    })

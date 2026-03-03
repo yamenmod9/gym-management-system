@@ -91,9 +91,10 @@ class FcmNotificationService {
   /// Resolve the correct endpoint path depending on which API service is in
   /// use.  Staff [ApiService] has baseUrl without `/api`; client
   /// [ClientApiService] has baseUrl that already includes `/api`.
-  String _resolvePath(String endpoint) {
+  String _resolvePath(String endpoint, {String? appTypeOverride}) {
+    final type = appTypeOverride ?? _appType;
     // appType 'client' → ClientApiService whose baseUrl ends with /api
-    if (_appType == 'client') {
+    if (type == 'client') {
       return endpoint; // e.g. '/notifications/register-device'
     }
     // Staff / super_admin → ApiService whose baseUrl is the bare host
@@ -122,8 +123,12 @@ class FcmNotificationService {
       return;
     }
 
+    debugPrint('FCM: Registering token with backend ($appType)...');
+    debugPrint('FCM: Token prefix=${token.substring(0, 20)}...');
+
     try {
       final path = _resolvePath('/notifications/register-device');
+      debugPrint('FCM: POST $path');
       final response = await apiService.post(
         path,
         data: {
@@ -133,13 +138,15 @@ class FcmNotificationService {
         },
       );
 
+      debugPrint('FCM: Registration response: ${response.statusCode} ${response.data}');
       if (response.statusCode == 200 || response.statusCode == 201) {
-        debugPrint('FCM: Token registered with backend ($appType)');
+        debugPrint('FCM: ✅ Token registered with backend ($appType)');
       } else {
-        debugPrint('FCM: Token registration failed: ${response.statusCode}');
+        debugPrint('FCM: ❌ Token registration failed: ${response.statusCode}');
       }
-    } catch (e) {
-      debugPrint('FCM: Token registration error: $e');
+    } catch (e, stackTrace) {
+      debugPrint('FCM: ❌ Token registration error: $e');
+      debugPrint('FCM: Stack trace: $stackTrace');
     }
   }
 

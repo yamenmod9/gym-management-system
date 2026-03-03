@@ -121,10 +121,14 @@ class ClientAuthProvider extends ChangeNotifier {
     print('🔐 ClientAuthProvider: New state - isAuth=$_isAuthenticated, passwordChanged=$_passwordChanged');
 
     // Register FCM token with backend
-    FcmNotificationService().registerTokenWithBackend(
-      apiService: _apiService,
-      appType: 'client',
-    );
+    try {
+      await FcmNotificationService().registerTokenWithBackend(
+        apiService: _apiService,
+        appType: 'client',
+      );
+    } catch (e) {
+      print('⚠️ FCM token registration failed: $e');
+    }
 
     print('🔐 ClientAuthProvider: Calling notifyListeners()...');
     notifyListeners();

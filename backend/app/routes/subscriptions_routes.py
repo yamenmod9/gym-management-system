@@ -1,6 +1,7 @@
 """
 Subscription management routes
 """
+import logging
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from marshmallow import ValidationError
@@ -15,6 +16,8 @@ from app.utils import (
 )
 from app.models.user import UserRole
 from app.extensions import db
+
+logger = logging.getLogger(__name__)
 
 subscriptions_bp = Blueprint('subscriptions', __name__, url_prefix='/api/subscriptions')
 
@@ -110,9 +113,9 @@ def create_subscription():
             f'مرحباً! تم تفعيل اشتراكك بنجاح.',
             {'type': 'subscription_created', 'subscription_id': str(subscription.id)},
         )
-    except Exception:
-        pass  # Don't fail the request if notification fails
-    
+    except Exception as e:
+        logger.exception('Push notification failed: %s', e)
+
     return success_response(subscription.to_dict(), "Subscription created successfully", 201)
 
 
@@ -182,9 +185,9 @@ def activate_subscription():
                 f'مرحباً! تم تفعيل اشتراكك بنجاح.',
                 {'type': 'subscription_activated', 'subscription_id': str(subscription.id)},
             )
-        except Exception:
-            pass
-        
+        except Exception as e:
+            logger.exception('Push notification failed: %s', e)
+
         return success_response(
             response_data,
             "Subscription activated successfully",
@@ -220,9 +223,9 @@ def renew_subscription(subscription_id):
             f'تم تجديد اشتراكك حتى {subscription.end_date.strftime("%Y-%m-%d")}.',
             {'type': 'subscription_renewed', 'subscription_id': str(subscription.id)},
         )
-    except Exception:
-        pass
-    
+    except Exception as e:
+        logger.exception('Push notification failed: %s', e)
+
     return success_response(subscription.to_dict(), "Subscription renewed successfully")
 
 
@@ -258,9 +261,9 @@ def freeze_subscription(subscription_id):
             f'تم تجميد اشتراكك لمدة {data["days"]} يوم.',
             {'type': 'subscription_frozen', 'subscription_id': str(subscription.id)},
         )
-    except Exception:
-        pass
-    
+    except Exception as e:
+        logger.exception('Push notification failed: %s', e)
+
     return success_response(subscription.to_dict(), "Subscription frozen successfully")
 
 
@@ -283,9 +286,9 @@ def unfreeze_subscription(subscription_id):
             'اشتراكك أصبح فعالاً مجدداً. مرحباً بعودتك!',
             {'type': 'subscription_unfrozen', 'subscription_id': str(subscription.id)},
         )
-    except Exception:
-        pass
-    
+    except Exception as e:
+        logger.exception('Push notification failed: %s', e)
+
     return success_response(subscription.to_dict(), "Subscription unfrozen successfully")
 
 
@@ -317,9 +320,9 @@ def stop_subscription(subscription_id):
             'تم إيقاف اشتراكك. تواصل مع الإدارة للمزيد.',
             {'type': 'subscription_stopped', 'subscription_id': str(subscription.id)},
         )
-    except Exception:
-        pass
-    
+    except Exception as e:
+        logger.exception('Push notification failed: %s', e)
+
     return success_response(subscription.to_dict(), "Subscription stopped successfully")
 
 

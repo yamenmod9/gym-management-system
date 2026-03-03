@@ -86,10 +86,14 @@ class AuthProvider extends ChangeNotifier {
       // Register FCM token with backend
       if (_apiService != null) {
         final appType = _userRole == 'super_admin' ? 'super_admin' : 'staff';
-        FcmNotificationService().registerTokenWithBackend(
-          apiService: _apiService!,
-          appType: appType,
-        );
+        try {
+          await FcmNotificationService().registerTokenWithBackend(
+            apiService: _apiService!,
+            appType: appType,
+          );
+        } catch (e) {
+          debugPrint('⚠️ FCM token registration failed: $e');
+        }
       }
 
       // If biometric is enabled, update stored credentials

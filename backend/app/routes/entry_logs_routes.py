@@ -1,6 +1,7 @@
 """
 Entry logs routes - Customer check-in/scanning
 """
+import logging
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from datetime import datetime
@@ -10,6 +11,8 @@ from app.models.entry_log import EntryType
 from app.utils import success_response, error_response, role_required, get_current_user
 from app.models.user import UserRole
 from app.extensions import db
+
+logger = logging.getLogger(__name__)
 
 entry_logs_bp = Blueprint('entry_logs', __name__, url_prefix='/api/entry-logs')
 
@@ -205,8 +208,8 @@ def scan_qr_code():
             f'مرحباً {customer.full_name}! تم تسجيل دخولك بنجاح.{remaining_msg}',
             {'type': 'check_in', 'entry_id': str(entry_log.id)},
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.exception('Push notification failed: %s', e)
 
     # Notify staff if coins/sessions are running low
     try:
@@ -226,9 +229,9 @@ def scan_qr_code():
                 f'{customer.full_name} لديه {subscription.remaining_sessions} حصة متبقية فقط.',
                 {'type': 'low_sessions', 'customer_id': str(customer.id)},
             )
-    except Exception:
-        pass
-    
+    except Exception as e:
+        logger.exception('Push notification failed: %s', e)
+
     return success_response({
         "attendance_id": entry_log.id,
         "entry_id": entry_log.id,  # Alias for compatibility
