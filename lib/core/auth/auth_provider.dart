@@ -26,8 +26,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Set the API service so we can register FCM tokens.
+  /// Also wires the session-expired callback so that a stale JWT
+  /// automatically triggers logout → GoRouter redirect to /login.
   void setApiService(ApiService api) {
     _apiService = api;
+    api.onSessionExpired = () {
+      debugPrint('🔒 AuthProvider: forced logout triggered by expired session');
+      _forceLogout();
+    };
   }
   
   // Getters
@@ -168,6 +174,21 @@ class AuthProvider extends ChangeNotifier {
     _branchId = null;
     // NOTE: We intentionally do NOT clear biometric credentials on logout.
     // That way the user can still use biometric to log back in.
+    notifyListeners();
+  }
+
+  /// Forced logout called from ApiService when a 401 / stale-JWT 404 is
+  /// detected.  Skips FCM unregister (the token is already invalid) and
+  /// just clears local state so GoRouter's refreshListenable redirects to
+  /// /login.
+  Future<void> _forceLogout() async {
+    if (!_isAuthenticated) return; // already logged out
+    await _authService.logout();
+    _isAuthenticated = false;
+    _userRole = null;
+    _userId = null;
+    _username = null;
+    _branchId = null;
     notifyListeners();
   }
   
