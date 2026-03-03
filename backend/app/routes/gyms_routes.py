@@ -35,7 +35,7 @@ def get_my_gym():
     """
     user = get_current_user()
     if not user:
-        return error_response("User not found", 404)
+        return error_response("Session expired. Please log in again.", 401)
 
     gym = None
     if user.role == UserRole.OWNER:
@@ -66,7 +66,7 @@ def setup_gym():
     """
     user = get_current_user()
     if not user:
-        return error_response("User not found", 404)
+        return error_response("Session expired. Please log in again.", 401)
 
     gym = Gym.query.filter_by(owner_id=user.id).first()
     if not gym:
@@ -103,7 +103,7 @@ def upload_logo():
     """
     user = get_current_user()
     if not user:
-        return error_response("User not found", 404)
+        return error_response("Session expired. Please log in again.", 401)
 
     if 'logo' not in request.files:
         return error_response("No file uploaded. Send a 'logo' field.", 400)

@@ -26,13 +26,13 @@ def role_required(*allowed_roles):
             user = db.session.get(User, user_id)
             
             if not user:
-                return jsonify({'error': 'User not found'}), 404
+                return jsonify({'success': False, 'error': 'Session expired. Please log in again.'}), 401
             
             if not user.is_active:
-                return jsonify({'error': 'User account is inactive'}), 403
+                return jsonify({'success': False, 'error': 'User account is inactive'}), 403
             
             if user.role not in allowed_roles:
-                return jsonify({'error': 'Insufficient permissions'}), 403
+                return jsonify({'success': False, 'error': 'Insufficient permissions'}), 403
             
             return fn(*args, **kwargs)
         return wrapper
@@ -52,7 +52,7 @@ def branch_access_required(fn):
         user = db.session.get(User, user_id)
         
         if not user:
-            return jsonify({'error': 'User not found'}), 404
+            return jsonify({'success': False, 'error': 'Session expired. Please log in again.'}), 401
         
         # Owner, super admin, and central accountant can access all branches
         if user.role in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
@@ -60,12 +60,12 @@ def branch_access_required(fn):
         
         # Branch-specific roles must have branch_id
         if not user.branch_id:
-            return jsonify({'error': 'User not assigned to any branch'}), 403
+            return jsonify({'success': False, 'error': 'User not assigned to any branch'}), 403
         
         # Check if the requested branch_id matches user's branch
         requested_branch_id = kwargs.get('branch_id')
         if requested_branch_id and requested_branch_id != user.branch_id:
-            return jsonify({'error': 'Access denied to this branch'}), 403
+            return jsonify({'success': False, 'error': 'Access denied to this branch'}), 403
         
         return fn(*args, **kwargs)
     return wrapper

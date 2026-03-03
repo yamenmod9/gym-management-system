@@ -39,6 +39,16 @@ class ApiService {
           }
           return handler.next(options);
         },
+        onResponse: (response, handler) async {
+          // Detect auth failures that come through as normal responses
+          // (because validateStatus allows < 500)
+          final statusCode = response.statusCode;
+          if (statusCode == 401) {
+            // Token expired or user no longer exists — clear cached token
+            await _storage.delete(key: _tokenKey);
+          }
+          return handler.next(response);
+        },
         onError: (error, handler) async {
           if (error.response?.statusCode == 401) {
             // Unauthorized - clear token and redirect to login
