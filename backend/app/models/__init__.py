@@ -15,6 +15,7 @@ from .daily_closing import DailyClosing
 from .fingerprint import Fingerprint
 from .activation_code import ActivationCode, ActivationCodeType
 from .entry_log import EntryLog, EntryType, EntryStatus
+from .device_token import DeviceToken
 
 __all__ = [
     'User',
@@ -42,5 +43,6 @@ __all__ = [
     'ActivationCodeType',
     'EntryLog',
     'EntryType',
-    'EntryStatus'
+    'EntryStatus',
+    'DeviceToken',
 ]

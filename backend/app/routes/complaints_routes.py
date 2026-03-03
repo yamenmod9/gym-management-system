@@ -102,6 +102,24 @@ def create_complaint():
     db.session.add(complaint)
     db.session.commit()
     
+    # Notify owner/branch manager about the new complaint
+    try:
+        from app.services.fcm_service import notify_role
+        notify_role(
+            'owner',
+            '📋 شكوى جديدة',
+            f'{complaint.title}',
+            {'type': 'new_complaint', 'complaint_id': str(complaint.id)},
+        )
+        notify_role(
+            'branch_manager',
+            '📋 شكوى جديدة',
+            f'{complaint.title}',
+            {'type': 'new_complaint', 'complaint_id': str(complaint.id)},
+        )
+    except Exception:
+        pass
+    
     return success_response(complaint.to_dict(), "Complaint created successfully", 201)
 
 

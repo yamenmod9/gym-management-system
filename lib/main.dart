@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'core/api/api_service.dart';
 import 'core/auth/auth_service.dart';
 import 'core/auth/auth_provider.dart';
@@ -8,13 +10,23 @@ import 'core/auth/biometric_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'core/providers/gym_branding_provider.dart';
+import 'core/services/fcm_notification_service.dart';
 import 'routes/app_router.dart';
 import 'features/owner/providers/owner_dashboard_provider.dart';
 import 'features/branch_manager/providers/branch_manager_provider.dart';
 import 'features/reception/providers/reception_provider.dart';
 import 'features/accountant/providers/accountant_provider.dart';
 
-void main() {
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await FcmNotificationService().initialize();
   runApp(const MyApp());
 }
 
@@ -35,7 +47,11 @@ class MyApp extends StatelessWidget {
           value: apiService,
         ),
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(authService, biometricService),
+          create: (_) {
+            final auth = AuthProvider(authService, biometricService);
+            auth.setApiService(apiService);
+            return auth;
+          },
         ),
 
         // Feature providers
@@ -103,6 +119,7 @@ class MyApp extends StatelessWidget {
             title: title,
             debugShowCheckedModeBanner: false,
             theme: theme,
+            scaffoldMessengerKey: FcmNotificationService.scaffoldMessengerKey,
             locale: const Locale('ar'),
             supportedLocales: const [Locale('ar')],
             localizationsDelegates: const [

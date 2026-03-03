@@ -64,6 +64,13 @@ def _ensure_db_schema(app):
 
         try:
             inspector = sa_inspect(db.engine)
+
+            # Create device_tokens table if it doesn't exist
+            if 'device_tokens' not in inspector.get_table_names():
+                from app.models.device_token import DeviceToken
+                DeviceToken.__table__.create(db.engine)
+                app.logger.info('Auto-migration: created device_tokens table')
+
             if 'transactions' in inspector.get_table_names():
                 columns = [col['name'] for col in inspector.get_columns('transactions')]
                 if 'discount' not in columns:

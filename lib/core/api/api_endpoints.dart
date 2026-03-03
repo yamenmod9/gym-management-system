@@ -72,4 +72,8 @@ class ApiEndpoints {
   // User / Staff Endpoints
   static const String users = '/api/users';
   static String userById(int id) => '/api/users/$id';
+
+  // Notification Endpoints
+  static const String registerDevice = '/api/notifications/register-device';
+  static const String unregisterDevice = '/api/notifications/unregister-device';
 }

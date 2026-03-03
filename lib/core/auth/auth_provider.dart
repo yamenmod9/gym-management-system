@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'auth_service.dart';
 import 'biometric_service.dart';
+import '../services/fcm_notification_service.dart';
+import '../api/api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
   final BiometricService _biometricService;
+  ApiService? _apiService;
   
   bool _isAuthenticated = false;
   bool _isLoading = true;
@@ -20,6 +23,11 @@ class AuthProvider extends ChangeNotifier {
   
   AuthProvider(this._authService, this._biometricService) {
     _checkAuthStatus();
+  }
+
+  /// Set the API service so we can register FCM tokens.
+  void setApiService(ApiService api) {
+    _apiService = api;
   }
   
   // Getters
@@ -74,6 +82,15 @@ class AuthProvider extends ChangeNotifier {
       _userId = result['user_id']?.toString();
       _username = result['username']?.toString();
       _branchId = result['branch_id']?.toString();
+
+      // Register FCM token with backend
+      if (_apiService != null) {
+        final appType = _userRole == 'super_admin' ? 'super_admin' : 'staff';
+        FcmNotificationService().registerTokenWithBackend(
+          apiService: _apiService!,
+          appType: appType,
+        );
+      }
 
       // If biometric is enabled, update stored credentials
       // so the latest password is always stored.
@@ -135,6 +152,10 @@ class AuthProvider extends ChangeNotifier {
   
   // Logout
   Future<void> logout() async {
+    // Unregister FCM token
+    if (_apiService != null) {
+      await FcmNotificationService().unregisterToken(apiService: _apiService!);
+    }
     await _authService.logout();
     _isAuthenticated = false;
     _userRole = null;

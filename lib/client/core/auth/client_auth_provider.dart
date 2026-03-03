@@ -4,16 +4,19 @@ import 'client_auth_service.dart';
 import '../../models/client_model.dart';
 import '../../../core/providers/gym_branding_provider.dart';
 import '../../../shared/models/gym_model.dart';
+import '../../../core/services/fcm_notification_service.dart';
 
 class ClientAuthProvider extends ChangeNotifier {
   final ClientAuthService _authService;
+  final ClientApiService _apiService;
   GymBrandingProvider? _brandingProvider;
   ClientModel? _currentClient;
   bool _isAuthenticated = false;
   bool _passwordChanged = true; // Always true — clients use their temporary password permanently
 
   ClientAuthProvider(ClientApiService apiService)
-      : _authService = ClientAuthService(apiService);
+      : _authService = ClientAuthService(apiService),
+        _apiService = apiService;
 
   /// Set the branding provider so login can load gym colors before navigation.
   void setBrandingProvider(GymBrandingProvider branding) {
@@ -116,6 +119,13 @@ class ClientAuthProvider extends ChangeNotifier {
 
     print('🔐 ClientAuthProvider: Login successful! Client: ${_currentClient?.fullName}');
     print('🔐 ClientAuthProvider: New state - isAuth=$_isAuthenticated, passwordChanged=$_passwordChanged');
+
+    // Register FCM token with backend
+    FcmNotificationService().registerTokenWithBackend(
+      apiService: _apiService,
+      appType: 'client',
+    );
+
     print('🔐 ClientAuthProvider: Calling notifyListeners()...');
     notifyListeners();
     print('🔐 ClientAuthProvider: notifyListeners() called');
@@ -150,6 +160,8 @@ class ClientAuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Unregister FCM token
+    await FcmNotificationService().unregisterToken(apiService: _apiService);
     await _authService.logout();
     _currentClient = null;
     _isAuthenticated = false;
