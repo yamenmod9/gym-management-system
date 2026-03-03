@@ -44,6 +44,11 @@ class AuthService:
             gym = Gym.query.filter_by(owner_id=user.id).first()
             if gym:
                 result['gym'] = gym.to_dict()
+        # For staff, find the gym they belong to
+        elif user.gym_id:
+            gym = Gym.query.get(user.gym_id)
+            if gym:
+                result['gym'] = gym.to_dict()
 
         return result, None
     
@@ -82,6 +87,7 @@ class AuthService:
             full_name=data['full_name'],
             phone=data.get('phone'),
             role=role,
+            gym_id=data.get('gym_id'),
             branch_id=data.get('branch_id'),
             is_active=data.get('is_active', True)
         )

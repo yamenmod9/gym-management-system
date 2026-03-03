@@ -78,6 +78,24 @@ def get_current_user():
     return db.session.get(User, user_id)
 
 
+def get_current_gym_id(user=None):
+    """Resolve the gym_id for the current user.
+    
+    - OWNER → gym they own
+    - Staff  → their gym_id field (set at creation)
+    - SUPER_ADMIN → None (sees everything)
+    """
+    if user is None:
+        user = get_current_user()
+    if user.role == UserRole.SUPER_ADMIN:
+        return None  # super admin is above gym scope
+    if user.role == UserRole.OWNER:
+        from app.models.gym import Gym
+        gym = Gym.query.filter_by(owner_id=user.id).first()
+        return gym.id if gym else None
+    return user.gym_id
+
+
 def paginate(query, page=1, per_page=20):
     """
     Paginate a SQLAlchemy query

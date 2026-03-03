@@ -13,6 +13,7 @@ import '../widgets/add_staff_dialog.dart';
 import 'smart_alerts_screen.dart';
 import 'staff_leaderboard_screen.dart';
 import 'branch_detail_screen.dart';
+import 'create_branch_screen.dart';
 import 'owner_settings_screen.dart';
 import '../../../core/localization/app_strings.dart';
 
@@ -108,6 +109,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                   onRetry: () => dashboardProvider.refresh(),
                 )
               : _buildCurrentTab(context, dashboardProvider, authProvider),
+      floatingActionButton: _buildFab(context, dashboardProvider),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         decoration: BoxDecoration(
@@ -178,6 +180,35 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         ),
       ),
     );
+  }
+
+  Widget? _buildFab(BuildContext context, OwnerDashboardProvider provider) {
+    // Tab 1 = Branches → show "Create Branch" FAB
+    if (_selectedIndex == 1) {
+      return FloatingActionButton.extended(
+        onPressed: () async {
+          final created = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (_) => const CreateBranchScreen()),
+          );
+          if (created == true) {
+            provider.refresh();
+          }
+        },
+        icon: const Icon(Icons.add_business),
+        label: const Text(S.createBranch),
+      );
+    }
+    // Tab 2 = Staff → show "Add Staff" FAB only if branches exist
+    if (_selectedIndex == 2 && provider.branchComparison.isNotEmpty) {
+      return FloatingActionButton.extended(
+        onPressed: () => _showAddStaffDialog(context),
+        icon: const Icon(Icons.person_add),
+        label: const Text(S.addStaff),
+        backgroundColor: Colors.green,
+      );
+    }
+    return null;
   }
 
   Widget _buildCurrentTab(BuildContext context, OwnerDashboardProvider provider, AuthProvider authProvider) {
@@ -374,14 +405,45 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   // Other specific tab build methods...
   Widget _buildBranchesTab(BuildContext context, OwnerDashboardProvider provider) {
     if (provider.branchComparison.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.store_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(S.noBranchesFound, style: TextStyle(fontSize: 16, color: Colors.grey)),
-          ],
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.store_outlined, size: 80, color: Colors.grey[600]),
+              const SizedBox(height: 20),
+              Text(
+                S.noBranchesYet,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[400],
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                S.createFirstBranchDesc,
+                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final created = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CreateBranchScreen()),
+                  );
+                  if (created == true) provider.refresh();
+                },
+                icon: const Icon(Icons.add_business),
+                label: const Text(S.createBranch),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -522,6 +584,87 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   }
 
   Widget _buildEmployeesTab(BuildContext context, OwnerDashboardProvider provider) {
+    // If there are no branches yet, guide the owner to create one first
+    if (provider.branchComparison.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.people_outlined, size: 80, color: Colors.grey[600]),
+              const SizedBox(height: 20),
+              Text(
+                S.noStaffYet,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[400],
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                S.createBranchFirst,
+                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() => _selectedIndex = 1); // switch to branches tab
+                },
+                icon: const Icon(Icons.add_business),
+                label: const Text(S.createBranch),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // If branches exist but no staff yet
+    if (provider.employeePerformance.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.person_add_outlined, size: 80, color: Colors.grey[600]),
+              const SizedBox(height: 20),
+              Text(
+                S.noStaffYet,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[400],
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                S.addStaffDesc,
+                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () => _showAddStaffDialog(context),
+                icon: const Icon(Icons.person_add),
+                label: const Text(S.addStaff),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  backgroundColor: Colors.green,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: () => provider.refresh(),
       child: ListView.builder(

@@ -57,25 +57,31 @@ def seed_database():
         db.drop_all()
         db.create_all()
         
-        # Create branches
-        print("  ↳ Creating branches...")
-        branches = create_branches()
-        
-        # Create users
+        # Create users (super admin + default owner)
         print("  ↳ Creating users...")
-        users = create_users(branches)
+        users = create_users([])  # branches not created yet
 
-        # Create gyms for owner users
-        print("  ↳ Creating gyms for owners...")
-        for u in users:
-            if u.role == UserRole.OWNER:
-                gym = Gym(
-                    name=f"{u.full_name}'s Gym",
-                    owner_id=u.id,
-                    is_setup_complete=False,
-                )
-                db.session.add(gym)
-        db.session.commit()
+        # Create gym for the DEFAULT owner only
+        print("  ↳ Creating gym for the default owner...")
+        default_owner = next(u for u in users if u.role == UserRole.OWNER)
+        default_gym = Gym(
+            name="Abu Faisal's Gym",
+            owner_id=default_owner.id,
+            primary_color='#DC2626',
+            secondary_color='#EF4444',
+            is_setup_complete=True,  # seed data fills it
+        )
+        db.session.add(default_gym)
+        db.session.flush()
+        gym_id = default_gym.id
+
+        # Create branches (scoped to default owner's gym)
+        print("  ↳ Creating branches...")
+        branches = create_branches(gym_id)
+
+        # Back-fill gym_id + branch_id on staff users
+        print("  ↳ Assigning staff to gym & branches...")
+        assign_staff_to_branches(users, branches, gym_id)
         
         # Create services
         print("  ↳ Creating services...")
@@ -214,8 +220,8 @@ def seed_database():
         print("="*70 + "\n")
 
 
-def create_branches():
-    """Create test branches with different performance levels"""
+def create_branches(gym_id):
+    """Create test branches scoped to the default owner's gym"""
     branches = [
         Branch(
             name='Dragon Club',  # High performance
@@ -223,6 +229,7 @@ def create_branches():
             address='123 Premium Street, Zamalek, Cairo',
             phone='0227350001',
             city='Cairo',
+            gym_id=gym_id,
             is_active=True
         ),
         Branch(
@@ -231,6 +238,7 @@ def create_branches():
             address='456 Central Avenue, Mohandessin, Giza',
             phone='0233450002',
             city='Giza',
+            gym_id=gym_id,
             is_active=True
         ),
         Branch(
@@ -239,6 +247,7 @@ def create_branches():
             address='789 Beach Road, Alexandria',
             phone='0345670003',
             city='Alexandria',
+            gym_id=gym_id,
             is_active=True
         )
     ]
@@ -252,7 +261,7 @@ def create_branches():
 
 
 def create_users(branches):
-    """Create test users - MINIMUM 2 per role (except owner)"""
+    """Create test users — branches are assigned later via assign_staff_to_branches."""
     users = []
     
     # ========== SUPER ADMIN (platform-level) ==========
@@ -267,7 +276,7 @@ def create_users(branches):
     super_admin.set_password('ZWL@2009')
     users.append(super_admin)
     
-    # ========== OWNER (exactly 1) ==========
+    # ========== OWNER (exactly 1 — the default/test owner) ==========
     owner = User(
         username='owner',
         email='owner@gymchain.com',
@@ -279,27 +288,26 @@ def create_users(branches):
     owner.set_password('owner123')
     users.append(owner)
     
-    # ========== BRANCH MANAGERS (1 per branch minimum) ==========
+    # ========== Staff users (branch_id + gym_id set later) ==========
+    # BRANCH MANAGERS (1 per branch minimum)
     manager_names = [
         ('Ahmed Khalil', '0201111001'),
         ('Mohamed Rashad', '0201111002'),
         ('Khaled Mansour', '0201111003')
     ]
-    
-    for i, branch in enumerate(branches):
+    for i, (name, phone) in enumerate(manager_names):
         manager = User(
             username=f'manager{i+1}',
             email=f'manager{i+1}@gymchain.com',
-            full_name=manager_names[i][0],
-            phone=manager_names[i][1],
+            full_name=name,
+            phone=phone,
             role=UserRole.BRANCH_MANAGER,
-            branch_id=branch.id,
             is_active=True
         )
         manager.set_password('manager123')
         users.append(manager)
     
-    # ========== FRONT DESK / RECEPTION (2 per branch) ==========
+    # FRONT DESK / RECEPTION (6 total — 2 per branch)
     reception_names = [
         ('Sara Mohamed', '0202220001'),
         ('Fatma Hassan', '0202220002'),
@@ -308,30 +316,23 @@ def create_users(branches):
         ('Mariam Ali', '0202220005'),
         ('Yasmin Samir', '0202220006')
     ]
+    for i, (name, phone) in enumerate(reception_names):
+        reception = User(
+            username=f'reception{i+1}',
+            email=f'reception{i+1}@gymchain.com',
+            full_name=name,
+            phone=phone,
+            role=UserRole.FRONT_DESK,
+            is_active=True
+        )
+        reception.set_password('reception123')
+        users.append(reception)
     
-    reception_idx = 0
-    for i, branch in enumerate(branches):
-        # Create 2 receptionists per branch
-        for j in range(2):
-            reception = User(
-                username=f'reception{reception_idx + 1}',
-                email=f'reception{reception_idx + 1}@gymchain.com',
-                full_name=reception_names[reception_idx][0],
-                phone=reception_names[reception_idx][1],
-                role=UserRole.FRONT_DESK,
-                branch_id=branch.id,
-                is_active=True
-            )
-            reception.set_password('reception123')
-            users.append(reception)
-            reception_idx += 1
-    
-    # ========== CENTRAL ACCOUNTANTS (2+) ==========
+    # CENTRAL ACCOUNTANTS (2)
     central_accountants = [
         ('Omar Farid', '0203330001', 'accountant1'),
         ('Hassan Nasser', '0203330002', 'accountant2')
     ]
-    
     for name, phone, username in central_accountants:
         accountant = User(
             username=username,
@@ -344,20 +345,18 @@ def create_users(branches):
         accountant.set_password('accountant123')
         users.append(accountant)
     
-    # ========== BRANCH ACCOUNTANTS (2+) ==========
-    branch_accountants = [
-        ('Amr Saleh', '0204440001', 'baccountant1', branches[0].id),  # Dragon Club
-        ('Tarek Hamdy', '0204440002', 'baccountant2', branches[1].id)  # Phoenix Club
+    # BRANCH ACCOUNTANTS (2 — branch assigned later)
+    branch_accountant_names = [
+        ('Amr Saleh', '0204440001', 'baccountant1'),
+        ('Tarek Hamdy', '0204440002', 'baccountant2')
     ]
-    
-    for name, phone, username, branch_id in branch_accountants:
+    for name, phone, username in branch_accountant_names:
         accountant = User(
             username=username,
             email=f'{username}@gymchain.com',
             full_name=name,
             phone=phone,
             role=UserRole.BRANCH_ACCOUNTANT,
-            branch_id=branch_id,
             is_active=True
         )
         accountant.set_password('accountant123')
@@ -368,12 +367,44 @@ def create_users(branches):
     
     db.session.flush()
     print(f"  ✓ Created {len(users)} users")
-    print(f"    - Owners: 1")
+    print(f"    - Super Admin: 1")
+    print(f"    - Owners: 1 (default)")
     print(f"    - Branch Managers: 3")
-    print(f"    - Front Desk: 6 (2 per branch)")
+    print(f"    - Front Desk: 6")
     print(f"    - Central Accountants: 2")
     print(f"    - Branch Accountants: 2")
     return users
+
+
+def assign_staff_to_branches(users, branches, gym_id):
+    """Assign gym_id and branch_id to staff users after branches are created."""
+    # Map roles to branches
+    managers = [u for u in users if u.role == UserRole.BRANCH_MANAGER]
+    receptionists = [u for u in users if u.role == UserRole.FRONT_DESK]
+    central_accountants = [u for u in users if u.role == UserRole.CENTRAL_ACCOUNTANT]
+    branch_accountants = [u for u in users if u.role == UserRole.BRANCH_ACCOUNTANT]
+
+    # Assign managers: 1 per branch
+    for i, mgr in enumerate(managers):
+        mgr.branch_id = branches[i % len(branches)].id
+        mgr.gym_id = gym_id
+
+    # Assign receptionists: 2 per branch
+    for i, rec in enumerate(receptionists):
+        rec.branch_id = branches[i // 2 % len(branches)].id
+        rec.gym_id = gym_id
+
+    # Central accountants: no branch but belong to the gym
+    for acc in central_accountants:
+        acc.gym_id = gym_id
+
+    # Branch accountants: assign to first 2 branches
+    for i, acc in enumerate(branch_accountants):
+        acc.branch_id = branches[i % len(branches)].id
+        acc.gym_id = gym_id
+
+    db.session.flush()
+    print(f"  ✓ Staff assigned to branches & gym")
 
 
 def create_services():
