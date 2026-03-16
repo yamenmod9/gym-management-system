@@ -27,6 +27,7 @@ from .alerts_routes import alerts_bp
 from .finance_routes import finance_bp
 from .entry_logs_routes import entry_logs_bp
 from .attendance_routes import attendance_bp
+from .privacy_routes import privacy_bp
 
 
 def register_blueprints(app):
@@ -60,3 +61,4 @@ def register_blueprints(app):
     app.register_blueprint(finance_bp)
     app.register_blueprint(entry_logs_bp)
     app.register_blueprint(attendance_bp)
+    app.register_blueprint(privacy_bp)
