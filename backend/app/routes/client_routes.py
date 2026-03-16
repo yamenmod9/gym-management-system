@@ -11,6 +11,63 @@ from app.extensions import db
 
 client_bp = Blueprint('client', __name__, url_prefix='/api/client')
 
+_DELETE_REQUEST_PREFIX = '[DELETE_REQUEST]'
+_DELETE_GRACE_DAYS = 90
+
+
+def _extract_delete_request_date(customer: Customer):
+    notes = customer.health_notes or ''
+    for line in notes.splitlines():
+        if line.startswith(_DELETE_REQUEST_PREFIX):
+            try:
+                raw_date = line.split(':', 1)[1].strip()
+                return datetime.fromisoformat(raw_date)
+            except (IndexError, ValueError):
+                return None
+    return None
+
+
+def _append_delete_request_note(customer: Customer, requested_at: datetime):
+    notes = customer.health_notes or ''
+    cleaned_lines = [
+        line for line in notes.splitlines() if not line.startswith(_DELETE_REQUEST_PREFIX)
+    ]
+    cleaned_lines.append(f'{_DELETE_REQUEST_PREFIX}: {requested_at.isoformat()}')
+    customer.health_notes = '\n'.join([line for line in cleaned_lines if line]).strip() or None
+
+
+def _clear_delete_request_note(customer: Customer):
+    notes = customer.health_notes or ''
+    cleaned_lines = [
+        line for line in notes.splitlines() if not line.startswith(_DELETE_REQUEST_PREFIX)
+    ]
+    customer.health_notes = '\n'.join([line for line in cleaned_lines if line]).strip() or None
+
+
+def _build_delete_status(customer: Customer):
+    requested_at = _extract_delete_request_date(customer)
+    if not requested_at:
+        return {
+            'requested': False,
+            'requested_at': None,
+            'scheduled_delete_at': None,
+            'days_remaining': None,
+            'is_due': False,
+        }
+
+    scheduled_delete_at = requested_at + timedelta(days=_DELETE_GRACE_DAYS)
+    now = datetime.utcnow()
+    delta_days = (scheduled_delete_at - now).days
+    days_remaining = max(delta_days, 0)
+
+    return {
+        'requested': True,
+        'requested_at': requested_at.isoformat(),
+        'scheduled_delete_at': scheduled_delete_at.isoformat(),
+        'days_remaining': days_remaining,
+        'is_due': now >= scheduled_delete_at,
+    }
+
 
 @client_bp.route('/me', methods=['GET'])
 @client_token_required
@@ -25,6 +82,12 @@ def get_client_profile():
     
     if not customer:
         return error_response('Customer not found', 404)
+
+    deletion_status = _build_delete_status(customer)
+    if deletion_status['is_due']:
+        customer.is_active = False
+        db.session.commit()
+        return error_response('This account has been deleted after the 90-day grace period.', 403)
     
     # Get active subscription with proper validation
     from datetime import date
@@ -65,8 +128,59 @@ def get_client_profile():
     response_data['password_changed'] = customer.password_changed
     response_data['qr_code_active'] = active_subscription is not None  # Add QR active status
     response_data['qr_image_url'] = f'/api/client/qr-image'
+    response_data['account_deletion'] = deletion_status
     
     return success_response(response_data)
+
+
+@client_bp.route('/account/delete-request', methods=['POST'])
+@client_token_required
+def request_account_deletion():
+    customer = get_current_client()
+
+    if not customer:
+        return error_response('Customer not found', 404)
+
+    requested_at = datetime.utcnow()
+    _append_delete_request_note(customer, requested_at)
+    db.session.commit()
+
+    scheduled_delete_at = requested_at + timedelta(days=_DELETE_GRACE_DAYS)
+
+    return success_response(
+        {
+            'requested': True,
+            'requested_at': requested_at.isoformat(),
+            'scheduled_delete_at': scheduled_delete_at.isoformat(),
+            'grace_period_days': _DELETE_GRACE_DAYS,
+        },
+        'Account deletion requested. Your account is scheduled for deletion in 90 days.'
+    )
+
+
+@client_bp.route('/account/delete-request', methods=['DELETE'])
+@client_token_required
+def cancel_account_deletion():
+    customer = get_current_client()
+
+    if not customer:
+        return error_response('Customer not found', 404)
+
+    existing_request = _extract_delete_request_date(customer)
+    if not existing_request:
+        return error_response('No pending deletion request found.', 404)
+
+    _clear_delete_request_note(customer)
+    db.session.commit()
+
+    return success_response(
+        {
+            'requested': False,
+            'requested_at': None,
+            'scheduled_delete_at': None,
+        },
+        'Account deletion request cancelled.'
+    )
 
 
 @client_bp.route('/change-password', methods=['POST'])
