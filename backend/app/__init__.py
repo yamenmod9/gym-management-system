@@ -46,7 +46,8 @@ def create_app(config_name='default'):
             'message': 'Gym Management System API',
             'version': '1.0.0',
             'status': 'running',
-            'docs': '/test'
+            'docs': '/test',
+            'privacy_policy': '/privacy-policy'
         })
     
     @app.route('/health')
