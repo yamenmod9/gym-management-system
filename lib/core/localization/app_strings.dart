@@ -737,6 +737,13 @@ class S {
   static const String privacyPolicy = 'سياسة الخصوصية';
   static const String readPrivacyPolicy = 'قراءة سياسة الخصوصية';
   static const String privacyPolicySoon = 'سياسة الخصوصية قريباً';
+  static const String deleteAccount = 'حذف الحساب';
+  static const String deleteAccountAfter90Days = 'سيتم حذف الحساب بعد 90 يوماً';
+  static const String deleteAccountWarning = 'يمكنك طلب حذف حسابك الآن، وسيتم حذفه نهائياً بعد 90 يوماً.';
+  static const String deleteAccountConfirmQuestion = 'هل تريد إرسال طلب حذف الحساب؟';
+  static const String deleteAccountRequested = 'تم إرسال طلب حذف الحساب. سيتم حذف حسابك خلال 90 يوماً.';
+  static const String deleteAccountRequestFailed = 'فشل إرسال طلب حذف الحساب.';
+  static const String requestDeletion = 'طلب الحذف';
   static const String signOutTestingOnly = 'تسجيل الخروج (للاختبار فقط)';
   static const String signOutQuestion = 'تسجيل الخروج من حسابك؟';
 

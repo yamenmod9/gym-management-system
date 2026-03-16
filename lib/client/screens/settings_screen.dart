@@ -8,6 +8,57 @@ import '../../shared/widgets/notification_settings_section.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
+  Future<void> _requestAccountDeletion(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(S.deleteAccount),
+        content: const Text(S.deleteAccountWarning),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text(S.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text(S.requestDeletion),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      final auth = context.read<ClientAuthProvider>();
+      await auth.requestAccountDeletion();
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(S.deleteAccountRequested),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 4),
+        ),
+      );
+
+      await auth.logout();
+      if (context.mounted) {
+        context.goNamed('welcome');
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final client = context.watch<ClientAuthProvider>().currentClient;
@@ -226,6 +277,14 @@ class SettingsScreen extends StatelessWidget {
                 ),
               );
             },
+          ),
+          _buildListTile(
+            context,
+            icon: Icons.delete_forever,
+            title: S.deleteAccount,
+            subtitle: S.deleteAccountAfter90Days,
+            iconColor: Colors.red,
+            onTap: () => _requestAccountDeletion(context),
           ),
 
           const Divider(),

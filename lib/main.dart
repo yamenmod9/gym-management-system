@@ -102,16 +102,19 @@ class MyApp extends StatelessWidget {
       child: Consumer2<AuthProvider, GymBrandingProvider>(
         builder: (context, authProvider, branding, _) {
           final router = AppRouter(authProvider, branding);
+          final shouldUseGymBranding = authProvider.isAuthenticated &&
+              branding.isSetupComplete &&
+              branding.gymId != null;
 
           // If the gym has branding configured, use it; otherwise fallback to role theme
-          final theme = branding.isSetupComplete && branding.gymId != null
+          final theme = shouldUseGymBranding
               ? AppTheme.getThemeByGymBranding(
                   primaryColor: branding.primaryColor,
                   secondaryColor: branding.secondaryColor,
                 )
               : AppTheme.getThemeByRole(authProvider.userRole);
 
-          final title = branding.isSetupComplete && branding.gymId != null
+          final title = shouldUseGymBranding
               ? branding.gymName
               : AppConstants.appName;
 

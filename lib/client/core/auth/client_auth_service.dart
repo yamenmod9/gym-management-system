@@ -142,6 +142,23 @@ class ClientAuthService {
     return token != null;
   }
 
+  Future<Map<String, dynamic>> requestAccountDeletion() async {
+    final response = await _apiService.requestAccountDeletion();
+
+    final isSuccess = (response['status'] == 'success') ||
+                     (response['success'] == true);
+
+    if (!isSuccess) {
+      throw Exception(response['message'] ?? 'Failed to request account deletion');
+    }
+
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    return <String, dynamic>{};
+  }
+
   Future<void> logout() async {
     await _apiService.clearTokens();
   }

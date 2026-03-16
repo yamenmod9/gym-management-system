@@ -180,8 +180,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     // App Name — dynamic from gym branding
                     Builder(
                       builder: (context) {
+                        final auth = context.watch<AuthProvider>();
                         final branding = context.watch<GymBrandingProvider>();
-                        final displayName = branding.isSetupComplete && branding.gymId != null
+                        final displayName = auth.isAuthenticated &&
+                                branding.isSetupComplete &&
+                                branding.gymId != null
                             ? branding.gymName
                             : AppConstants.appName;
                         return Text(

@@ -2,6 +2,7 @@
 Client authentication routes - Code-based authentication for mobile app
 """
 from flask import Blueprint, request
+from datetime import datetime, timedelta
 from app.models import Customer, ActivationCode, ActivationCodeType
 from app.services.notification_service import get_notification_service
 from app.utils import success_response, error_response
@@ -9,6 +10,45 @@ from app.utils.client_auth import create_client_token
 from app.extensions import db
 
 client_auth_bp = Blueprint('client_auth', __name__, url_prefix='/api/client/auth')
+
+_DELETE_REQUEST_PREFIX = '[DELETE_REQUEST]'
+_DELETE_GRACE_DAYS = 90
+
+
+def _extract_delete_request_date(customer: Customer):
+    notes = customer.health_notes or ''
+    for line in notes.splitlines():
+        if line.startswith(_DELETE_REQUEST_PREFIX):
+            try:
+                raw_date = line.split(':', 1)[1].strip()
+                return datetime.fromisoformat(raw_date)
+            except (IndexError, ValueError):
+                return None
+    return None
+
+
+def _build_delete_status(customer: Customer):
+    requested_at = _extract_delete_request_date(customer)
+    if not requested_at:
+        return {
+            'requested': False,
+            'requested_at': None,
+            'scheduled_delete_at': None,
+            'days_remaining': None,
+            'is_due': False,
+        }
+
+    scheduled_delete_at = requested_at + timedelta(days=_DELETE_GRACE_DAYS)
+    now = datetime.utcnow()
+    days_remaining = max((scheduled_delete_at - now).days, 0)
+
+    return {
+        'requested': True,
+        'requested_at': requested_at.isoformat(),
+        'scheduled_delete_at': scheduled_delete_at.isoformat(),
+        'days_remaining': days_remaining,
+        'is_due': now >= scheduled_delete_at,
+    }
 
 
 @client_auth_bp.route('/login', methods=['POST'])
@@ -38,6 +78,12 @@ def client_login():
     
     if not customer:
         return error_response('Invalid phone or password', 401)
+
+    deletion_status = _build_delete_status(customer)
+    if deletion_status['is_due']:
+        customer.is_active = False
+        db.session.commit()
+        return error_response('This account has been deleted after the 90-day grace period.', 403)
     
     # Verify password
     if not customer.check_password(password):
@@ -76,6 +122,7 @@ def client_login():
             'branch_name': customer.branch.name if customer.branch else None,
             'has_active_subscription': active_subscription is not None
         },
+        'account_deletion': deletion_status,
         'gym': gym_data,
     }, 'Login successful')
 

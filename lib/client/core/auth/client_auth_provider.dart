@@ -182,10 +182,15 @@ class ClientAuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<Map<String, dynamic>> requestAccountDeletion() async {
+    return await _authService.requestAccountDeletion();
+  }
+
   Future<void> logout() async {
     // Unregister FCM token
     await FcmNotificationService().unregisterToken(apiService: _apiService);
     await _authService.logout();
+    _brandingProvider?.reset();
     _currentClient = null;
     _isAuthenticated = false;
     _passwordChanged = true;

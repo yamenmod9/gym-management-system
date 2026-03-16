@@ -212,6 +212,24 @@ class ClientApiService {
     }
   }
 
+  Future<Map<String, dynamic>> requestAccountDeletion() async {
+    try {
+      final response = await _dio.post('/client/account/delete-request');
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> cancelAccountDeletion() async {
+    try {
+      final response = await _dio.delete('/client/account/delete-request');
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   // Generic POST request (used by FCM notification service)
   Future<Response> post(
     String path, {
