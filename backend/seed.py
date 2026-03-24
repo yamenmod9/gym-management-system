@@ -266,14 +266,14 @@ def create_users(branches):
     
     # ========== SUPER ADMIN (platform-level) ==========
     super_admin = User(
-        username='Zyad',
-        email='zyad@platform.com',
-        full_name='Zyad',
+        username='powerfit',
+        email='admin@powerfit.com',
+        full_name='PowerFit Admin',
         phone='0200000000',
         role=UserRole.SUPER_ADMIN,
         is_active=True
     )
-    super_admin.set_password('ZWL@2009')
+    super_admin.set_password('PowerFit2026!')
     users.append(super_admin)
     
     # ========== OWNER (exactly 1 — the default/test owner) ==========
