@@ -654,7 +654,7 @@ def create_customers(branches):
 
 
 def create_subscriptions(customers, services, branches, users):
-    """Create subscriptions - REALISTIC statuses, renewals, rejections, freeze history"""
+    """Create subscriptions and ensure every seeded client has active access."""
     subscriptions = []
     reception_users = [u for u in users if u.role == UserRole.FRONT_DESK]
     
@@ -819,6 +819,46 @@ def create_subscriptions(customers, services, branches, users):
             
             subscriptions.append(subscription)
             db.session.add(subscription)
+
+    # Ensure every seeded customer has at least one active subscription for client app testing.
+    ensured_active_count = 0
+    customers_with_active = {
+        s.customer_id
+        for s in subscriptions
+        if s.status == SubscriptionStatus.ACTIVE and (
+            s.subscription_type == 'coins' or s.end_date >= date.today()
+        )
+    }
+
+    default_client_service = services[0]  # Monthly Gym Membership (coin-based)
+    for customer in customers:
+        if customer.id in customers_with_active:
+            continue
+
+        reception = next((u for u in reception_users if u.branch_id == customer.branch_id), None)
+        start_date = date.today() - timedelta(days=random.randint(0, 5))
+        end_date = start_date + timedelta(days=default_client_service.duration_days)
+
+        fallback_subscription = Subscription(
+            customer_id=customer.id,
+            service_id=default_client_service.id,
+            branch_id=customer.branch_id,
+            start_date=start_date,
+            end_date=end_date,
+            status=SubscriptionStatus.ACTIVE,
+            freeze_count=0,
+            total_frozen_days=0,
+            classes_attended=0,
+            created_by=reception.id if reception else None,
+        )
+        fallback_subscription.subscription_type = 'coins'
+        fallback_subscription.total_coins = 30
+        fallback_subscription.remaining_coins = random.randint(18, 30)
+
+        subscriptions.append(fallback_subscription)
+        db.session.add(fallback_subscription)
+        customers_with_active.add(customer.id)
+        ensured_active_count += 1
     
     db.session.flush()
     
@@ -858,6 +898,7 @@ def create_subscriptions(customers, services, branches, users):
     print(f"    - Frozen: {frozen_count}")
     print(f"    - Stopped: {stopped_count}")
     print(f"    - Expired: {expired_count}")
+    print(f"    - Added fallback active subscriptions: {ensured_active_count}")
     print(f"    - Freeze history records: {freeze_history_count}")
     
     return subscriptions
