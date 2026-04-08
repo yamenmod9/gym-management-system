@@ -27,6 +27,16 @@ from app.models.gym import Gym
 # Set seed for reproducible results (can be commented out for true randomness)
 random.seed(42)
 
+# Dedicated, stable account for Google Play review/testing.
+GOOGLE_PLAY_TEST_CLIENT = {
+    'full_name': 'Google Play Test Client',
+    'phone': '01099990000',
+    'password': 'GP12TEST',
+    'email': 'google.play.tester@example.com',
+    'national_id': '2909999000001',
+    'branch_index': 0,
+}
+
 
 def generate_temp_password():
     """Generate a random 6-character temporary password (e.g., AB12CD)"""
@@ -193,6 +203,11 @@ def seed_database():
         print("  ")
         print("  Username: baccountant2 | Password: accountant123")
         print("  Branch: Phoenix Club | Name: Rania Nabil")
+
+        print("\n[CLIENT] DEDICATED GOOGLE PLAY TEST ACCOUNT:")
+        print(f"  Phone: {GOOGLE_PLAY_TEST_CLIENT['phone']} | Password: {GOOGLE_PLAY_TEST_CLIENT['password']}")
+        print(f"  Name: {GOOGLE_PLAY_TEST_CLIENT['full_name']} | Branch: {branches[GOOGLE_PLAY_TEST_CLIENT['branch_index']].name}")
+        print("  Note: Use this stable account in Google Play Console for reviewer testing")
         
         # Print sample customer credentials
         print("\n[CLIENT] CLIENT APP TEST ACCOUNTS (Sample from 150 customers):")
@@ -505,6 +520,8 @@ def create_services():
 
 def create_customers(branches):
     """Create test customers - WEIGHTED distribution for realistic branch performance"""
+    from passlib.hash import pbkdf2_sha256
+
     customers = []
     
     # Egyptian first names
@@ -534,6 +551,35 @@ def create_customers(branches):
     # Phoenix Club (medium): 55 customers (36.7%)
     # Tiger Club (lower): 35 customers (23.3%)
     branch_distribution = [60, 55, 35]
+
+    # Add one fixed account specifically for Google Play reviewer testing.
+    test_branch_idx = GOOGLE_PLAY_TEST_CLIENT['branch_index']
+    if 0 <= test_branch_idx < len(branches):
+        test_branch = branches[test_branch_idx]
+        test_password = GOOGLE_PLAY_TEST_CLIENT['password']
+        test_customer = Customer(
+            full_name=GOOGLE_PLAY_TEST_CLIENT['full_name'],
+            phone=GOOGLE_PLAY_TEST_CLIENT['phone'],
+            email=GOOGLE_PLAY_TEST_CLIENT['email'],
+            national_id=GOOGLE_PLAY_TEST_CLIENT['national_id'],
+            date_of_birth=date(1998, 6, 15),
+            gender=Gender.MALE,
+            address=f'100 Review Street, {test_branch.city}',
+            height=178,
+            weight=78,
+            health_notes='Google Play reviewer test account',
+            branch_id=test_branch.id,
+            is_active=True,
+            temp_password=test_password,
+            password_changed=False
+        )
+        test_customer.password_hash = pbkdf2_sha256.hash(test_password)
+        test_customer.calculate_health_metrics()
+        customers.append(test_customer)
+        db.session.add(test_customer)
+
+        # Keep total customers at 150 by reducing generated count in that branch.
+        branch_distribution[test_branch_idx] = max(0, branch_distribution[test_branch_idx] - 1)
     
     customer_id = 1
     for branch_idx, branch in enumerate(branches):
@@ -589,7 +635,6 @@ def create_customers(branches):
             )
             
             # Hash the temp password (don't use set_password() as it clears temp_password)
-            from passlib.hash import pbkdf2_sha256
             customer.password_hash = pbkdf2_sha256.hash(temp_password)
             
             # Calculate health metrics
@@ -604,6 +649,7 @@ def create_customers(branches):
     print(f"    - Dragon Club: {branch_distribution[0]}")
     print(f"    - Phoenix Club: {branch_distribution[1]}")
     print(f"    - Tiger Club: {branch_distribution[2]}")
+    print(f"    - Dedicated Google Play test account: {GOOGLE_PLAY_TEST_CLIENT['phone']}")
     return customers
 
 
@@ -644,6 +690,14 @@ def create_subscriptions(customers, services, branches, users):
         
         # Select customers for subscriptions
         subscribed_customers = random.sample(branch_cust, subscription_count)
+
+        # Ensure the Google Play test customer always has an active subscription.
+        test_customer = next((c for c in branch_cust if c.phone == GOOGLE_PLAY_TEST_CLIENT['phone']), None)
+        if test_customer and test_customer not in subscribed_customers:
+            if subscribed_customers:
+                subscribed_customers[-1] = test_customer
+            else:
+                subscribed_customers.append(test_customer)
         
         for customer in subscribed_customers:
             # Get reception user from same branch
@@ -700,6 +754,15 @@ def create_subscriptions(customers, services, branches, users):
                 status = SubscriptionStatus.ACTIVE
                 freeze_count = random.randint(0, 2)
                 total_frozen = random.randint(0, 7) if freeze_count > 0 else 0
+
+            if customer.phone == GOOGLE_PLAY_TEST_CLIENT['phone']:
+                service = services[0]  # Monthly gym membership for predictable review flow
+                days_old = 5
+                start_date = date.today() - timedelta(days=days_old)
+                end_date = start_date + timedelta(days=service.duration_days)
+                status = SubscriptionStatus.ACTIVE
+                freeze_count = 0
+                total_frozen = 0
             
             subscription = Subscription(
                 customer_id=customer.id,
