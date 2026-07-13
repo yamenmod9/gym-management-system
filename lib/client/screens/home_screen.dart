@@ -5,6 +5,7 @@ import '../../core/localization/app_strings.dart';
 import '../core/auth/client_auth_provider.dart';
 import '../core/api/client_api_service.dart';
 import '../models/subscription_model.dart';
+import '../../shared/widgets/skeleton_loader.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -118,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         onRefresh: _loadSubscription,
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const DashboardSkeleton()
             : _error != null
                 ? Center(
                     child: Column(

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/skeleton_loader.dart';
 import '../../../shared/widgets/stat_card.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../core/api/api_service.dart';
@@ -97,7 +97,7 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
         ),
       ),
       body: _isLoading
-          ? const LoadingIndicator(message: S.loadingBranchDetails)
+          ? const DashboardSkeleton()
           : _error != null
               ? Center(
                   child: Padding(

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/skeleton_loader.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../core/api/api_service.dart';
 import '../../../core/api/api_endpoints.dart';
@@ -89,7 +89,7 @@ class _OperationalMonitorScreenState extends State<OperationalMonitorScreen> {
         ],
       ),
       body: _isLoading
-          ? const LoadingIndicator(message: S.loadingOperationalData)
+          ? const DashboardSkeleton()
           : _error != null
               ? Center(
                   child: Padding(

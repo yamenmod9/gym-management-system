@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/skeleton_loader.dart';
 import '../providers/reception_provider.dart';
 import '../../../core/localization/app_strings.dart';
 
@@ -149,7 +149,7 @@ class _CustomersListScreenState extends State<CustomersListScreen> {
           // Customer list
           Expanded(
             child: _isLoading
-                ? const LoadingIndicator()
+                ? const DashboardSkeleton()
                 : _filteredCustomers.isEmpty
                     ? Center(
                         child: Text(

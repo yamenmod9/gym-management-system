@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/localization/app_strings.dart';
 import '../core/api/client_api_service.dart';
 import '../models/entry_history_model.dart';
+import '../../shared/widgets/skeleton_loader.dart';
 
 class EntryHistoryScreen extends StatefulWidget {
   const EntryHistoryScreen({super.key});
@@ -75,7 +76,7 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
         title: const Text(S.entryHistoryTitle),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const DashboardSkeleton()
           : _error != null
               ? Center(
                   child: Column(

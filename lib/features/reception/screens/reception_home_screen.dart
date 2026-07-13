@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/skeleton_loader.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../core/providers/gym_branding_provider.dart';
 import '../../../core/utils/helpers.dart';
@@ -46,7 +46,7 @@ class _ReceptionHomeScreenState extends State<ReceptionHomeScreen> {
         ],
       ),
       body: provider.isLoading
-          ? const LoadingIndicator(message: S.loading)
+          ? const DashboardSkeleton()
           : provider.error != null
               ? ErrorDisplay(
                   message: provider.error!,

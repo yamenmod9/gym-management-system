@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../shared/models/owner_model.dart';
-import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/skeleton_loader.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../shared/widgets/stat_card.dart';
 import '../providers/super_admin_provider.dart';
@@ -75,7 +75,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ],
       ),
       body: provider.isLoading
-          ? const LoadingIndicator(message: S.loadingPlatformData)
+          ? const DashboardSkeleton()
           : provider.error != null
               ? ErrorDisplay(
                   message: provider.error!,

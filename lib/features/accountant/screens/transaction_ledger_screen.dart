@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/localization/app_strings.dart';
-import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/skeleton_loader.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../core/api/api_service.dart';
@@ -243,7 +243,7 @@ class _TransactionLedgerScreenState extends State<TransactionLedgerScreen> {
           // Transaction list
           Expanded(
             child: _isLoading
-                ? const LoadingIndicator(message: S.loadingTransactions)
+                ? const DashboardSkeleton()
                 : _error != null
                     ? ErrorDisplay(message: _error!, onRetry: _loadTransactions)
                     : _filteredTransactions.isEmpty

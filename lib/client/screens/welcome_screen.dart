@@ -4,6 +4,7 @@ import '../../core/localization/app_strings.dart';
 import '../core/auth/client_auth_provider.dart';
 import '../../core/providers/gym_branding_provider.dart';
 import '../../shared/models/gym_model.dart';
+import '../../shared/widgets/loading_indicator.dart';
 import 'package:go_router/go_router.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -188,16 +189,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               ElevatedButton(
                 onPressed: _isLoading ? null : _login,
                 child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
-                        ),
-                      )
+                    ? const SmallLoadingIndicator()
                     : const Text(S.login),
               ),
               const SizedBox(height: 24),

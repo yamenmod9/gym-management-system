@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/localization/app_strings.dart';
 import '../core/api/client_api_service.dart';
 import '../models/subscription_model.dart';
+import '../../shared/widgets/skeleton_loader.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
@@ -89,7 +90,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         title: const Text(S.subscriptionDetails),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const DashboardSkeleton()
           : _error != null
               ? Center(
                   child: Column(

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/providers/gym_branding_provider.dart';
-import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/skeleton_loader.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../shared/widgets/stat_card.dart';
 import '../../../shared/widgets/date_range_picker.dart';
@@ -102,7 +102,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         ],
       ),
       body: dashboardProvider.isLoading
-          ? const LoadingIndicator(message: S.loadingDashboard)
+          ? const DashboardSkeleton()
           : dashboardProvider.error != null
               ? ErrorDisplay(
                   message: dashboardProvider.error!,

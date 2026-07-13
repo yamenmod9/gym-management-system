@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/skeleton_loader.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../core/utils/helpers.dart';
 import '../providers/owner_dashboard_provider.dart';
@@ -30,7 +30,7 @@ class StaffLeaderboardScreen extends StatelessWidget {
       body: Consumer<OwnerDashboardProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading) {
-            return const LoadingIndicator(message: S.loadingStaffPerformance);
+            return const DashboardSkeleton();
           }
 
           if (provider.error != null) {
