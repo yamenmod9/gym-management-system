@@ -20,7 +20,7 @@ import 'features/reception/providers/reception_provider.dart';
 import 'features/accountant/providers/accountant_provider.dart';
 import 'features/super_admin/providers/super_admin_provider.dart';
 
-import 'features/auth/screens/role_chooser_screen.dart';
+import 'features/auth/screens/landing_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/gym_setup_wizard.dart';
 import 'features/owner/screens/owner_dashboard.dart';
@@ -200,7 +200,7 @@ class _WebAppState extends State<WebApp> {
       routes: [
         GoRoute(
           path: '/',
-          builder: (context, state) => const RoleChooserScreen(),
+          builder: (context, state) => const LandingScreen(),
         ),
         GoRoute(
           path: '/login',
