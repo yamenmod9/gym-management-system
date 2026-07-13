@@ -187,28 +187,36 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
                   // Entry type label + status
                   Row(
                     children: [
-                      Text(
-                        entry.entryTypeLabel,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                      Expanded(
                         child: Text(
-                          isApproved ? S.approvedEntry : S.deniedEntry,
-                          style: TextStyle(
-                            color: statusColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                          entry.entryTypeLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            isApproved ? S.approvedEntry : S.deniedEntry,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
@@ -237,28 +245,39 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
                   const SizedBox(height: 8),
 
                   // Date and time
-                  Row(
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 6,
                     children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 14,
-                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 14,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            dateFormat.format(dateTime),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        dateFormat.format(dateTime),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(width: 16),
-                      Icon(
-                        Icons.access_time,
-                        size: 14,
-                        color: Theme.of(context).textTheme.bodySmall?.color,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        timeFormat.format(dateTime),
-                        style: Theme.of(context).textTheme.bodySmall,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.access_time,
+                            size: 14,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            timeFormat.format(dateTime),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                       ),
                     ],
                   ),

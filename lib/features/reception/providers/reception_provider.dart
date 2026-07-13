@@ -713,7 +713,8 @@ class ReceptionProvider extends ChangeNotifier {
         ApiEndpoints.customers,
         queryParameters: {
           'branch_id': branchId,
-          'limit': 1000, // Get all customers
+          'per_page': 1000,
+          'limit': 1000, // Keep backward compatibility with older backends
         },
       );
 
@@ -760,8 +761,9 @@ class ReceptionProvider extends ChangeNotifier {
             ApiEndpoints.subscriptions,
             queryParameters: {
               'branch_id': branchId,
-              'status': 'active',
-              'limit': 1000,
+              'status': 'ACTIVE',
+              'per_page': 1000,
+              'limit': 1000, // Keep backward compatibility with older backends
             },
           );
 
@@ -782,7 +784,9 @@ class ReceptionProvider extends ChangeNotifier {
             for (var sub in subs) {
               if (sub is! Map) continue;
               final subMap = Map<String, dynamic>.from(sub);
-              final customerIdRaw = subMap['customer_id'];
+              final customerIdRaw = subMap['customer_id'] ??
+                  subMap['customerId'] ??
+                  subMap['customer']?['id'];
               final status = (subMap['status'] ?? '').toString().toLowerCase();
               final isActiveStatus =
                   status.isEmpty || status == 'active' || status == 'valid' || status == 'running';
@@ -823,11 +827,25 @@ class ReceptionProvider extends ChangeNotifier {
             hasActiveSubscription = true;
           }
 
+          final activeSubscriptionsCountRaw = customerMap['active_subscriptions_count'] ??
+              customerMap['activeSubscriptionsCount'] ??
+              customerMap['subscriptions_count'];
+          if (!hasActiveSubscription && activeSubscriptionsCountRaw != null) {
+            final activeSubscriptionsCount = activeSubscriptionsCountRaw is num
+                ? activeSubscriptionsCountRaw.toInt()
+                : int.tryParse(activeSubscriptionsCountRaw.toString()) ?? 0;
+            if (activeSubscriptionsCount > 0) {
+              hasActiveSubscription = true;
+            }
+          }
+
           if (!hasActiveSubscription && customerMap['active_subscription'] is Map) {
             hasActiveSubscription = true;
           }
 
-          final customerIdRaw = customerMap['id'];
+          final customerIdRaw = customerMap['id'] ??
+              customerMap['customer_id'] ??
+              customerMap['customerId'];
           final customerId = customerIdRaw is int
               ? customerIdRaw
               : int.tryParse(customerIdRaw?.toString() ?? '');

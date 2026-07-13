@@ -183,10 +183,17 @@ class _CustomersListScreenState extends State<CustomersListScreen> {
     // Extract temporary password - backend should return this for staff when password_changed is false
     final tempPassword = customer['temporary_password'] ?? customer['temp_password'] ?? S.notAvailable;
     final hasActiveSubRaw = customer['has_active_subscription'];
+    final activeSubsCountRaw = customer['active_subscriptions_count'] ??
+        customer['activeSubscriptionsCount'] ??
+        customer['subscriptions_count'];
+    final activeSubsCount = activeSubsCountRaw is num
+        ? activeSubsCountRaw.toInt()
+        : int.tryParse(activeSubsCountRaw?.toString() ?? '') ?? 0;
     final hasActiveSub = hasActiveSubRaw == true ||
       hasActiveSubRaw == 1 ||
       hasActiveSubRaw?.toString().toLowerCase() == 'true' ||
-      hasActiveSubRaw?.toString() == '1';
+      hasActiveSubRaw?.toString() == '1' ||
+      activeSubsCount > 0;
     final customerId = customer['id'];
 
     return Card(

@@ -1,6 +1,6 @@
 {
-  "installCommand": "bash install_web.sh",
-  "buildCommand": "bash build_web.sh",
+  "installCommand": "bash scripts/install_web.sh",
+  "buildCommand": "bash scripts/build_web.sh",
   "outputDirectory": "build/web",
   "rewrites": [
     {
