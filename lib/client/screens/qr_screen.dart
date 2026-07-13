@@ -153,7 +153,7 @@ class _QrScreenState extends State<QrScreen> {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/home');
+              context.go('/client/home');
             }
           },
         ),

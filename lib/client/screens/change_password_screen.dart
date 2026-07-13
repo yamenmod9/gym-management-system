@@ -93,7 +93,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         // Navigate based on context
         if (widget.isFirstLogin) {
           // First login - go to home
-          context.go('/home');
+          context.go('/client/home');
         } else {
           // Regular password change - go back
           context.pop();

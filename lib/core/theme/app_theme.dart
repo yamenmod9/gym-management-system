@@ -148,10 +148,16 @@ class AppTheme {
         seedColor = branchManagerColor;
         break;
       case 'reception':
+      case 'front_desk':
         seedColor = receptionColor;
         break;
       case 'accountant':
+      case 'central_accountant':
+      case 'branch_accountant':
         seedColor = accountantColor;
+        break;
+      case 'super_admin':
+        seedColor = superAdminColor;
         break;
       default:
         seedColor = primaryColor;

@@ -82,7 +82,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/home');
+              context.go('/client/home');
             }
           },
         ),

@@ -26,6 +26,7 @@ echo "Using API_BASE_URL: $API_BASE_URL"
 # Build the production web bundle that Vercel will serve.
 flutter config --enable-web
 flutter build web --release \
+  -t lib/web_main.dart \
   --dart-define=APP_ENV="$ENVIRONMENT" \
   --dart-define=ENVIRONMENT="$ENVIRONMENT" \
   --dart-define=API_BASE_URL="$API_BASE_URL"

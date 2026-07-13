@@ -68,7 +68,7 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/home');
+              context.go('/client/home');
             }
           },
         ),
