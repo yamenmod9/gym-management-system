@@ -107,7 +107,7 @@ class _LandingScreenState extends State<LandingScreen> {
               onNavHow: () => _scrollTo(_howKey),
               onNavPricing: () => _scrollTo(_pricingKey),
               onNavFaq: () => _scrollTo(_faqKey),
-              onLogin: () => _scrollTo(_gatewayKey),
+              onLogin: () => context.go('/login'),
               wide: _isWide(context),
             ),
             Expanded(
@@ -1389,85 +1389,12 @@ class _LandingScreenState extends State<LandingScreen> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: _muted, fontSize: 19),
               ),
-              const SizedBox(height: 48),
-              _responsiveGrid(context, [
-                _roleCard(
-                  Icons.person,
-                  _crimson,
-                  _t['roleMember']!,
-                  _t['roleMemberD']!,
-                  () => context.go('/login'),
-                ),
-                _roleCard(
-                  Icons.badge,
-                  _red,
-                  _t['roleStaff']!,
-                  _t['roleStaffD']!,
-                  () => context.go('/login'),
-                ),
-                _roleCard(
-                  Icons.admin_panel_settings,
-                  _gold,
-                  _t['roleAdmin']!,
-                  _t['roleAdminD']!,
-                  () => context.go('/login'),
-                ),
-              ]),
+              const SizedBox(height: 40),
+              // Single login entry — the form itself detects whether the
+              // account is a member, staff, or admin and routes to the
+              // matching dashboard, so there's no role to pick here.
+              _primaryCta(_t['login']!, () => context.go('/login')),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _roleCard(
-    IconData icon,
-    Color color,
-    String title,
-    String desc,
-    VoidCallback onTap,
-  ) {
-    return _HoverLift(
-      builder: (hovering) => Material(
-        color: _card,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: color.withValues(alpha: 0.5)),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(icon, color: color, size: 26),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  desc,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: _muted, fontSize: 14),
-                ),
-              ],
-            ),
           ),
         ),
       ),
@@ -1517,7 +1444,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   ),
                   _footerLink(_t['navPricing']!, () => _scrollTo(_pricingKey)),
                   _footerLink(_t['navFaq']!, () => _scrollTo(_faqKey)),
-                  _footerLink(_t['login']!, () => _scrollTo(_gatewayKey)),
+                  _footerLink(_t['login']!, () => context.go('/login')),
                 ],
               ),
               Row(
@@ -1863,30 +1790,6 @@ class _RevealOnScrollState extends State<_RevealOnScroll>
   }
 }
 
-/// Lifts its child slightly on hover (desktop web).
-class _HoverLift extends StatefulWidget {
-  final Widget Function(bool hovering) builder;
-  const _HoverLift({required this.builder});
-  @override
-  State<_HoverLift> createState() => _HoverLiftState();
-}
-
-class _HoverLiftState extends State<_HoverLift> {
-  bool _hovering = false;
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        transform: Matrix4.translationValues(0, _hovering ? -6 : 0, 0),
-        child: widget.builder(_hovering),
-      ),
-    );
-  }
-}
-
 /// Pulsing placeholder shown in place of a price number while
 /// GET /api/pricing is in flight — sized to roughly match the real price
 /// text so nothing jumps when the real number arrives.
@@ -2040,13 +1943,7 @@ const Map<String, String> _arText = {
   'faq4q': 'هل يمكنني التجربة أولاً؟',
   'faq4a': 'ابدأ مجاناً وارتقِ بالخطة متى شئت دون التزام.',
   'finalHead': 'جاهز لإدارة ناديك بذكاء؟',
-  'finalSub': 'اختر كيف تريد الدخول.',
-  'roleMember': 'عميل',
-  'roleMemberD': 'ادخل إلى تطبيق الأعضاء',
-  'roleStaff': 'موظف',
-  'roleStaffD': 'سجّل الدخول إلى الكونسول',
-  'roleAdmin': 'مسؤول النظام',
-  'roleAdminD': 'إدارة النظام',
+  'finalSub': 'سجّل الدخول إلى حسابك للمتابعة.',
 };
 
 const Map<String, String> _enText = {
@@ -2163,11 +2060,5 @@ const Map<String, String> _enText = {
   'faq4q': 'Can I try it first?',
   'faq4a': 'Start free and upgrade whenever you are ready, no commitment.',
   'finalHead': 'Ready to run your gym the smart way?',
-  'finalSub': 'Choose how you want to enter.',
-  'roleMember': 'Member',
-  'roleMemberD': 'Open the member app',
-  'roleStaff': 'Staff',
-  'roleStaffD': 'Log in to the console',
-  'roleAdmin': 'System admin',
-  'roleAdminD': 'System administration',
+  'finalSub': 'Sign in to your account to continue.',
 };
