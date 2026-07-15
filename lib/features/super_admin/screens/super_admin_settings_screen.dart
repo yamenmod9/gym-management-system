@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/localization/app_strings.dart';
+import '../../../shared/widgets/language_settings_tile.dart';
 import '../../../shared/widgets/notification_settings_section.dart';
 
 class SuperAdminSettingsScreen extends StatelessWidget {
@@ -62,6 +63,15 @@ class SuperAdminSettingsScreen extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Appearance
+          Card(
+            child: LanguageSettingsTile(
+              onPersist: authProvider.setPreferredLanguage,
             ),
           ),
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../shared/widgets/biometric_settings_section.dart';
 import '../../../core/localization/app_strings.dart';
+import '../../../shared/widgets/language_settings_tile.dart';
 import '../../../shared/widgets/notification_settings_section.dart';
 
 class ProfileSettingsScreen extends StatelessWidget {
@@ -87,18 +88,8 @@ class ProfileSettingsScreen extends StatelessWidget {
                   },
                 ),
                 const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.language),
-                  title: Text(S.language),
-                  subtitle: Text(S.arabicDefault),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(S.languageComingSoon),
-                      ),
-                    );
-                  },
+                LanguageSettingsTile(
+                  onPersist: authProvider.setPreferredLanguage,
                 ),
               ],
             ),

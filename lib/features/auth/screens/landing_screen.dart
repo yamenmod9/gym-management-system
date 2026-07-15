@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/models/pricing_model.dart';
+import '../../../core/providers/locale_provider.dart';
 import '../../../core/services/pricing_service.dart';
+
+const _contactEmail = 'yamen.mahmoud912@gmail.com';
 
 /// Public marketing homepage served at '/'. Full bilingual (AR/EN) PowerFit
 /// site — hero, features, how-it-works, screenshots, testimonials, pricing,
@@ -36,18 +42,19 @@ class _LandingScreenState extends State<LandingScreen> {
   final _faqKey = GlobalKey();
   final _gatewayKey = GlobalKey();
 
-  // Persisted at the class level (not the widget instance) so the choice
-  // survives navigating away from and back to the landing route — GoRouter
-  // rebuilds a fresh LandingScreen/State each time this route is visited.
-  static bool _lastSelectedAr = true;
-
-  late bool _ar = _lastSelectedAr;
+  // Reads through the app-wide LocaleProvider (persisted via
+  // SharedPreferences) rather than owning local state, so the choice
+  // survives both navigating away from this route and a full page reload
+  // — this used to be a plain field that only lived in memory, which is
+  // why toggling the language here and reloading used to snap back to
+  // Arabic.
+  bool get _ar => context.watch<LocaleProvider>().isArabic;
   int _faqOpen = -1;
 
-  void _toggleLang() => setState(() {
-    _ar = !_ar;
-    _lastSelectedAr = _ar;
-  });
+  void _toggleLang() {
+    final locale = context.read<LocaleProvider>();
+    locale.setArabic(!locale.isArabic);
+  }
 
   Map<String, String> get _t => _ar ? _arText : _enText;
 
@@ -1403,59 +1410,62 @@ class _LandingScreenState extends State<LandingScreen> {
 
   // ── Footer ───────────────────────────────────────────────────────────────
   Widget _footer(BuildContext context) {
+    final wide = _isWide(context);
+    final brand = _footerBrand();
+    final links = _footerLinksColumn();
+    final contact = _footerContactBox();
+
     return Container(
       width: double.infinity,
       color: _bg,
-      padding: const EdgeInsets.fromLTRB(24, 48, 24, 40),
+      padding: const EdgeInsets.fromLTRB(24, 56, 24, 32),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0x12FFFFFF))),
       ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1180),
-          child: Wrap(
-            spacing: 24,
-            runSpacing: 20,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _logoMark(30),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'PowerFit',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
+              if (wide)
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 4, child: brand),
+                      const SizedBox(width: 32),
+                      Expanded(flex: 3, child: links),
+                      const SizedBox(width: 32),
+                      Expanded(flex: 4, child: contact),
+                    ],
                   ),
-                ],
-              ),
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    brand,
+                    const SizedBox(height: 32),
+                    links,
+                    const SizedBox(height: 32),
+                    contact,
+                  ],
+                ),
+              const SizedBox(height: 40),
+              const Divider(color: Colors.white10, height: 1),
+              const SizedBox(height: 20),
               Wrap(
-                spacing: 24,
-                runSpacing: 8,
+                spacing: 16,
+                runSpacing: 12,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  _footerLink(
-                    _t['navFeatures']!,
-                    () => _scrollTo(_featuresKey),
-                  ),
-                  _footerLink(_t['navPricing']!, () => _scrollTo(_pricingKey)),
-                  _footerLink(_t['navFaq']!, () => _scrollTo(_faqKey)),
-                  _footerLink(_t['login']!, () => context.go('/login')),
-                ],
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _langButton(),
-                  const SizedBox(width: 16),
                   const Text(
                     '© 2026 PowerFit',
                     style: TextStyle(color: Color(0xFF5A5A5A), fontSize: 13),
                   ),
+                  _langButton(),
                 ],
               ),
             ],
@@ -1463,6 +1473,154 @@ class _LandingScreenState extends State<LandingScreen> {
         ),
       ),
     );
+  }
+
+  Widget _footerBrand() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _logoMark(30),
+            const SizedBox(width: 10),
+            const Text(
+              'PowerFit',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Text(
+          _t['footerTagline']!,
+          style: const TextStyle(color: _muted, fontSize: 14, height: 1.6),
+        ),
+      ],
+    );
+  }
+
+  Widget _footerLinksColumn() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _t['footerLinksHead']!,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _footerLink(_t['navFeatures']!, () => _scrollTo(_featuresKey)),
+        const SizedBox(height: 10),
+        _footerLink(_t['navPricing']!, () => _scrollTo(_pricingKey)),
+        const SizedBox(height: 10),
+        _footerLink(_t['navFaq']!, () => _scrollTo(_faqKey)),
+        const SizedBox(height: 10),
+        _footerLink(_t['login']!, () => context.go('/login')),
+      ],
+    );
+  }
+
+  Widget _footerContactBox() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _card,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _red.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.mail_outline, color: _red3, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                _t['contactUsHead']!,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _t['contactUsDesc']!,
+            style: const TextStyle(color: _muted, fontSize: 13.5, height: 1.6),
+          ),
+          const SizedBox(height: 16),
+          InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => launchUrl(Uri(scheme: 'mailto', path: _contactEmail)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: _bg,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text(
+                        _contactEmail,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: _t['copyEmail']!,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(6),
+                      onTap: () => _copyEmail(),
+                      child: const Padding(
+                        padding: EdgeInsets.all(2),
+                        child: Icon(
+                          Icons.copy_rounded,
+                          size: 16,
+                          color: _muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _copyEmail() {
+    Clipboard.setData(const ClipboardData(text: _contactEmail));
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(SnackBar(content: Text(_t['emailCopied']!)));
   }
 
   Widget _footerLink(String text, VoidCallback onTap) => InkWell(
@@ -1840,6 +1998,12 @@ const Map<String, String> _arText = {
   'navPricing': 'الأسعار',
   'navFaq': 'الأسئلة',
   'login': 'تسجيل الدخول',
+  'footerTagline': 'نظام متكامل لإدارة صالات الألعاب الرياضية — الاشتراكات والفروع والأعضاء في مكان واحد.',
+  'footerLinksHead': 'روابط سريعة',
+  'contactUsHead': 'تواصل معنا',
+  'contactUsDesc': 'لديك سؤال أو تريد طلب عرض توضيحي؟ راسلنا مباشرة وسنرد عليك في أقرب وقت.',
+  'copyEmail': 'نسخ البريد الإلكتروني',
+  'emailCopied': 'تم نسخ البريد الإلكتروني',
   'heroBadge': 'نظام إدارة النوادي الرياضية',
   'heroHead': 'أدر ناديك بالكامل من مكان واحد',
   'heroSub':
@@ -1901,7 +2065,7 @@ const Map<String, String> _arText = {
   'billingAnnualNote': 'يُحاسب سنوياً',
   'noCardRequired': 'بدون بطاقة ائتمان',
   'pricingDisclaimerUsd':
-      'الأسعار معروضة بالدولار الأمريكي — تواصل معنا للعملات المحلية',
+      'الأسعار تحويل تقديري — تواصل معنا لتأكيد السعر بعملتك',
   'enterprisePriceLabel': 'مخصّص',
   'enterpriseFrom': 'ابتداءً من',
   'perBranchMonthly': '/فرع شهرياً',
@@ -1952,6 +2116,12 @@ const Map<String, String> _enText = {
   'navPricing': 'Pricing',
   'navFaq': 'FAQ',
   'login': 'Log in',
+  'footerTagline': 'The all-in-one platform for running your gym — subscriptions, branches, and members in one place.',
+  'footerLinksHead': 'Quick links',
+  'contactUsHead': 'Contact us',
+  'contactUsDesc': 'Have a question or want a demo? Reach out directly and we\'ll get back to you soon.',
+  'copyEmail': 'Copy email',
+  'emailCopied': 'Email copied to clipboard',
   'heroBadge': 'Gym management system',
   'heroHead': 'Run your entire gym from one place',
   'heroSub':
@@ -2015,7 +2185,7 @@ const Map<String, String> _enText = {
   'billingAnnualNote': 'billed annually',
   'noCardRequired': 'No credit card required',
   'pricingDisclaimerUsd':
-      'Prices shown in USD — contact us for local currency options',
+      'Prices are an estimated conversion — contact us to confirm pricing in your currency',
   'enterprisePriceLabel': 'Custom',
   'enterpriseFrom': 'From',
   'perBranchMonthly': '/branch monthly',
