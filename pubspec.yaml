@@ -63,6 +63,11 @@ dependencies:
   # Charts
   fl_chart: ^0.66.0
 
+  # PDF receipts: `pdf` renders the document, `printing` hands it to the
+  # platform's print/share/save sheet (web, Windows and mobile alike).
+  pdf: ^3.11.0
+  printing: ^5.13.0
+
   # QR Code Generation
   qr_flutter: ^4.1.0
 
@@ -79,6 +84,7 @@ dependencies:
   # Firebase Core and Messaging for Push Notifications
   firebase_core: ^3.0.0
   firebase_messaging: ^15.0.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -116,6 +122,9 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/icon/powerfit.jpeg
+    # Loaded by the PDF receipt only — not a UI face, so it is an asset rather
+    # than a font family. See ReceiptPdf for why Cairo cannot be used there.
+    - assets/fonts/NotoSansArabic-Regular.ttf
   # assets:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
@@ -141,6 +150,14 @@ flutter:
           weight: 700
         - asset: assets/fonts/Cairo-Regular.ttf
           weight: 900
+    # IBM Plex Mono — worn by every number, metric, and data label on the
+    # public landing page so figures read as instrument-panel output.
+    - family: IBMPlexMono
+      fonts:
+        - asset: assets/fonts/IBMPlexMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexMono-SemiBold.ttf
+          weight: 600
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

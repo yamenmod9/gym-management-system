@@ -75,6 +75,12 @@ class S {
   static String get roleAutoResolved => _t('يحدّد النظام دورك تلقائياً بعد تسجيل الدخول.', 'Your role is resolved automatically after login.');
   static String get backToHome => _t('الرئيسية', 'Home');
 
+  // ─── UNIFIED LOGIN SCREEN (web) ──────────────────────────────
+  static String get unifiedLoginSubtitle => _t('سجّل الدخول للمتابعة — للموظفين والإداريين والأعضاء', 'Sign in to continue — for staff, admins, and members');
+  static String get loginIdentifier => _t('اسم المستخدم أو الهاتف أو البريد الإلكتروني', 'Username, phone, or email');
+  static String get enterLoginIdentifier => _t('أدخل اسم المستخدم أو رقم الهاتف أو البريد الإلكتروني', 'Enter your username, phone, or email');
+  static String get loginIdentifierRequired => _t('هذا الحقل مطلوب', 'This field is required');
+
   // ─── GYM SETUP WIZARD ──────────────────────────────────────
   static String get setupYourGym => _t('إعداد النادي الرياضي', 'Set up your gym');
   static String stepOf(int step) => _t(
@@ -224,10 +230,14 @@ class S {
   static String get allStaffMembers => _t('جميع الموظفين', 'All staff');
   static String get transactions => _t('العمليات', 'Transactions');
   static String get retention => _t('الاحتفاظ', 'Retention');
-  static String get filterOptions => _t('خيارات التصفية', 'Filter options');
+  static String get renewal => _t('التجديد', 'Renewal');
+  static String get avgRetention => _t('متوسط الاحتفاظ', 'Avg retention');
+  static String membersSignedCount(int count) => _t('$count عضو مسجل', '$count members signed');
+  static String get sortBy => _t('ترتيب حسب', 'Sort by');
   static String get sortByRevenue => _t('ترتيب حسب الإيرادات', 'Sort by revenue');
-  static String get sortByCustomers => _t('ترتيب حسب العملاء', 'Sort by members');
+  static String get sortByTransactions => _t('ترتيب حسب العمليات', 'Sort by transactions');
   static String get sortByRetention => _t('ترتيب حسب معدل الاحتفاظ', 'Sort by retention rate');
+  static String get sortByRenewal => _t('ترتيب حسب معدل التجديد', 'Sort by renewal rate');
 
   // ─── BRANCH DETAIL ─────────────────────────────────────────
   static String get operations => _t('العمليات', 'Operations');
@@ -472,6 +482,12 @@ class S {
   static String get pleaseSelectSessions => _t('يرجى اختيار عدد الجلسات', 'Please select the number of sessions');
   static String get subscriptionActivated => _t('تم تفعيل الاشتراك', 'Subscription activated');
   static String get customerIdRequired => _t('معرف العميل *', 'Member ID *');
+  static String get customerRequired => _t('العميل *', 'Member *');
+  static String get searchCustomerHint =>
+      _t('ابحث بالاسم أو الهاتف أو البريد أو المعرف', 'Search by name, phone, email or ID');
+  static String get pleaseSelectCustomer => _t('يرجى اختيار عميل', 'Please select a member');
+  static String get searching => _t('جارٍ البحث...', 'Searching...');
+  static String get changeSelection => _t('تغيير', 'Change');
   static String get subscriptionTypeRequired => _t('نوع الاشتراك *', 'Subscription type *');
   static String get chooseSubType => _t('اختر نوع الاشتراك', 'Choose a subscription type');
   static String get coinsAmountRequired => _t('عدد العملات *', 'Number of coins *');
@@ -595,6 +611,141 @@ class S {
   static String get noTransactionsToday => _t('لا توجد عمليات اليوم', 'No transactions today');
   static String get viewTransactionHistory => _t('عرض سجل العمليات', 'View transaction history');
   static String get noExpensesFound => _t('لا توجد مصروفات', 'No expenses found');
+
+  // ─── MONEY MANAGEMENT ──────────────────────────────────────
+  static String get moneyManagement => _t('إدارة الأموال', 'Money management');
+  static String get recordExpense => _t('تسجيل مصروف', 'Record expense');
+  static String get addExpense => _t('إضافة مصروف', 'Add expense');
+  static String get earnings => _t('الإيرادات', 'Earnings');
+  static String get moneyIn => _t('الوارد', 'Money in');
+  static String get moneyOut => _t('الصادر', 'Money out');
+  static String get netBalance => _t('الصافي', 'Net balance');
+  static String get approvedExpenses => _t('مصروفات معتمدة', 'Approved expenses');
+  static String get pendingApproval => _t('بانتظار الموافقة', 'Awaiting approval');
+  static String get expenseTitle => _t('البيان', 'What was it for?');
+  static String get expenseCategory => _t('الفئة', 'Category');
+  static String get expenseDate => _t('التاريخ', 'Date');
+  static String get expenseRecorded => _t('تم تسجيل المصروف', 'Expense recorded');
+  static String get expenseApproved => _t('تمت الموافقة على المصروف', 'Expense approved');
+  static String get expenseRejected => _t('تم رفض المصروف', 'Expense rejected');
+  static String get approve => _t('موافقة', 'Approve');
+  static String get reject => _t('رفض', 'Reject');
+  static String get rejectionReason => _t('سبب الرفض *', 'Reason for rejection *');
+  static String get rejectionReasonRequired =>
+      _t('يرجى كتابة سبب الرفض', 'Please give a reason for rejecting');
+  static String get pendingExcludedFromNet =>
+      _t('الصافي يحتسب المصروفات المعتمدة فقط', 'Net counts approved expenses only');
+  static String get noBranchSelected => _t('يرجى اختيار فرع', 'Please select a branch');
+  static String expensesCountLabel(int count) =>
+      _t(count == 1 ? 'مصروف واحد' : '$count مصروفات',
+          count == 1 ? '1 expense' : '$count expenses');
+
+  static String expenseCategoryLabel(String value) {
+    switch (value) {
+      case 'maintenance':
+        return _t('صيانة', 'Maintenance');
+      case 'utilities':
+        return _t('فواتير ومرافق', 'Utilities');
+      case 'salaries':
+        return _t('رواتب', 'Salaries');
+      case 'equipment':
+        return _t('معدات', 'Equipment');
+      case 'supplies':
+        return _t('مستلزمات', 'Supplies');
+      case 'rent':
+        return _t('إيجار', 'Rent');
+      case 'marketing':
+        return _t('تسويق', 'Marketing');
+      case 'services':
+        return _t('خدمات', 'Services');
+      case 'safety':
+        return _t('السلامة', 'Safety');
+      case 'insurance':
+        return _t('تأمين', 'Insurance');
+      case 'training':
+        return _t('تدريب', 'Training');
+      case 'software':
+        return _t('برمجيات', 'Software');
+      case 'uncategorized':
+        return _t('غير مصنف', 'Uncategorized');
+      case 'other':
+        // Explicit: the default below echoes the raw value, which would print
+        // this real category as a lowercase 'other'.
+        return _t('أخرى', 'Other');
+      default:
+        // Expense.category is free text, so an unmapped value can always
+        // arrive. Echo it rather than folding it into 'Other' — several
+        // distinct categories sharing one label reads as a rendering bug,
+        // especially as breakdown rows sitting next to each other.
+        return value.isEmpty ? _t('أخرى', 'Other') : value;
+    }
+  }
+
+  /// The folded tail of a breakdown — distinct from an unmapped category label.
+  static String otherCategories(int count) => _t('أخرى ($count)', 'Other ($count)');
+
+  static String get allCategories => _t('كل الفئات', 'All categories');
+  static String get noExpensesInCategory =>
+      _t('لا توجد مصروفات في هذه الفئة', 'No expenses in this category');
+
+  // ─── RECEIPTS ──────────────────────────────────────────────
+  /// Deliberately "receipt", never "invoice": nothing in the schema carries a
+  /// VAT rate, amount, or registration number, so the document must not imply
+  /// it is a tax invoice.
+  static String get paymentReceipt => _t('إيصال دفع', 'Payment receipt');
+  static String get receiptNumberLabel => _t('رقم الإيصال', 'Receipt no.');
+  static String get referenceNumberLabel => _t('الرقم المرجعي', 'Reference no.');
+  static String get issuedBy => _t('صدر بواسطة', 'Issued by');
+  static String get member => _t('العميل', 'Member');
+  static String get item => _t('البند', 'Item');
+  static String get amount => _t('المبلغ', 'Amount');
+  static String get date => _t('التاريخ', 'Date');
+  static String get printReceipt => _t('طباعة الإيصال', 'Print receipt');
+  static String get receiptFailed =>
+      _t('تعذر إنشاء الإيصال', 'Could not generate the receipt');
+
+  /// Shared by the member payments list and the printed receipt.
+  static String paymentMethodLabel(String method) {
+    switch (method.toLowerCase()) {
+      case 'network':
+      case 'card':
+        return card;
+      case 'transfer':
+        return transfer;
+      case 'cash':
+        return cash;
+      default:
+        return method;
+    }
+  }
+
+  static String transactionTypeLabel(String type) {
+    switch (type.toLowerCase()) {
+      case 'subscription':
+        return _t('اشتراك', 'Subscription');
+      case 'renewal':
+        return _t('تجديد', 'Renewal');
+      case 'freeze':
+        return _t('تجميد', 'Freeze');
+      default:
+        return _t('أخرى', 'Other');
+    }
+  }
+
+  // ─── CHARTS ────────────────────────────────────────────────
+  static String get revenueTrend => _t('اتجاه الإيرادات', 'Revenue trend');
+  static String get expensesByCategory => _t('المصروفات حسب الفئة', 'Expenses by category');
+
+  static String trendPeriodLabel(String period) {
+    switch (period) {
+      case 'weekly':
+        return _t('أسبوعي', 'Weekly');
+      case 'monthly':
+        return _t('شهري', 'Monthly');
+      default:
+        return _t('يومي', 'Daily');
+    }
+  }
   static String get noBranchData => _t('لا توجد بيانات فروع', 'No branch data');
   static String get subscriptions => _t('الاشتراكات', 'Subscriptions');
   static String get financialReports => _t('التقارير المالية', 'Financial reports');
@@ -693,6 +844,25 @@ class S {
   static String get showQrAtDoor => _t('اعرض رمز QR عند الباب', 'Show your QR code at the door');
   static String get untilRenewal => _t('متبقٍ حتى التجديد', 'left until renewal');
   static String get manageSubscription => _t('إدارة الاشتراك', 'Manage subscription');
+
+  // ─── CLIENT PAYMENTS ───────────────────────────────────────
+  static String get myPayments => _t('مدفوعاتي', 'My payments');
+  static String get paymentsAndSubscriptions =>
+      _t('الاشتراكات والمدفوعات', 'Subscriptions & payments');
+  static String get totalPaid => _t('إجمالي المدفوع', 'Total paid');
+  static String get totalPaidAllTime =>
+      _t('إجمالي ما دفعته حتى الآن', 'Total you have paid to date');
+  static String get paidForThisSubscription =>
+      _t('المدفوع لهذا الاشتراك', 'Paid for this subscription');
+  static String get otherPayments => _t('مدفوعات أخرى', 'Other payments');
+  static String get noPaymentsYet => _t('لا توجد مدفوعات بعد', 'No payments yet');
+  static String get noPaymentsRecorded =>
+      _t('لم يتم تسجيل أي دفعة لهذا الاشتراك', 'No payments recorded for this subscription');
+  static String paymentsCountLabel(int count) =>
+      _t(count == 1 ? 'دفعة واحدة' : '$count دفعات', count == 1 ? '1 payment' : '$count payments');
+  static String subscriptionsCountLabel(int count) =>
+      _t(count == 1 ? 'اشتراك واحد' : '$count اشتراكات', count == 1 ? '1 subscription' : '$count subscriptions');
+  static String get discountLabel => _t('خصم', 'Discount');
   static String get dayUnit => _t('يوم', 'day');
   static String get coinUnit => _t('عملة', 'coin');
   static String get sessionUnit => _t('جلسة', 'session');

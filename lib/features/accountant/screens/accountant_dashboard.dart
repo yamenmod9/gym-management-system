@@ -6,9 +6,11 @@ import '../../../core/providers/gym_branding_provider.dart';
 import '../../../shared/widgets/skeleton_loader.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../shared/widgets/stat_card.dart';
+import '../../../shared/widgets/dash_charts.dart';
 import '../../../shared/widgets/dashboard_shell.dart';
 import '../../../shared/widgets/date_range_picker.dart';
 import '../../../core/utils/helpers.dart';
+import '../../finance/screens/money_management_view.dart';
 import '../providers/accountant_provider.dart';
 import 'accountant_settings_screen.dart';
 import 'transaction_ledger_screen.dart';
@@ -66,7 +68,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
       navItems: [
         DashNavItem(Icons.dashboard_outlined, S.overview),
         DashNavItem(Icons.point_of_sale_outlined, S.sales),
-        DashNavItem(Icons.money_off_outlined, S.expenses),
+        DashNavItem(Icons.account_balance_wallet_outlined, S.moneyManagement),
         DashNavItem(Icons.store_outlined, S.branches),
         DashNavItem(Icons.assessment_outlined, S.reports),
       ],
@@ -90,9 +92,8 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
           onTap: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => const AccountantSettingsScreen())),
         ),
-        DashIconAction(
-            icon: Icons.logout, tooltip: S.logout, onTap: authProvider.logout),
       ],
+      onLogout: authProvider.logout,
       body: body,
     );
   }
@@ -100,7 +101,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
   static List<String> get _titles => [
     S.overview,
     S.sales,
-    S.expenses,
+    S.moneyManagement,
     S.branches,
     S.reports,
   ];
@@ -178,6 +179,18 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                 iconColor: DashColors.amber),
           ]),
           const SizedBox(height: 20),
+          DashRevenueTrendCard(
+            points: provider.revenueTrend,
+            period: provider.trendPeriod,
+            onPeriodChanged: provider.setTrendPeriod,
+            accent: accent,
+          ),
+          const SizedBox(height: 20),
+          DashExpenseCategoryCard(
+            categories: provider.expensesByCategory,
+            accent: accent,
+          ),
+          const SizedBox(height: 20),
           _buildPaymentBreakdownCard(context, ds),
           if (changePercent != 0 || changeAmount != 0) ...[
             const SizedBox(height: 20),
@@ -247,7 +260,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(S.paymentBreakdown,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey[700])),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF243050))),
             const SizedBox(height: 12),
             _buildPaymentRow(S.cash, cash, total, Colors.green),
             const SizedBox(height: 8),
@@ -277,7 +290,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
           width: 48,
           child: Text('${percent.toStringAsFixed(0)}%',
             textAlign: TextAlign.end,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            style: TextStyle(fontSize: 12, color: Color(0xFF6B7590))),
         ),
       ],
     );
@@ -311,7 +324,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(S.monthOverMonth,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    style: TextStyle(fontSize: 12, color: Color(0xFF6B7590))),
                   const SizedBox(height: 4),
                   Text(
                     '${isPositive ? '+' : ''}${NumberHelper.formatCurrency(changeAmount)}',
@@ -385,7 +398,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                       Text(S.salesAndTransactions,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                       Text(S.transactionsToday(transactions.length),
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                        style: TextStyle(color: Color(0xFF6B7590), fontSize: 13)),
                     ],
                   ),
                 ),
@@ -429,9 +442,9 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.receipt_long, size: 64, color: Colors.grey[300]),
+                        Icon(Icons.receipt_long, size: 64, color: Color(0xFF9AA3B8)),
                         const SizedBox(height: 16),
-                        Text(S.noTransactionsToday, style: TextStyle(fontSize: 16, color: Colors.grey[500])),
+                        Text(S.noTransactionsToday, style: TextStyle(fontSize: 16, color: Color(0xFF9AA3B8))),
                         const SizedBox(height: 8),
                         TextButton.icon(
                           onPressed: () {
@@ -495,7 +508,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                     if (serviceName.isNotEmpty)
                                       Text(serviceName,
-                                        style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                        style: TextStyle(fontSize: 12, color: Color(0xFF6B7590))),
                                     Row(
                                       children: [
                                         Container(
@@ -510,7 +523,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                                         if (date.isNotEmpty) ...[
                                           const SizedBox(width: 8),
                                           Text(_formatTime(date),
-                                            style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                                            style: TextStyle(fontSize: 11, color: Color(0xFF9AA3B8))),
                                         ],
                                       ],
                                     ),
@@ -541,7 +554,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
       ),
       child: Column(
         children: [
-          Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+          Text(label, style: TextStyle(fontSize: 11, color: Color(0xFF6B7590))),
           const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -562,167 +575,24 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
     }
   }
 
-  // ─── EXPENSES TAB ─────────────────────────────────────────────────────
+  // ─── EXPENSES / MONEY TAB ─────────────────────────────────────────────
 
   Widget _buildExpensesTab(BuildContext context, AccountantProvider provider) {
-    final expenses = provider.expenses;
-    final ds = provider.dailySales;
-    final totalExpenses = provider.approvedExpenseTotal > 0
-        ? provider.approvedExpenseTotal + provider.pendingExpenseTotal
-        : (ds['monthly_expenses'] ?? 0).toDouble();
-    final pendingCount = expenses.where((e) => (e['status'] ?? '').toString().toLowerCase() == 'pending').length;
-    final approvedCount = expenses.where((e) => (e['status'] ?? '').toString().toLowerCase() == 'approved').length;
+    final role = context.read<AuthProvider>().userRole;
+    // The backend lets central accountants clear expenses but not branch ones.
+    final canReview = role == 'central_accountant' || role == 'accountant';
 
-    return RefreshIndicator(
+    return MoneyManagementView(
+      earnings: (provider.dailySales['monthly_revenue'] ?? 0).toDouble(),
+      expenses: provider.expenses,
+      categoryTotals: provider.expensesByCategory,
+      branches: [
+        for (final branch in provider.branchComparison)
+          Map<String, dynamic>.from(branch as Map),
+      ],
+      defaultBranchId: provider.selectedBranchId,
+      canReview: canReview,
       onRefresh: () => provider.refresh(),
-      child: Column(
-        children: [
-          // Summary Cards
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                Expanded(child: _buildMiniStat(S.totalExpenses,
-                  NumberHelper.formatCurrency(totalExpenses), Colors.red)),
-                const SizedBox(width: 8),
-                Expanded(child: _buildMiniStat(S.pending,
-                  '$pendingCount', Colors.orange)),
-                const SizedBox(width: 8),
-                Expanded(child: _buildMiniStat(S.approved,
-                  '$approvedCount', Colors.green)),
-              ],
-            ),
-          ),
-          const Divider(),
-
-          // Expense list
-          Expanded(
-            child: expenses.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.money_off, size: 64, color: Colors.grey[300]),
-                        const SizedBox(height: 16),
-                        Text(S.noExpensesFound, style: TextStyle(fontSize: 16, color: Colors.grey[500])),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                    itemCount: expenses.length,
-                    itemBuilder: (context, index) {
-                      final expense = expenses[index];
-                      final amount = (expense['amount'] ?? 0).toDouble();
-                      final status = (expense['status'] ?? 'pending').toString();
-                      final category = expense['category'] ?? 'General';
-                      final title = expense['title'] ?? expense['description'] ?? 'Expense';
-                      final branchName = expense['branch_name'] ?? '';
-                      final date = expense['date'] ?? expense['created_at'] ?? '';
-
-                      Color statusColor;
-                      IconData statusIcon;
-                      switch (status.toLowerCase()) {
-                        case 'approved':
-                          statusColor = Colors.green;
-                          statusIcon = Icons.check_circle;
-                          break;
-                        case 'rejected':
-                          statusColor = Colors.red;
-                          statusIcon = Icons.cancel;
-                          break;
-                        default:
-                          statusColor = Colors.orange;
-                          statusIcon = Icons.hourglass_top;
-                      }
-
-                      return Card(
-                        elevation: 2,
-                        margin: const EdgeInsets.only(bottom: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: Colors.red.withOpacity(0.1),
-                                    child: const Icon(Icons.money_off, color: Colors.red, size: 20),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(title,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                        Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey.withOpacity(0.1),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(category,
-                                                style: TextStyle(fontSize: 10, color: Colors.grey[700])),
-                                            ),
-                                            if (branchName.isNotEmpty) ...[
-                                              const SizedBox(width: 6),
-                                              Icon(Icons.store, size: 12, color: Colors.grey[500]),
-                                              const SizedBox(width: 2),
-                                              Flexible(
-                                                child: Text(branchName,
-                                                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                                                  overflow: TextOverflow.ellipsis),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(NumberHelper.formatCurrency(amount),
-                                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 15)),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: statusColor.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(statusIcon, size: 12, color: statusColor),
-                                            const SizedBox(width: 4),
-                                            Text(status,
-                                              style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w500)),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              if (date.isNotEmpty) ...[
-                                const SizedBox(height: 6),
-                                Text(date, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-                              ],
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -736,9 +606,9 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.store_outlined, size: 64, color: Colors.grey[300]),
+            Icon(Icons.store_outlined, size: 64, color: Color(0xFF9AA3B8)),
             const SizedBox(height: 16),
-            Text(S.noBranchData, style: TextStyle(fontSize: 16, color: Colors.grey[500])),
+            Text(S.noBranchData, style: TextStyle(fontSize: 16, color: Color(0xFF9AA3B8))),
           ],
         ),
       );
@@ -788,7 +658,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                             if (city.isNotEmpty || address.isNotEmpty)
                               Text(address.isNotEmpty ? address : city,
-                                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                style: TextStyle(color: Color(0xFF6B7590), fontSize: 13),
                                 maxLines: 1, overflow: TextOverflow.ellipsis),
                           ],
                         ),
@@ -805,7 +675,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                               color: score >= 70 ? Colors.green : score >= 40 ? Colors.orange : Colors.red)),
                         ),
                       if (!isActive)
-                        Chip(label: Text(S.inactive), backgroundColor: Colors.grey),
+                        Chip(label: Text(S.inactive), backgroundColor: Color(0xFF9AA3B8)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -844,14 +714,14 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
   Widget _buildBranchStat(IconData icon, String value, String label, {Color? color}) {
     return Column(
       children: [
-        Icon(icon, size: 20, color: color ?? Colors.grey[600]),
+        Icon(icon, size: 20, color: color ?? Color(0xFF6B7590)),
         const SizedBox(height: 4),
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(value,
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color)),
         ),
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+        Text(label, style: TextStyle(fontSize: 11, color: Color(0xFF6B7590))),
       ],
     );
   }
@@ -910,11 +780,11 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                 child: Column(
                   children: [
                     const SizedBox(height: 60),
-                    Icon(Icons.assessment_outlined, size: 64, color: Colors.grey[300]),
+                    Icon(Icons.assessment_outlined, size: 64, color: Color(0xFF9AA3B8)),
                     const SizedBox(height: 16),
-                    Text(S.noReportData, style: TextStyle(fontSize: 16, color: Colors.grey[500])),
+                    Text(S.noReportData, style: TextStyle(fontSize: 16, color: Color(0xFF9AA3B8))),
                     const SizedBox(height: 8),
-                    Text(S.tryAdjustingDateRange, style: TextStyle(fontSize: 13, color: Colors.grey[400])),
+                    Text(S.tryAdjustingDateRange, style: TextStyle(fontSize: 13, color: Color(0xFF9AA3B8))),
                   ],
                 ),
               ),
@@ -967,7 +837,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         const SizedBox(height: 12),
 
         if (byBranch is List && byBranch.isNotEmpty) ...[
-          Text(S.byBranch, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.grey[700])),
+          Text(S.byBranch, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF243050))),
           const SizedBox(height: 8),
           ...byBranch.map((b) => _buildReportDataRow(
             b['branch_name'] ?? b['name'] ?? S.unknown,
@@ -979,7 +849,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         ],
 
         if (byService is List && byService.isNotEmpty) ...[
-          Text(S.byService, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.grey[700])),
+          Text(S.byService, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF243050))),
           const SizedBox(height: 8),
           ...byService.map((s) => _buildReportDataRow(
             s['service_name'] ?? s['name'] ?? S.unknown,
@@ -991,7 +861,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         ],
 
         if (byPayment is List && byPayment.isNotEmpty) ...[
-          Text(S.byPaymentMethod, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.grey[700])),
+          Text(S.byPaymentMethod, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF243050))),
           const SizedBox(height: 8),
           ...byPayment.map((p) => _buildReportDataRow(
             p['payment_method'] ?? p['method'] ?? S.unknown,
@@ -1022,7 +892,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                 width: 42,
                 child: Text('${percent.toStringAsFixed(0)}%',
                   textAlign: TextAlign.end,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  style: TextStyle(fontSize: 12, color: Color(0xFF6B7590))),
               ),
             ],
           ),
@@ -1031,7 +901,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: total > 0 ? value / total : 0,
-              backgroundColor: Colors.grey[200],
+              backgroundColor: Color(0xFF1B2748),
               valueColor: AlwaysStoppedAnimation<Color>(color),
               minHeight: 4,
             ),
@@ -1058,7 +928,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         ),
         if (dailyBreakdown is List && dailyBreakdown.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Text(S.dailyBreakdown, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.grey[700])),
+          Text(S.dailyBreakdown, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF243050))),
           const SizedBox(height: 8),
           ...dailyBreakdown.map((day) {
             final dayName = day['day'] ?? day['date'] ?? '—';
@@ -1146,7 +1016,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (branch.isNotEmpty) Text(branch, style: const TextStyle(fontSize: 13)),
-                        if (date.isNotEmpty) Text(date, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                        if (date.isNotEmpty) Text(date, style: TextStyle(fontSize: 11, color: Color(0xFF9AA3B8))),
                       ],
                     ),
                   ),

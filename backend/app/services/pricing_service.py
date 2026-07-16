@@ -5,18 +5,20 @@ Data-driven by design: adding a new fully-priced region (e.g. Saudi
 Arabia in SAR) means adding one entry to REGION_PRICING below — no new
 branching logic anywhere else in this file or in the route that serves it.
 
-Only Egypt (EG) is finalized right now. Every other country falls back to
-DEFAULT_REGION (USD), computed from a single manually-maintained exchange
-rate constant — deliberately NOT a live FX API, since EGP is volatile and
-prices shown to a visitor shouldn't drift with the market between page
-loads. Update USD_TO_EGP_RATE by hand as it meaningfully drifts.
+Only Egypt (EG) is finalized right now — those are real business pricing
+decisions, not a currency conversion. Every other mapped country gets its
+own currency converted from the EG numbers via a manually-maintained
+exchange rate in CURRENCIES (see USD_TO_EGP_RATE and CURRENCIES below —
+deliberately NOT a live FX API, since several of these currencies are
+volatile and prices shown to a visitor shouldn't drift with the market
+between page loads). A country with no entry in COUNTRY_CURRENCY falls
+back to DEFAULT_REGION (USD).
 """
 
-# ─── Manually maintained exchange rate ──────────────────────────────────
-# Update this by hand periodically (e.g. quarterly, or after a large EGP
-# move). It only affects the computed USD fallback for non-finalized
-# regions — it never touches the EG numbers, which are fixed business
-# pricing, not a currency conversion.
+# ─── Manually maintained exchange rates ─────────────────────────────────
+# Update these by hand periodically (e.g. quarterly, or after a large
+# move). They only affect the computed non-EGP regions — they never touch
+# the EG numbers, which are fixed business pricing, not a conversion.
 USD_TO_EGP_RATE = 50.0  # placeholder as of 2026-07 — verify against a live rate before go-live
 
 TRIAL_DAYS = 14
@@ -29,15 +31,24 @@ TRIAL_ELIGIBLE_TIERS = {'starter', 'growth'}
 
 def _round_to_x9(value):
     """Round to the nearest whole number ending in 9 (…19, 29, 59…) — the
-    classic SaaS 'clean psychological price' look, never a cents value."""
+    classic SaaS 'clean psychological price' look, never a cents value.
+
+    Below 10, skip the "ends in 9" treatment and just round to the
+    nearest whole unit instead: with a couple of high-value currencies
+    (BHD, OMR, KWD — worth roughly $2.60–$3.75 each) the $19/$29/$59
+    tiers convert to single-digit amounts, and forcing all of them to
+    round to the tens digit would collapse distinct tiers onto the same
+    "9" price."""
     if value <= 0:
         return 9
+    if value < 10:
+        return max(1, round(value))
     return max(9, round((value + 1) / 10) * 10 - 1)
 
 
 # ─── Fully-specified regions ─────────────────────────────────────────────
 # Only put a region here once its pricing is a deliberate business
-# decision, not a currency conversion. Everything else uses DEFAULT_REGION.
+# decision, not a currency conversion. Everything else is derived below.
 REGION_PRICING = {
     'EG': {
         'currency': 'EGP',
@@ -51,40 +62,115 @@ REGION_PRICING = {
     },
 }
 
+# ─── Currency definitions ────────────────────────────────────────────────
+# rate_per_usd: how many units of that currency equal 1 USD — a manually
+# maintained snapshot, not a live rate (see USD_TO_EGP_RATE above for why).
+# Snapshot taken 2026-07 — verify against a live rate before go-live,
+# especially the ones flagged below as actively managed/volatile.
+CURRENCIES = {
+    'USD': {'symbol': '$', 'symbol_position': 'before', 'rate_per_usd': 1.0},
+    'EUR': {'symbol': '€', 'symbol_position': 'before', 'rate_per_usd': 0.876},
+    # GCC — pegged to USD, essentially fixed for years/decades.
+    'SAR': {'symbol': 'ر.س', 'symbol_position': 'after', 'rate_per_usd': 3.75},
+    'AED': {'symbol': 'د.إ', 'symbol_position': 'after', 'rate_per_usd': 3.6725},
+    'QAR': {'symbol': 'ر.ق', 'symbol_position': 'after', 'rate_per_usd': 3.64},
+    'BHD': {'symbol': 'د.ب', 'symbol_position': 'after', 'rate_per_usd': 0.376},
+    'OMR': {'symbol': 'ر.ع.', 'symbol_position': 'after', 'rate_per_usd': 0.3845},
+    'KWD': {'symbol': 'د.ك', 'symbol_position': 'after', 'rate_per_usd': 0.3098},
+    # Levant / Iraq.
+    'JOD': {'symbol': 'د.أ', 'symbol_position': 'after', 'rate_per_usd': 0.709},
+    'IQD': {'symbol': 'د.ع', 'symbol_position': 'after', 'rate_per_usd': 1310.0},
+    # LBP and SYP are managed/freshly re-based rates, not free-floating —
+    # double-check these are still current before go-live. SYP reflects
+    # the Jan-2026 redenomination (100 old SYP = 1 new SYP).
+    'LBP': {'symbol': 'ل.ل', 'symbol_position': 'after', 'rate_per_usd': 89500.0},
+    'SYP': {'symbol': 'ل.س', 'symbol_position': 'after', 'rate_per_usd': 122.0},
+    # YER: Yemen effectively has two markets (government- vs Houthi-
+    # controlled areas) with very different rates — this is the
+    # government-area rate; treat as a rough estimate.
+    'YER': {'symbol': 'ر.ي', 'symbol_position': 'after', 'rate_per_usd': 238.6},
+    # Maghreb.
+    'MAD': {'symbol': 'د.م.', 'symbol_position': 'after', 'rate_per_usd': 9.33},
+    'TND': {'symbol': 'د.ت', 'symbol_position': 'after', 'rate_per_usd': 2.96},
+    'DZD': {'symbol': 'د.ج', 'symbol_position': 'after', 'rate_per_usd': 133.2},
+    'LYD': {'symbol': 'د.ل', 'symbol_position': 'after', 'rate_per_usd': 6.37},
+    # Horn of Africa / Mauritania.
+    'SDG': {'symbol': 'ج.س', 'symbol_position': 'after', 'rate_per_usd': 601.5},
+    'SOS': {'symbol': 'S', 'symbol_position': 'after', 'rate_per_usd': 571.0},
+    'DJF': {'symbol': 'Fdj', 'symbol_position': 'after', 'rate_per_usd': 177.7},
+    'KMF': {'symbol': 'CF', 'symbol_position': 'after', 'rate_per_usd': 431.0},
+    'MRU': {'symbol': 'أ.م', 'symbol_position': 'after', 'rate_per_usd': 39.9},
+}
 
-def _build_default_region():
-    """Compute the USD fallback from the EG numbers via the maintained FX
-    rate, rounded to clean sticker prices. Recomputed at import time so a
-    USD_TO_EGP_RATE edit takes effect on the next deploy with no other
+# Country → currency. Every Arab League member with its own national
+# currency, plus the Eurozone for EUR. A country not listed here falls
+# back to DEFAULT_REGION (USD). Palestine (PS) is deliberately omitted —
+# it has no currency of its own (ILS and JOD both circulate), so any
+# single mapping here would be a guess; the USD fallback is the honest
+# default.
+COUNTRY_CURRENCY = {
+    # Arab League.
+    'SA': 'SAR', 'AE': 'AED', 'QA': 'QAR', 'BH': 'BHD', 'OM': 'OMR', 'KW': 'KWD',
+    'JO': 'JOD', 'IQ': 'IQD', 'LB': 'LBP', 'SY': 'SYP', 'YE': 'YER',
+    'MA': 'MAD', 'TN': 'TND', 'DZ': 'DZD', 'LY': 'LYD',
+    'SD': 'SDG', 'SO': 'SOS', 'DJ': 'DJF', 'KM': 'KMF', 'MR': 'MRU',
+    # Eurozone.
+    'AT': 'EUR', 'BE': 'EUR', 'HR': 'EUR', 'CY': 'EUR', 'EE': 'EUR', 'FI': 'EUR',
+    'FR': 'EUR', 'DE': 'EUR', 'GR': 'EUR', 'IE': 'EUR', 'IT': 'EUR', 'LV': 'EUR',
+    'LT': 'EUR', 'LU': 'EUR', 'MT': 'EUR', 'NL': 'EUR', 'PT': 'EUR', 'SK': 'EUR',
+    'SI': 'EUR', 'ES': 'EUR',
+}
+
+
+def _build_region_for_currency(currency_code):
+    """Compute this currency's tier prices from the EG numbers via USD,
+    rounded to clean sticker prices. Recomputed at import time so editing
+    a rate in CURRENCIES takes effect on the next deploy with no other
     code changes."""
     eg = REGION_PRICING['EG']
+    cur = CURRENCIES[currency_code]
+    rate = cur['rate_per_usd']
+
+    def convert(egp_amount):
+        usd_amount = egp_amount / USD_TO_EGP_RATE
+        return _round_to_x9(usd_amount * rate)
+
     return {
-        'currency': 'USD',
-        'symbol': '$',
-        'symbol_position': 'before',  # "$29", not "29 $"
+        'currency': currency_code,
+        'symbol': cur['symbol'],
+        'symbol_position': cur['symbol_position'],
         'is_finalized': False,
-        'starter': _round_to_x9(eg['starter'] / USD_TO_EGP_RATE),
-        'growth': _round_to_x9(eg['growth'] / USD_TO_EGP_RATE),
-        'pro': _round_to_x9(eg['pro'] / USD_TO_EGP_RATE),
-        'enterprise_per_branch': _round_to_x9(eg['enterprise_per_branch'] / USD_TO_EGP_RATE),
+        'starter': convert(eg['starter']),
+        'growth': convert(eg['growth']),
+        'pro': convert(eg['pro']),
+        'enterprise_per_branch': convert(eg['enterprise_per_branch']),
     }
 
 
-DEFAULT_REGION = _build_default_region()
+DEFAULT_REGION = _build_region_for_currency('USD')
+
+# Pre-computed at import time for every mapped currency — cheap (small
+# fixed set) and keeps get_region_pricing() a simple dict lookup.
+_CONVERTED_REGIONS = {
+    code: _build_region_for_currency(code) for code in CURRENCIES if code != 'USD'
+}
 
 DISCLAIMER_NON_FINALIZED = (
-    'Prices shown in USD — contact us for local currency options'
+    'Prices are an estimated conversion — contact us to confirm pricing in your currency'
 )
 
 
 def get_region_pricing(country_code):
     """Look up the pricing region for a country code (or None), always
     returning a usable dict — never raises, never returns None. Unknown
-    or missing country codes fall back to DEFAULT_REGION."""
+    or missing country codes fall back to DEFAULT_REGION (USD)."""
     if country_code:
-        region = REGION_PRICING.get(country_code.upper())
-        if region:
-            return dict(region)
+        code = country_code.upper()
+        if code in REGION_PRICING:
+            return dict(REGION_PRICING[code])
+        currency_code = COUNTRY_CURRENCY.get(code)
+        if currency_code:
+            return dict(_CONVERTED_REGIONS[currency_code])
     return dict(DEFAULT_REGION)
 
 

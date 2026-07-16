@@ -12,6 +12,7 @@ import 'core/auth/biometric_service.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'core/providers/gym_branding_provider.dart';
+import 'core/providers/locale_provider.dart';
 import 'core/services/fcm_notification_service.dart';
 import 'routes/super_admin_router.dart';
 import 'features/super_admin/providers/super_admin_provider.dart';
@@ -59,17 +60,21 @@ class SuperAdminApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => GymBrandingProvider(),
         ),
+        ChangeNotifierProvider(
+          create: (_) => LocaleProvider(),
+        ),
       ],
-      child: Consumer<AuthProvider>(
-        builder: (context, authProvider, _) {
+      child: Consumer2<AuthProvider, LocaleProvider>(
+        builder: (context, authProvider, localeProvider, _) {
           final router = SuperAdminRouter(authProvider);
           return MaterialApp.router(
+            key: ValueKey(localeProvider.isArabic),
             title: 'مدير منصة النادي',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.superAdminTheme,
             scaffoldMessengerKey: FcmNotificationService.scaffoldMessengerKey,
-            locale: const Locale('ar'),
-            supportedLocales: const [Locale('ar')],
+            locale: localeProvider.locale,
+            supportedLocales: const [Locale('ar'), Locale('en')],
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,

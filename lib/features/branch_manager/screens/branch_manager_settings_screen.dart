@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../shared/widgets/biometric_settings_section.dart';
+import '../../../shared/widgets/language_settings_tile.dart';
 import '../../../shared/widgets/notification_settings_section.dart';
 
 class BranchManagerSettingsScreen extends StatelessWidget {
@@ -53,7 +54,7 @@ class BranchManagerSettingsScreen extends StatelessWidget {
                     Text(
                       S.branchIdLabel(authProvider.branchId ?? ''),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey,
+                        color: Color(0xFF9AA3B8),
                       ),
                     ),
                 ],
@@ -87,18 +88,8 @@ class BranchManagerSettingsScreen extends StatelessWidget {
                   },
                 ),
                 const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.language),
-                  title: Text(S.language),
-                  subtitle: Text(S.arabicDefault),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(S.languageComingSoon),
-                      ),
-                    );
-                  },
+                LanguageSettingsTile(
+                  onPersist: authProvider.setPreferredLanguage,
                 ),
               ],
             ),

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/localization/app_strings.dart';
 import '../core/auth/client_auth_provider.dart';
 import '../core/theme/client_theme.dart';
+import '../../core/providers/locale_provider.dart';
+import '../../shared/widgets/language_settings_tile.dart';
 import '../../shared/widgets/notification_settings_section.dart';
 
 /// Profile / settings tab, styled to the PowerFit Member App design: an
@@ -91,6 +93,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final client = context.watch<ClientAuthProvider>().currentClient;
+    final locale = context.watch<LocaleProvider>();
 
     return Container(
       color: ClientTheme.darkGrey,
@@ -115,6 +118,11 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () => context.pushNamed('subscription')),
               _divider(),
               _row(context,
+                  icon: Icons.receipt_long_outlined,
+                  title: S.myPayments,
+                  onTap: () => context.pushNamed('payments')),
+              _divider(),
+              _row(context,
                   icon: Icons.phone_outlined,
                   title: S.contactInformationSetting,
                   onTap: () => _soon(context, S.contactEditingSoon)),
@@ -132,8 +140,15 @@ class SettingsScreen extends StatelessWidget {
               _row(context,
                   icon: Icons.language,
                   title: S.language,
-                  trailingText: S.arabicDefault,
-                  onTap: () => _soon(context, S.languageComingSoon)),
+                  trailingText: locale.isArabic
+                      ? S.arabicLanguageName
+                      : S.englishLanguageName,
+                  onTap: () => showLanguagePicker(
+                        context,
+                        onPersist: context
+                            .read<ClientAuthProvider>()
+                            .setPreferredLanguage,
+                      )),
               _divider(),
               _row(context,
                   icon: Icons.dark_mode_outlined,

@@ -4,10 +4,11 @@ import '../../../core/auth/auth_provider.dart';
 import '../../../core/providers/gym_branding_provider.dart';
 import '../../../shared/widgets/skeleton_loader.dart';
 import '../../../shared/widgets/error_display.dart';
-import '../../../shared/widgets/stat_card.dart';
+import '../../../shared/widgets/dash_charts.dart';
 import '../../../shared/widgets/dashboard_shell.dart';
 import '../../../shared/widgets/date_range_picker.dart';
 import '../../../core/utils/helpers.dart';
+import '../../finance/screens/money_management_view.dart';
 import '../providers/owner_dashboard_provider.dart';
 import '../widgets/add_staff_dialog.dart';
 import 'smart_alerts_screen.dart';
@@ -99,9 +100,8 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           onTap: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => const OwnerSettingsScreen())),
         ),
-        DashIconAction(
-            icon: Icons.logout, tooltip: S.logout, onTap: authProvider.logout),
       ],
+      onLogout: authProvider.logout,
       floatingActionButton: _buildFab(context, dashboardProvider),
       body: body,
     );
@@ -196,6 +196,13 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 iconColor: DashColors.amber),
           ]),
           const SizedBox(height: 20),
+          DashRevenueTrendCard(
+            points: provider.revenueTrend,
+            period: provider.trendPeriod,
+            onPeriodChanged: provider.setTrendPeriod,
+            accent: accent,
+          ),
+          const SizedBox(height: 20),
           if (wide)
             IntrinsicHeight(
               child: Row(
@@ -212,6 +219,11 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
             const SizedBox(height: 18),
             alerts,
           ],
+          const SizedBox(height: 20),
+          DashExpenseCategoryCard(
+            categories: provider.expensesByCategory,
+            accent: accent,
+          ),
           const SizedBox(height: 20),
           _branchComparisonCard(context, provider, accent),
         ],
@@ -377,19 +389,19 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.store_outlined, size: 80, color: Colors.grey[600]),
+              Icon(Icons.store_outlined, size: 80, color: Color(0xFF6B7590)),
               const SizedBox(height: 20),
               Text(
                 S.noBranchesYet,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[400],
+                      color: Color(0xFF9AA3B8),
                     ),
               ),
               const SizedBox(height: 8),
               Text(
                 S.createFirstBranchDesc,
-                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                style: TextStyle(fontSize: 14, color: Color(0xFF9AA3B8)),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -472,16 +484,16 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                               if (city.isNotEmpty || address.isNotEmpty)
                                 Text(
                                   address.isNotEmpty ? address : city,
-                                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                  style: TextStyle(color: Color(0xFF6B7590), fontSize: 13),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               if (manager.isNotEmpty)
                                 Row(
                                   children: [
-                                    Icon(Icons.person, size: 13, color: Colors.grey[500]),
+                                    Icon(Icons.person, size: 13, color: Color(0xFF9AA3B8)),
                                     const SizedBox(width: 4),
-                                    Text(manager, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                                    Text(manager, style: TextStyle(color: Color(0xFF9AA3B8), fontSize: 12)),
                                   ],
                                 ),
                             ],
@@ -503,7 +515,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                             ),
                           ),
                         if (!isActive)
-                          Chip(label: Text(S.inactive), backgroundColor: Colors.grey),
+                          Chip(label: Text(S.inactive), backgroundColor: Color(0xFF9AA3B8)),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -522,9 +534,9 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Icon(Icons.phone, size: 14, color: Colors.grey[500]),
+                          Icon(Icons.phone, size: 14, color: Color(0xFF9AA3B8)),
                           const SizedBox(width: 6),
-                          Text(phone, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                          Text(phone, style: TextStyle(fontSize: 12, color: Color(0xFF6B7590))),
                         ],
                       ),
                     ],
@@ -541,10 +553,10 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   Widget _buildBranchStat(IconData icon, String value, String label) {
     return Column(
       children: [
-        Icon(icon, size: 20, color: Colors.grey[600]),
+        Icon(icon, size: 20, color: Color(0xFF6B7590)),
         const SizedBox(height: 4),
         Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+        Text(label, style: TextStyle(fontSize: 11, color: Color(0xFF6B7590))),
       ],
     );
   }
@@ -558,19 +570,19 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.people_outlined, size: 80, color: Colors.grey[600]),
+              Icon(Icons.people_outlined, size: 80, color: Color(0xFF6B7590)),
               const SizedBox(height: 20),
               Text(
                 S.noStaffYet,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[400],
+                      color: Color(0xFF9AA3B8),
                     ),
               ),
               const SizedBox(height: 8),
               Text(
                 S.createBranchFirst,
-                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                style: TextStyle(fontSize: 14, color: Color(0xFF9AA3B8)),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -599,19 +611,19 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.person_add_outlined, size: 80, color: Colors.grey[600]),
+              Icon(Icons.person_add_outlined, size: 80, color: Color(0xFF6B7590)),
               const SizedBox(height: 20),
               Text(
                 S.noStaffYet,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[400],
+                      color: Color(0xFF9AA3B8),
                     ),
               ),
               const SizedBox(height: 8),
               Text(
                 S.addStaffDesc,
-                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                style: TextStyle(fontSize: 14, color: Color(0xFF9AA3B8)),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -697,7 +709,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
               roleColor = Colors.teal;
               break;
             default:
-              roleColor = Colors.grey;
+              roleColor = Color(0xFF9AA3B8);
           }
 
           return Card(
@@ -738,7 +750,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                               Flexible(
                                 child: Text(
                                   branchName,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  style: TextStyle(fontSize: 12, color: Color(0xFF6B7590)),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -758,7 +770,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                       const SizedBox(height: 2),
                       Text(
                         S.transactionsCount(transactions as int),
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 11, color: Color(0xFF6B7590)),
                       ),
                     ],
                   ),
@@ -774,47 +786,20 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   Widget _buildFinanceTab(BuildContext context, OwnerDashboardProvider provider) {
     final revenueData = provider.revenueData ?? {};
     final totalRevenue = (revenueData['total_revenue'] as num?)?.toDouble() ?? 0.0;
-    final totalExpenses = (revenueData['total_expenses'] as num?)?.toDouble() ?? 0.0;
-    final netProfit = (revenueData['net_profit'] as num?)?.toDouble() ?? (totalRevenue - totalExpenses);
-    final activeSubscriptions = revenueData['active_subscriptions'] ?? 0;
-    final totalCustomers = revenueData['total_customers'] ?? 0;
 
-    return RefreshIndicator(
+    // The owner spans every branch, so they pick one when filing an expense
+    // and may clear whatever the branches recorded.
+    return MoneyManagementView(
+      earnings: totalRevenue,
+      expenses: provider.expenses,
+      categoryTotals: provider.expensesByCategory,
+      branches: [
+        for (final branch in provider.branchComparison)
+          Map<String, dynamic>.from(branch as Map),
+      ],
+      defaultBranchId: provider.selectedBranchId,
+      canReview: true,
       onRefresh: () => provider.refresh(),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-        children: [
-          SimpleStatCard(
-            label: S.totalRevenue,
-            value: NumberHelper.formatCurrency(totalRevenue),
-            color: Colors.green,
-          ),
-          const SizedBox(height: 12),
-          SimpleStatCard(
-            label: S.totalExpenses,
-            value: NumberHelper.formatCurrency(totalExpenses),
-            color: Colors.red,
-          ),
-          const SizedBox(height: 12),
-          SimpleStatCard(
-            label: S.netProfit,
-            value: NumberHelper.formatCurrency(netProfit),
-            color: netProfit >= 0 ? Colors.blue : Colors.red,
-          ),
-          const SizedBox(height: 12),
-          SimpleStatCard(
-            label: S.activeSubscriptions,
-            value: NumberHelper.formatNumber(activeSubscriptions),
-            color: Colors.teal,
-          ),
-          const SizedBox(height: 12),
-          SimpleStatCard(
-            label: S.totalCustomers,
-            value: NumberHelper.formatNumber(totalCustomers),
-            color: Colors.orange,
-          ),
-        ],
-      ),
     );
   }
 
@@ -826,9 +811,9 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           children: [
             Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
             SizedBox(height: 16),
-            Text(S.noComplaints, style: TextStyle(fontSize: 16, color: Colors.grey)),
+            Text(S.noComplaints, style: TextStyle(fontSize: 16, color: Color(0xFF9AA3B8))),
             SizedBox(height: 8),
-            Text(S.allClear, style: TextStyle(fontSize: 13, color: Colors.grey)),
+            Text(S.allClear, style: TextStyle(fontSize: 13, color: Color(0xFF9AA3B8))),
           ],
         ),
       );
@@ -886,20 +871,20 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                       description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                      style: TextStyle(color: Color(0xFF243050), fontSize: 13),
                     ),
                   ],
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: 14, color: Colors.grey[500]),
+                      Icon(Icons.location_on, size: 14, color: Color(0xFF9AA3B8)),
                       const SizedBox(width: 4),
-                      Text(c['branch_name'] ?? S.unknownBranch, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                      Text(c['branch_name'] ?? S.unknownBranch, style: TextStyle(color: Color(0xFF6B7590), fontSize: 12)),
                       if (c['customer_name'] != null) ...[
                         const SizedBox(width: 12),
-                        Icon(Icons.person, size: 14, color: Colors.grey[500]),
+                        Icon(Icons.person, size: 14, color: Color(0xFF9AA3B8)),
                         const SizedBox(width: 4),
-                        Text(c['customer_name'], style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                        Text(c['customer_name'], style: TextStyle(color: Color(0xFF6B7590), fontSize: 12)),
                       ],
                     ],
                   ),

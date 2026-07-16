@@ -1,18 +1,30 @@
 import 'package:flutter/material.dart';
+import '../../core/localization/app_strings.dart';
 
 /// Shared design tokens for the PowerFit staff console (desktop-sidebar layout).
+/// Neutrals follow the charcoal-navy instrument-panel system introduced on the
+/// landing page; role/gym accent colors arrive via [DashboardShell.accent] and
+/// are untouched by these platform surfaces.
 class DashColors {
-  static const bg = Color(0xFF121212);
-  static const sidebar = Color(0xFF1A1A1A);
-  static const topbar = Color(0xFF1E1E1E);
-  static const card = Color(0xFF2A2A2A);
-  static const inner = Color(0xFF1E1E1E);
-  static const muted = Color(0xFFB0B0B0);
-  static const subtle = Color(0xFF808080);
+  static const bg = Color(0xFF0E1425);
+  static const sidebar = Color(0xFF0A0F1D);
+  static const topbar = Color(0xFF131C33);
+  static const card = Color(0xFF16203A);
+  static const inner = Color(0xFF111B33);
+  static const muted = Color(0xFF9AA3B8);
+  static const subtle = Color(0xFF6B7590);
   static const emerald = Color(0xFF10B981);
   static const amber = Color(0xFFF59E0B);
-  static const blue = Color(0xFF3B82F6);
-  static const line = Color(0x12FFFFFF);
+  static const blue = Color(0xFF4C6FFF);
+  static const line = Color(0xFF243050);
+
+  /// Chart mark colors — a step darker than [emerald] and the red used for
+  /// money-out above. Those are tuned for text and icons; a plotted mark has to
+  /// sit inside the dark-mode lightness band against the [card] surface it is
+  /// drawn on, which the text tokens deliberately exceed. Same meanings
+  /// (money in / money out), different legibility job.
+  static const chartRevenue = Color(0xFF059669);
+  static const chartExpense = Color(0xFFEF4444);
 }
 
 class DashNavItem {
@@ -39,6 +51,11 @@ class DashboardShell extends StatelessWidget {
   final Widget body;
   final Widget? floatingActionButton;
 
+  /// Signs the current user out. Rendered as a tile in the sidebar footer so
+  /// every staff role reaches it from the nav itself — including roles whose
+  /// screens hide the topbar (see [showTopbar]) and never render [actions].
+  final VoidCallback? onLogout;
+
   /// When false, the shell renders no topbar (the [body] provides its own
   /// chrome, e.g. child screens with their own AppBars). A slim menu strip is
   /// still shown on narrow screens so the drawer stays reachable.
@@ -59,6 +76,7 @@ class DashboardShell extends StatelessWidget {
     this.actions = const [],
     required this.body,
     this.floatingActionButton,
+    this.onLogout,
     this.showTopbar = true,
   });
 
@@ -83,6 +101,7 @@ class DashboardShell extends StatelessWidget {
               navItems: navItems,
               selectedIndex: selectedIndex,
               onSelect: onSelect,
+              onLogout: onLogout,
             ),
             Expanded(
               child: showTopbar
@@ -121,6 +140,7 @@ class DashboardShell extends StatelessWidget {
             Navigator.of(context).pop();
             onSelect(i);
           },
+          onLogout: onLogout,
           inDrawer: true,
         ),
       ),
@@ -162,6 +182,7 @@ class _Sidebar extends StatelessWidget {
   final List<DashNavItem> navItems;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
+  final VoidCallback? onLogout;
   final bool inDrawer;
 
   const _Sidebar({
@@ -173,8 +194,31 @@ class _Sidebar extends StatelessWidget {
     required this.navItems,
     required this.selectedIndex,
     required this.onSelect,
+    this.onLogout,
     this.inDrawer = false,
   });
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(S.logout),
+        content: Text(S.confirmLogout),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(S.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            child: Text(S.logout),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) onLogout!.call();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -281,6 +325,16 @@ class _Sidebar extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (onLogout != null)
+                    Tooltip(
+                      message: S.logout,
+                      child: IconButton(
+                        icon: const Icon(Icons.logout, size: 19),
+                        color: DashColors.muted,
+                        splashRadius: 20,
+                        onPressed: () => _confirmLogout(context),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -408,6 +462,10 @@ class _Topbar extends StatelessWidget {
 }
 
 /// A KPI stat card in the console style.
+///
+/// Deliberately compact: these tile up several-across on every breakpoint
+/// (see [DashKpiGrid]), so the metric strip stays a thin band at the top of a
+/// dashboard and leaves the fold to real content.
 class DashKpiCard extends StatelessWidget {
   final String label;
   final String value;
@@ -417,6 +475,7 @@ class DashKpiCard extends StatelessWidget {
   final String? sub;
   final String? trend;
   final bool trendUp;
+  final VoidCallback? onTap;
 
   const DashKpiCard({
     super.key,
@@ -428,55 +487,56 @@ class DashKpiCard extends StatelessWidget {
     this.sub,
     this.trend,
     this.trendUp = true,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
+    final card = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
       decoration: BoxDecoration(
         color: DashColors.card,
         border: Border.all(color: DashColors.line),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Flexible(
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: iconColor, size: 14),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
                 child: Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: DashColors.muted,
-                    fontSize: 13,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: iconColor, size: 17),
-              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: AlignmentDirectional.centerStart,
@@ -484,30 +544,30 @@ class DashKpiCard extends StatelessWidget {
               value,
               style: TextStyle(
                 color: valueColor ?? Colors.white,
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
               ),
             ),
           ),
-          if (trend != null || sub != null) ...[
-            const SizedBox(height: 4),
+          if (trend != null || sub != null)
             Row(
               children: [
                 if (trend != null) ...[
                   Icon(
                     trendUp ? Icons.arrow_drop_up : Icons.arrow_drop_down,
                     color: trendUp ? DashColors.emerald : Colors.redAccent,
-                    size: 18,
+                    size: 15,
                   ),
                   Text(
                     trend!,
                     style: TextStyle(
                       color: trendUp ? DashColors.emerald : Colors.redAccent,
-                      fontSize: 13,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 5),
                 ],
                 if (sub != null)
                   Flexible(
@@ -517,16 +577,21 @@ class DashKpiCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: DashColors.subtle,
-                        fontSize: 12,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
               ],
             ),
-          ],
         ],
       ),
+    );
+    if (onTap == null) return card;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: card,
     );
   }
 }
@@ -774,14 +839,22 @@ class DashProgressRow extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+            // The label yields and ellipsizes; the amount never does. A long
+            // branch or category name beside a full-width currency string
+            // (e.g. "EGP 51,477.00") overflows a phone-width card otherwise.
+            Expanded(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
+            const SizedBox(width: 10),
             Text(
               trailing,
               style: TextStyle(color: trailingColor, fontSize: 13),
@@ -831,37 +904,58 @@ class DashBody extends StatelessWidget {
   }
 }
 
-/// Responsive KPI grid: [columns] cards per row on wide, fewer on narrow.
+/// Responsive KPI strip: packs as many equal-width [cards] per row as fit at
+/// [minTileWidth], measuring the space actually handed to it rather than the
+/// window — so it stays correct inside a sidebar-inset column. Two-up on
+/// phones, up to [maxColumns] on desktop; tiles share one fixed [tileHeight]
+/// so rows line up and the strip's footprint is predictable.
 class DashKpiGrid extends StatelessWidget {
   final List<Widget> cards;
-  const DashKpiGrid({super.key, required this.cards});
+  final double minTileWidth;
+  final int maxColumns;
+  final double tileHeight;
+
+  const DashKpiGrid({
+    super.key,
+    required this.cards,
+    this.minTileWidth = 168,
+    this.maxColumns = 4,
+    this.tileHeight = 96,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final w = MediaQuery.sizeOf(context).width;
-    final cols = w >= 1000 ? 4 : (w >= 640 ? 2 : 1);
-    const gap = 18.0;
-    final rows = <Widget>[];
-    for (var i = 0; i < cards.length; i += cols) {
-      final row = <Widget>[];
-      for (var j = 0; j < cols; j++) {
-        final idx = i + j;
-        row.add(
-          Expanded(child: idx < cards.length ? cards[idx] : const SizedBox()),
+    if (cards.isEmpty) return const SizedBox.shrink();
+    const gap = 12.0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.maxWidth;
+        var cols = ((available + gap) / (minTileWidth + gap)).floor();
+        // Phones fit fewer than two tiles at the target width, but a single
+        // column of full-width cards is the tall stack we're getting away
+        // from — so two-up is the floor.
+        if (cols < 2) cols = 2;
+        if (cols > maxColumns) cols = maxColumns;
+        // Never stretch a short strip across more columns than it has cards.
+        if (cols > cards.length) cols = cards.length;
+        if (cols < 1) cols = 1;
+        // Even out the last row: 6 cards over 4 columns reads better as 3+3
+        // than 4+2. Widening tiles this way never breaks minTileWidth.
+        final rows = (cards.length / cols).ceil();
+        cols = (cards.length / rows).ceil();
+        final tileWidth = (available - gap * (cols - 1)) / cols;
+
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final card in cards)
+              SizedBox(width: tileWidth, height: tileHeight, child: card),
+          ],
         );
-        if (j < cols - 1) row.add(const SizedBox(width: gap));
-      }
-      rows.add(
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: row,
-          ),
-        ),
-      );
-      if (i + cols < cards.length) rows.add(const SizedBox(height: gap));
-    }
-    return Column(children: rows);
+      },
+    );
   }
 }
 
