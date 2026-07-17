@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/api/api_service.dart';
 import '../../../shared/models/owner_model.dart';
+import '../../../shared/models/gym_model.dart';
 
 class SuperAdminProvider extends ChangeNotifier {
   final ApiService _apiService;
@@ -8,17 +9,27 @@ class SuperAdminProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   List<OwnerModel> _owners = [];
+  List<GymModel> _gyms = [];
+  List<dynamic> _allStaff = [];
   Map<String, dynamic>? _stats;
 
   SuperAdminProvider(this._apiService);
 
+  ApiService get apiService => _apiService;
   bool get isLoading => _isLoading;
   String? get error => _error;
   List<OwnerModel> get owners => _owners;
+  List<GymModel> get gyms => _gyms;
+  List<dynamic> get allStaff => _allStaff;
   Map<String, dynamic>? get stats => _stats;
 
   int get totalOwners => _owners.length;
   int get activeOwners => _owners.where((o) => o.isActive).length;
+  int get totalGyms => _gyms.length;
+  int get activeGyms => _gyms.where((g) => g.isActive).length;
+  int get totalBranches => _gyms.fold(0, (sum, g) => sum + g.branchCount);
+  int get totalCustomers => _gyms.fold(0, (sum, g) => sum + g.customerCount);
+  int get totalStaff => _gyms.fold(0, (sum, g) => sum + g.staffCount);
 
   Future<void> loadDashboardData() async {
     _isLoading = true;
@@ -26,14 +37,11 @@ class SuperAdminProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Fetch all owner-role users from the backend
-      final response = await _apiService.get('/api/users?role=owner&per_page=100');
-      final data = response.data;
-
-      if (data['success'] == true) {
-        final items = (data['data']['items'] as List?) ?? [];
-        _owners = items.map((o) => OwnerModel.fromJson(o as Map<String, dynamic>)).toList();
-      }
+      await Future.wait([
+        _loadOwners(),
+        _loadGyms(),
+        _loadAllStaff(),
+      ]);
 
       _stats = {
         'total_owners': _owners.length,
@@ -46,6 +54,98 @@ class SuperAdminProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _loadOwners() async {
+    final response = await _apiService.get('/api/users?role=owner&per_page=100');
+    final data = response.data;
+    if (data['success'] == true) {
+      final items = (data['data']['items'] as List?) ?? [];
+      _owners = items
+          .map((o) => OwnerModel.fromJson(o as Map<String, dynamic>))
+          .toList();
+    }
+  }
+
+  Future<void> _loadGyms() async {
+    try {
+      final response = await _apiService.get('/api/gyms');
+      final data = response.data;
+      if (data['success'] == true) {
+        final items = (data['data'] as List?) ?? [];
+        _gyms = items
+            .map((g) => GymModel.fromJson(g as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('⚠️ Gyms load failed: $e');
+      _gyms = [];
+    }
+  }
+
+  Future<void> _loadAllStaff() async {
+    try {
+      final response = await _apiService.get('/api/users?per_page=100');
+      final data = response.data;
+      if (data['success'] == true) {
+        _allStaff = (data['data']['items'] as List?) ?? [];
+      }
+    } catch (e) {
+      debugPrint('⚠️ Staff load failed: $e');
+      _allStaff = [];
+    }
+  }
+
+  /// Branches of one gym, with per-branch stats (drill-down).
+  Future<List<dynamic>> fetchGymBranches(int gymId) async {
+    final response = await _apiService.get('/api/gyms/$gymId/branches');
+    final data = response.data;
+    if (data['success'] == true) {
+      return (data['data'] as List?) ?? [];
+    }
+    return [];
+  }
+
+  /// Activate/deactivate any gym.
+  Future<Map<String, dynamic>> toggleGymStatus(GymModel gym) async {
+    try {
+      final newStatus = !gym.isActive;
+      await _apiService.put('/api/gyms/${gym.id}', data: {'is_active': newStatus});
+      final index = _gyms.indexWhere((g) => g.id == gym.id);
+      if (index != -1) {
+        _gyms[index] = gym.copyWith(isActive: newStatus);
+        notifyListeners();
+      }
+      return {'success': true, 'active': newStatus};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  /// Edit any gym's core settings.
+  Future<Map<String, dynamic>> updateGym(int gymId, Map<String, dynamic> fields) async {
+    try {
+      final response = await _apiService.put('/api/gyms/$gymId', data: fields);
+      final data = response.data;
+      if (data['success'] == true) {
+        final updated = GymModel.fromJson(data['data'] as Map<String, dynamic>);
+        final index = _gyms.indexWhere((g) => g.id == gymId);
+        if (index != -1) {
+          // Keep the counts the list endpoint computed — the update
+          // response doesn't include them.
+          _gyms[index] = updated.copyWith(
+            branchCount: _gyms[index].branchCount,
+            customerCount: _gyms[index].customerCount,
+            staffCount: _gyms[index].staffCount,
+          );
+          notifyListeners();
+        }
+        return {'success': true};
+      }
+      return {'success': false, 'message': data['error'] ?? 'Update failed'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
     }
   }
 

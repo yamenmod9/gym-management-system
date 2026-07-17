@@ -8,6 +8,7 @@ import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/gym_setup_wizard.dart';
 import '../features/auth/screens/staff_language_setup_screen.dart';
 import '../features/owner/screens/owner_dashboard.dart';
+import '../features/regional_manager/screens/regional_manager_dashboard.dart';
 import '../features/branch_manager/screens/branch_manager_dashboard.dart';
 import '../features/reception/screens/reception_main_screen.dart';
 import '../features/accountant/screens/accountant_dashboard.dart';
@@ -59,6 +60,8 @@ class AppRouter {
         switch (userRole) {
           case AppConstants.roleOwner:
             return '/owner';
+          case AppConstants.roleRegionalManager:
+            return '/regional-manager';
           case AppConstants.roleBranchManager:
             return '/branch-manager';
           case AppConstants.roleFrontDesk:  // Backend returns 'front_desk'
@@ -79,6 +82,9 @@ class AppRouter {
 
       // Check if user has access to requested route
       if (state.matchedLocation.startsWith('/owner') && userRole != AppConstants.roleOwner) {
+        return _getDefaultRoute(userRole);
+      }
+      if (state.matchedLocation.startsWith('/regional-manager') && userRole != AppConstants.roleRegionalManager) {
         return _getDefaultRoute(userRole);
       }
       if (state.matchedLocation.startsWith('/branch-manager') && userRole != AppConstants.roleBranchManager) {
@@ -116,6 +122,10 @@ class AppRouter {
       GoRoute(
         path: '/owner',
         builder: (context, state) => const OwnerDashboard(),
+      ),
+      GoRoute(
+        path: '/regional-manager',
+        builder: (context, state) => const RegionalManagerDashboard(),
       ),
       GoRoute(
         path: '/branch-manager',
@@ -158,6 +168,8 @@ class AppRouter {
     switch (role) {
       case AppConstants.roleOwner:
         return '/owner';
+      case AppConstants.roleRegionalManager:
+        return '/regional-manager';
       case AppConstants.roleBranchManager:
         return '/branch-manager';
       case AppConstants.roleFrontDesk:  // Backend: 'front_desk'

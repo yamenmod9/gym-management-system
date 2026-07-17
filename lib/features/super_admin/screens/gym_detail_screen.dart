@@ -1,13 +1,63 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../core/providers/gym_branding_provider.dart';
 import '../../../shared/models/gym_model.dart';
-import 'super_admin_dashboard.dart';
+import '../providers/super_admin_provider.dart';
 
-class GymDetailScreen extends StatelessWidget {
+class GymDetailScreen extends StatefulWidget {
   final GymModel gym;
 
   const GymDetailScreen({super.key, required this.gym});
+
+  @override
+  State<GymDetailScreen> createState() => _GymDetailScreenState();
+}
+
+class _GymDetailScreenState extends State<GymDetailScreen> {
+  late GymModel gym;
+  List<dynamic> _branches = [];
+  bool _loadingBranches = true;
+
+  @override
+  void initState() {
+    super.initState();
+    gym = widget.gym;
+    _loadBranches();
+  }
+
+  Future<void> _loadBranches() async {
+    try {
+      final branches =
+          await context.read<SuperAdminProvider>().fetchGymBranches(gym.id);
+      if (!mounted) return;
+      setState(() {
+        _branches = branches;
+        _loadingBranches = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingBranches = false);
+    }
+  }
+
+  Future<void> _toggleActive() async {
+    final provider = context.read<SuperAdminProvider>();
+    final result = await provider.toggleGymStatus(gym);
+    if (!mounted) return;
+    if (result['success'] == true) {
+      setState(() => gym = gym.copyWith(isActive: result['active'] as bool));
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result['success'] == true
+            ? (result['active'] == true ? S.gymActivated : S.gymDeactivated)
+            : result['message'].toString()),
+        backgroundColor:
+            result['success'] == true ? Colors.green : Colors.red,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +69,16 @@ class GymDetailScreen extends StatelessWidget {
         title: Text(gym.name),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: gym.isActive ? S.deactivate : S.activate,
+            icon: Icon(
+              gym.isActive ? Icons.block : Icons.check_circle,
+              color: gym.isActive ? Colors.red : Colors.green,
+            ),
+            onPressed: _toggleActive,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -114,6 +174,73 @@ class GymDetailScreen extends StatelessWidget {
                 Expanded(child: _buildStatTile(context, S.staff, '${gym.staffCount}', Icons.badge, Colors.purple)),
               ],
             ),
+
+            const SizedBox(height: 24),
+
+            // Branches drill-down
+            Text(
+              S.branches,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            if (_loadingBranches)
+              const Center(
+                  child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
+              ))
+            else if (_branches.isEmpty)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    S.noBranchesInGym,
+                    style: const TextStyle(color: Color(0xFF9AA3B8)),
+                  ),
+                ),
+              )
+            else
+              ..._branches.map((b) => Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: primaryColor.withOpacity(0.12),
+                        child: Icon(Icons.store, color: primaryColor, size: 20),
+                      ),
+                      title: Text(
+                        (b['name'] ?? S.unknown).toString(),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        [
+                          if ((b['city'] ?? '').toString().isNotEmpty)
+                            b['city'].toString(),
+                          '${b['customers_count'] ?? 0} ${S.customers}',
+                          '${b['staff_count'] ?? 0} ${S.staff}',
+                          '${b['active_subscriptions'] ?? 0} ${S.activeSubs}',
+                        ].join(' · '),
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF9AA3B8)),
+                      ),
+                      trailing: (b['is_active'] ?? true) == true
+                          ? null
+                          : Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                S.inactive,
+                                style: const TextStyle(
+                                    fontSize: 11, color: Colors.red),
+                              ),
+                            ),
+                    ),
+                  )),
 
             const SizedBox(height: 24),
 

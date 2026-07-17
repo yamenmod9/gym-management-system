@@ -300,10 +300,13 @@ class S {
   static String get phoneOptional => _t('الهاتف (اختياري)', 'Phone (optional)');
   static String get roleRequired => _t('الدور *', 'Role *');
   static String get branchManager => _t('مدير فرع', 'Branch manager');
+  static String get regionalManager => _t('مدير إقليمي', 'Regional manager');
   static String get frontDesk => _t('الاستقبال', 'Front desk');
   static String get branchAccountant => _t('محاسب فرع', 'Branch accountant');
   static String get centralAccountant => _t('محاسب مركزي', 'Central accountant');
   static String get branchRequired => _t('الفرع *', 'Branch *');
+  static String get managedBranchesRequired => _t('الفروع المُدارة *', 'Managed branches *');
+  static String get selectAtLeastOneBranch => _t('اختر فرعاً واحداً على الأقل', 'Select at least one branch');
   static String get noBranchesCreateFirst => _t('لا توجد فروع. أنشئ فرعاً أولاً.', 'No branches. Create one first.');
   static String get selectBranch => _t('اختر فرعاً', 'Select a branch');
   static String get creating => _t('جاري الإنشاء...', 'Creating...');
@@ -589,6 +592,27 @@ class S {
   // ─── BRANCH MANAGER SETTINGS ───────────────────────────────
   static String get manager => _t('المدير', 'Manager');
   static String get branchManagerRole => _t('مدير فرع', 'Branch manager');
+
+  // ─── REGIONAL MANAGER DASHBOARD ────────────────────────────
+  static String get regionalManagerRole => _t('مدير إقليمي', 'Regional manager');
+  static String get regionalManagerTitle => _t('لوحة المدير الإقليمي', 'Regional Manager Dashboard');
+  static String get yourBranches => _t('فروعك', 'Your branches');
+  static String get members => _t('الأعضاء', 'Members');
+  static String get money => _t('الأموال', 'Money');
+
+  // ─── SUPER ADMIN (PLATFORM) ────────────────────────────────
+  static String get gyms => _t('الأندية', 'Gyms');
+  static String get allGyms => _t('كل الأندية', 'All gyms');
+  static String get totalGyms => _t('إجمالي الأندية', 'Total gyms');
+  static String get activeGyms => _t('أندية نشطة', 'Active gyms');
+  static String get totalBranches => _t('إجمالي الفروع', 'Total branches');
+  static String get totalStaff => _t('إجمالي الموظفين', 'Total staff');
+  static String get allStaff => _t('كل الموظفين', 'All staff');
+  static String get noGymsYet => _t('لا توجد أندية بعد', 'No gyms yet');
+  static String get gymActivated => _t('تم تفعيل النادي', 'Gym activated');
+  static String get gymDeactivated => _t('تم إلغاء تفعيل النادي', 'Gym deactivated');
+  static String get viewBranches => _t('عرض الفروع', 'View branches');
+  static String get noBranchesInGym => _t('لا توجد فروع في هذا النادي', 'No branches in this gym');
 
   // ─── ACCOUNTANT DASHBOARD ──────────────────────────────────
   static String get accountantDashboard => _t('لوحة تحكم المحاسب', 'Accountant Dashboard');
