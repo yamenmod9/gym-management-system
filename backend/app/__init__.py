@@ -90,6 +90,12 @@ def _ensure_db_schema(app):
                 regional_manager_branches.create(db.engine)
                 app.logger.info('Auto-migration: created regional_manager_branches table')
 
+            # Staff-to-staff issues (distinct from member complaints).
+            if 'issues' not in existing_tables:
+                from app.models.issue import Issue
+                Issue.__table__.create(db.engine)
+                app.logger.info('Auto-migration: created issues table')
+
             # Add gym_id column to users table if missing
             if 'users' in existing_tables:
                 columns = [col['name'] for col in inspector.get_columns('users')]

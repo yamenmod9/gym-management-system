@@ -70,13 +70,16 @@ class AuthService:
         #         return None, "Owner account already exists. Only ONE owner is allowed."
         role = UserRole(data['role'])
         
-        # Validate branch requirement for branch-specific roles
+        # Validate branch requirement for branch-specific roles. The plain
+        # ACCOUNTANT is included so a "normal" accountant can never end up
+        # unscoped and thereby control more than the one branch they're tied to.
         branch_specific_roles = [
             UserRole.BRANCH_MANAGER,
             UserRole.FRONT_DESK,
-            UserRole.BRANCH_ACCOUNTANT
+            UserRole.BRANCH_ACCOUNTANT,
+            UserRole.ACCOUNTANT,
         ]
-        
+
         if role in branch_specific_roles and not data.get('branch_id'):
             return None, f"{role.value} must be assigned to a branch"
 

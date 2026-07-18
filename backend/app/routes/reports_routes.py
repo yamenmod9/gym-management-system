@@ -16,7 +16,7 @@ from app.utils import (
 from app.models.user import UserRole
 from app.extensions import db
 from datetime import date, datetime, timedelta
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from collections import defaultdict
 
 reports_bp = Blueprint('reports', __name__, url_prefix='/api/reports')
@@ -754,54 +754,79 @@ def get_employee_performance():
         transactions_count = len(transactions)
         total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
 
-        # Share of this staff member's sales that were renewals rather than new
-        # business. Null rather than 0 when they sold nothing in the window, so
-        # "no sales" never renders as "0% renewals".
+        # Renewal rate = renewals / membership sales (new signups + renewals).
+        #
+        # The old version divided renewals by *every* transaction, so a protein
+        # shake or a freeze fee dragged the rate down — a made-up number. The
+        # honest question is "of the memberships this person sold, how many were
+        # repeat business rather than brand-new signups", so only SUBSCRIPTION
+        # and RENEWAL transactions belong in the denominator. Null when they
+        # sold no memberships at all, so "no sales" never reads as "0%".
+        new_sub_count = sum(
+            1 for t in transactions if t.transaction_type == TransactionType.SUBSCRIPTION
+        )
         renewals_count = sum(
             1 for t in transactions if t.transaction_type == TransactionType.RENEWAL
         )
+        membership_sales = new_sub_count + renewals_count
         renewal_rate = (
-            renewals_count / transactions_count * 100 if transactions_count else None
+            renewals_count / membership_sales * 100 if membership_sales else None
         )
 
-        # Retention: of the customers this staff member signed up during the
-        # window, how many still hold an active subscription now. Attribution is
-        # via Subscription.created_by, so it credits whoever filed the signup.
-        signed_customer_ids = {
-            row[0]
-            for row in db.session.query(Subscription.customer_id).filter(
+        # Retention rate = of the subscriptions this staff member opened in the
+        # window that have SINCE ENDED, how many the same member came back from.
+        #
+        # The old version asked "does this customer have any active subscription
+        # right now" — but a member who signed up last week is trivially still
+        # active, so it climbed toward 100% and measured nothing. Real retention
+        # can only be judged once a subscription has had the chance to lapse, so
+        # the denominator is subscriptions whose end_date has already passed, and
+        # the numerator is those whose member holds a later or currently-active
+        # subscription. Null until at least one has ended — not a fake 100%.
+        created_subs = Subscription.query.filter(
+            and_(
+                Subscription.created_by == staff.id,
+                Subscription.created_at >= datetime.combine(month_start.date(), datetime.min.time()),
+                Subscription.created_at <= datetime.combine(month_end.date(), datetime.max.time())
+            )
+        ).all()
+
+        report_today = date.today()
+        ended_subs = [s for s in created_subs if s.end_date and s.end_date < report_today]
+        retained = 0
+        for sub in ended_subs:
+            came_back = Subscription.query.filter(
                 and_(
-                    Subscription.created_by == staff.id,
-                    Subscription.created_at >= datetime.combine(month_start.date(), datetime.min.time()),
-                    Subscription.created_at <= datetime.combine(month_end.date(), datetime.max.time())
+                    Subscription.customer_id == sub.customer_id,
+                    Subscription.id != sub.id,
+                    or_(
+                        Subscription.start_date >= sub.end_date,
+                        Subscription.status == SubscriptionStatus.ACTIVE,
+                    ),  # noqa: E501
                 )
-            ).distinct()
-        }
-        if signed_customer_ids:
-            retained_customer_ids = {
-                row[0]
-                for row in db.session.query(Subscription.customer_id).filter(
-                    and_(
-                        Subscription.customer_id.in_(signed_customer_ids),
-                        Subscription.status == SubscriptionStatus.ACTIVE
-                    )
-                ).distinct()
-            }
-            retention_rate = len(retained_customer_ids) / len(signed_customer_ids) * 100
-        else:
-            retention_rate = None
+            ).first() is not None
+            if came_back:
+                retained += 1
+        retention_rate = (retained / len(ended_subs) * 100) if ended_subs else None
 
         performance_data.append({
             'staff_id': staff.id,
+            'id': staff.id,
             'staff_name': staff.username,
             'full_name': staff.full_name,
+            'email': staff.email,
+            'phone': staff.phone,
             'role': staff.role.value,
+            'is_active': staff.is_active,
+            'branch_id': staff.branch_id,
             'branch_name': staff.branch.name if staff.branch else 'N/A',
             'transactions_count': transactions_count,
             'total_revenue': total_revenue,
+            'new_subscriptions': new_sub_count,
             'renewals_count': renewals_count,
             'renewal_rate': renewal_rate,
-            'customers_signed': len(signed_customer_ids),
+            'customers_signed': len(created_subs),
+            'subscriptions_ended': len(ended_subs),
             'retention_rate': retention_rate
         })
     

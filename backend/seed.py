@@ -355,6 +355,7 @@ def build_gym(spec, services):
     create_complaints(branches, customers, spec)
     create_daily_closings(branches, staff)
     create_entry_logs(subscriptions, branches, spec)
+    create_issues(gym, branches, staff)
 
     return {
         'spec': spec,
@@ -364,6 +365,98 @@ def build_gym(spec, services):
         'customers': customers,
         'subscriptions': subscriptions,
     }
+
+
+# Realistic staff-raised issues, phrased as things the front line escalates
+# upward — the opposite direction to member complaints.
+ISSUE_TEMPLATES = [
+    ('Card machine offline', 'The POS card reader keeps disconnecting during peak hours; several members had to pay cash.', 'high'),
+    ('Short on change', 'The till ran out of small change this morning and I could not give correct change to members.', 'medium'),
+    ('Overdue supplier invoice', 'The cleaning supplies invoice is two weeks overdue and the supplier is threatening to pause delivery.', 'high'),
+    ('Rota gap this weekend', 'We have no reception cover for Saturday evening — need approval to call in a colleague.', 'medium'),
+    ('Broken turnstile sensor', 'The QR turnstile at the side entrance is not reading codes; members are being let in manually.', 'high'),
+    ('Refund needs approval', 'A member is requesting a refund above my limit and I need a manager to authorise it.', 'medium'),
+    ('Price list out of date', 'The printed price list at the desk does not match the app; which is correct?', 'low'),
+    ('Locker keys missing', 'Three locker keys went missing this week; requesting a replacement set.', 'low'),
+]
+
+
+def create_issues(gym, branches, staff):
+    """Seed a spread of staff-raised issues routed upward.
+
+    Front desk and branch accountants raise most of them; some are addressed to
+    a specific manager, others left to the general upward pool. A mix of open,
+    in-progress and resolved so every filter has something to show.
+    """
+    from app.models.issue import Issue, IssueStatus, IssuePriority
+
+    reporters = staff['reception'] + staff['branch_accountants']
+    reporters = [r for r in reporters if r.is_active]
+    if not reporters:
+        return
+
+    managers_by_branch = {m.branch_id: m for m in staff['managers']}
+    owner = staff['owner']
+    priority_map = {
+        'low': IssuePriority.LOW,
+        'medium': IssuePriority.MEDIUM,
+        'high': IssuePriority.HIGH,
+    }
+
+    created = 0
+    for reporter in reporters:
+        # 1–3 issues each.
+        for _ in range(random.randint(1, 3)):
+            title, description, prio = random.choice(ISSUE_TEMPLATES)
+
+            # Half go to a named recipient (their branch manager, else owner),
+            # half into the general upward pool.
+            assignee = None
+            if random.random() < 0.5:
+                assignee = managers_by_branch.get(reporter.branch_id) or owner
+
+            days_ago = random.randint(0, 30)
+            created_at = datetime.now() - timedelta(days=days_ago)
+            # Older issues are more likely to have been dealt with.
+            if days_ago > 14:
+                status = random.choices(
+                    [IssueStatus.RESOLVED, IssueStatus.IN_PROGRESS, IssueStatus.OPEN],
+                    weights=[70, 20, 10], k=1)[0]
+            elif days_ago > 5:
+                status = random.choices(
+                    [IssueStatus.RESOLVED, IssueStatus.IN_PROGRESS, IssueStatus.OPEN],
+                    weights=[35, 40, 25], k=1)[0]
+            else:
+                status = random.choices(
+                    [IssueStatus.IN_PROGRESS, IssueStatus.OPEN],
+                    weights=[30, 70], k=1)[0]
+
+            issue = Issue(
+                title=title,
+                description=description,
+                priority=priority_map[prio],
+                status=status,
+                gym_id=gym.id,
+                branch_id=reporter.branch_id,
+                reported_by_id=reporter.id,
+                assigned_to_id=assignee.id if assignee else None,
+                created_at=created_at,
+            )
+            if status == IssueStatus.RESOLVED:
+                resolver = assignee or managers_by_branch.get(reporter.branch_id) or owner
+                issue.resolved_by_id = resolver.id
+                issue.resolved_at = created_at + timedelta(days=random.randint(1, 5))
+                issue.resolution_notes = random.choice([
+                    'Sorted — thanks for flagging.',
+                    'Resolved, supplier contacted.',
+                    'Fixed, replacement arranged.',
+                    'Approved and handled.',
+                ])
+            db.session.add(issue)
+            created += 1
+
+    db.session.flush()
+    print(f'  ✓ Issues: {created} staff-raised tickets routed upward')
 
 
 def create_super_admin():
@@ -775,9 +868,14 @@ def create_subscriptions(customers, services, branches, staff):
     # the random draw above, which on a given seed might produce none.
     pin_expiring_subscriptions(subscriptions)
 
-    # Every customer must be able to log into the client app and see an active
-    # plan, so anyone the draw above left without one gets a fresh membership.
+    # Most customers get an active plan so the client app always has something
+    # to show — but NOT all of them. About a quarter of those left without one
+    # stay churned (an expired plan and no renewal), because retention is only
+    # meaningful when some members actually lapsed; a dataset where everyone is
+    # active reports a true but useless 100% retention. The Google Play tester
+    # is always kept active.
     ensured = 0
+    churned = 0
     with_active = {
         s.customer_id for s in subscriptions
         if s.status == SubscriptionStatus.ACTIVE and s.end_date >= date.today()
@@ -785,6 +883,13 @@ def create_subscriptions(customers, services, branches, staff):
     for customer in customers:
         if customer.id in with_active:
             continue
+
+        is_test_client = customer.phone == GOOGLE_PLAY_TEST_CLIENT['phone']
+        # Leave ~25% churned to give retention real variance.
+        if not is_test_client and random.random() < 0.25:
+            churned += 1
+            continue
+
         desk = staff['desk_by_branch'][customer.branch_id]
         start_date = date.today() - timedelta(days=random.randint(0, 5))
         fallback = Subscription(

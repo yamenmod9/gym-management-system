@@ -108,10 +108,11 @@ def get_accessible_branch_ids(user=None):
     """
     if user is None:
         user = get_current_user()
+    # Unrestricted, gym-wide: super admin, owner, and the central accountant
+    # whose whole job is company-wide books. Every other accountant tier is
+    # scoped — a plain (branch) accountant to exactly one branch, a regional
+    # accountant to their group. Only the CENTRAL tier crosses branches.
     if user.role in (UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT):
-        return None
-    # Legacy plain 'accountant' with no home branch acts as a central accountant
-    if user.role == UserRole.ACCOUNTANT and not user.branch_id:
         return None
     if user.role in BRANCH_GROUP_ROLES:
         return user.managed_branch_ids

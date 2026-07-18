@@ -185,6 +185,16 @@ def update_user(user_id):
     # Hierarchy: you can only edit accounts that rank strictly below you
     if editor.id != target.id and not editor.outranks(target.role):
         return error_response("You cannot edit an account at or above your own rank", 403)
+    # Branch scope: a branch/regional manager may only edit staff of a branch
+    # they run. Owner/super admin (unrestricted scope) skip this.
+    accessible = get_accessible_branch_ids(editor)
+    if editor.id != target.id and accessible is not None:
+        if target.branch_id not in accessible:
+            return error_response("You can only manage staff of branches you run", 403)
+        # And they must not move a staff member out of their own scope.
+        new_branch = data.get('branch_id', target.branch_id)
+        if new_branch is not None and new_branch not in accessible:
+            return error_response("You can only assign staff to branches you run", 403)
 
     user, error = AuthService.update_user(user_id, data)
     
