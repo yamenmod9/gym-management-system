@@ -52,7 +52,10 @@ import 'client/screens/settings_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   setUrlStrategy(PathUrlStrategy());
-  await Firebase.initializeApp(options: FirebaseOptionsFor.staff);
+  // The web build is one Firebase Web app for every role, so it uses the web
+  // options (its own apiKey/appId), not the Android ones the mobile entrypoints
+  // pass.
+  await Firebase.initializeApp(options: FirebaseOptionsFor.web);
   await FcmNotificationService().initialize();
   runApp(const WebApp());
 }
