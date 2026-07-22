@@ -24,60 +24,80 @@ class DashboardService:
     """Dashboard and reporting service"""
     
     @staticmethod
-    def get_owner_dashboard():
-        """Get comprehensive owner dashboard"""
+    def get_owner_dashboard(branch_ids=None):
+        """Get comprehensive owner dashboard.
+
+        branch_ids: optional list restricting every metric to those branches
+        (used for regional managers, who see only their branch group).
+        """
         today = date.today()
         thirty_days_ago = today - timedelta(days=30)
         seven_days_ago = today - timedelta(days=7)
-        
+
+        def branch_scoped(query, column):
+            return query.filter(column.in_(branch_ids)) if branch_ids is not None else query
+
         # Smart alerts
+        if branch_ids is not None:
+            expiring_7 = len(get_expiring_subscriptions(days=7, branch_id=branch_ids))
+            expiring_3 = len(get_expiring_subscriptions(days=3, branch_id=branch_ids))
+        else:
+            expiring_7 = len(get_expiring_subscriptions(days=7))
+            expiring_3 = len(get_expiring_subscriptions(days=3))
         alerts = {
-            'expiring_subscriptions': len(get_expiring_subscriptions(days=7)),
-            'expiring_soon': len(get_expiring_subscriptions(days=3)),
-            'open_complaints': Complaint.query.filter(
+            'expiring_subscriptions': expiring_7,
+            'expiring_soon': expiring_3,
+            'open_complaints': branch_scoped(Complaint.query.filter(
                 Complaint.status == ComplaintStatus.OPEN
-            ).count(),
-            'pending_expenses': Expense.query.filter(
+            ), Complaint.branch_id).count(),
+            'pending_expenses': branch_scoped(Expense.query.filter(
                 Expense.status == ExpenseStatus.PENDING
-            ).count()
+            ), Expense.branch_id).count()
         }
-        
+
         # Revenue summary (last 30 days)
-        total_revenue = db.session.query(func.sum(Transaction.amount)).filter(
+        total_revenue = branch_scoped(db.session.query(func.sum(Transaction.amount)).filter(
             Transaction.transaction_date >= thirty_days_ago
-        ).scalar() or 0
-        
+        ), Transaction.branch_id).scalar() or 0
+
         # Active subscriptions
-        active_subscriptions = Subscription.query.filter(
+        active_subscriptions = branch_scoped(Subscription.query.filter(
             Subscription.status == SubscriptionStatus.ACTIVE
-        ).count()
-        
+        ), Subscription.branch_id).count()
+
         # Total customers
-        total_customers = Customer.query.filter_by(is_active=True).count()
-        
+        total_customers = branch_scoped(
+            Customer.query.filter_by(is_active=True), Customer.branch_id
+        ).count()
+
         # Branch comparison
         branch_performance = compare_branches_performance(thirty_days_ago, today)
-        
+        if branch_ids is not None:
+            branch_performance = [
+                b for b in branch_performance
+                if (b.get('branch_id') or b.get('id')) in branch_ids
+            ]
+
         # Best and worst branches
         best_branch = branch_performance[0] if branch_performance else None
         worst_branch = branch_performance[-1] if len(branch_performance) > 1 else None
-        
+
         # Recent complaints by type
-        complaints_by_type = db.session.query(
+        complaints_by_type = branch_scoped(db.session.query(
             Complaint.complaint_type,
             func.count(Complaint.id)
         ).filter(
             Complaint.created_at >= thirty_days_ago
-        ).group_by(Complaint.complaint_type).all()
-        
+        ), Complaint.branch_id).group_by(Complaint.complaint_type).all()
+
         # Staff performance (top 5)
-        staff_revenue = db.session.query(
+        staff_revenue = branch_scoped(db.session.query(
             User.id,
             User.full_name,
             func.sum(Transaction.amount).label('total')
         ).join(Transaction, Transaction.created_by == User.id).filter(
             Transaction.transaction_date >= thirty_days_ago
-        ).group_by(User.id, User.full_name).order_by(func.sum(Transaction.amount).desc()).limit(5).all()
+        ), Transaction.branch_id).group_by(User.id, User.full_name).order_by(func.sum(Transaction.amount).desc()).limit(5).all()
         
         return {
             'alerts': alerts,
@@ -101,19 +121,27 @@ class DashboardService:
         }
     
     @staticmethod
-    def get_accountant_dashboard(branch_id=None):
-        """Get accountant dashboard"""
+    def get_accountant_dashboard(branch_id=None, branch_ids=None):
+        """Get accountant dashboard.
+
+        branch_id restricts to one branch; branch_ids to a set (regional
+        accountants). Passing neither means gym-wide (central tier).
+        """
         today = date.today()
         current_month_start = today.replace(day=1)
         last_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
-        
+
+        def scoped(query, column):
+            if branch_id:
+                return query.filter(column == branch_id)
+            if branch_ids is not None:
+                return query.filter(column.in_(branch_ids))
+            return query
+
         # Daily sales (today)
-        today_transactions = Transaction.query.filter(
+        today_transactions = scoped(Transaction.query.filter(
             func.date(Transaction.transaction_date) == today
-        )
-        
-        if branch_id:
-            today_transactions = today_transactions.filter_by(branch_id=branch_id)
+        ), Transaction.branch_id)
         
         today_summary = {
             'cash': 0,
@@ -133,31 +161,24 @@ class DashboardService:
                 today_summary['transfer'] += amount
         
         # Monthly revenue
-        current_month_revenue = db.session.query(func.sum(Transaction.amount)).filter(
+        current_month_revenue = scoped(db.session.query(func.sum(Transaction.amount)).filter(
             Transaction.transaction_date >= current_month_start
-        )
-        
-        last_month_revenue = db.session.query(func.sum(Transaction.amount)).filter(
+        ), Transaction.branch_id)
+
+        last_month_revenue = scoped(db.session.query(func.sum(Transaction.amount)).filter(
             and_(
                 Transaction.transaction_date >= last_month_start,
                 Transaction.transaction_date < current_month_start
             )
-        )
-        
-        if branch_id:
-            current_month_revenue = current_month_revenue.filter_by(branch_id=branch_id)
-            last_month_revenue = last_month_revenue.filter_by(branch_id=branch_id)
-        
+        ), Transaction.branch_id)
+
         current_month_total = current_month_revenue.scalar() or 0
         last_month_total = last_month_revenue.scalar() or 0
-        
+
         # Expenses
-        expenses_query = Expense.query.filter(
+        expenses_query = scoped(Expense.query.filter(
             Expense.expense_date >= current_month_start
-        )
-        
-        if branch_id:
-            expenses_query = expenses_query.filter_by(branch_id=branch_id)
+        ), Expense.branch_id)
         
         approved_expenses = expenses_query.filter(
             Expense.status == ExpenseStatus.APPROVED

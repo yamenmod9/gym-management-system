@@ -11,11 +11,42 @@ class UserRole(enum.Enum):
     """User roles in the system"""
     SUPER_ADMIN = 'super_admin'
     OWNER = 'owner'
+    REGIONAL_MANAGER = 'regional_manager'
     BRANCH_MANAGER = 'branch_manager'
     FRONT_DESK = 'front_desk'
     ACCOUNTANT = 'accountant'
     BRANCH_ACCOUNTANT = 'branch_accountant'
     CENTRAL_ACCOUNTANT = 'central_accountant'
+    REGIONAL_ACCOUNTANT = 'regional_accountant'
+
+
+# Rank of each role in the staff hierarchy. Higher outranks lower; a user may
+# only create/manage accounts of strictly lower rank than their own.
+ROLE_RANK = {
+    UserRole.SUPER_ADMIN: 100,
+    UserRole.OWNER: 90,
+    UserRole.REGIONAL_MANAGER: 80,
+    UserRole.BRANCH_MANAGER: 70,
+    UserRole.CENTRAL_ACCOUNTANT: 60,
+    UserRole.REGIONAL_ACCOUNTANT: 55,
+    UserRole.BRANCH_ACCOUNTANT: 50,
+    UserRole.ACCOUNTANT: 50,
+    UserRole.FRONT_DESK: 10,
+}
+
+# Roles whose scope is a *group* of branches (managed_branches) rather than
+# the single branch_id every other branch-level role carries.
+BRANCH_GROUP_ROLES = (UserRole.REGIONAL_MANAGER, UserRole.REGIONAL_ACCOUNTANT)
+
+
+# Branches assigned to a branch-group role (regional manager / regional
+# accountant). The member has their tier's full powers over every branch in
+# this set.
+regional_manager_branches = db.Table(
+    'regional_manager_branches',
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('branch_id', db.Integer, db.ForeignKey('branches.id'), primary_key=True),
+)
 
 
 class User(db.Model):
@@ -36,6 +67,14 @@ class User(db.Model):
     # Branch relationship (nullable for Owner and Central roles)
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
     branch = db.relationship('Branch', back_populates='staff')
+
+    # Branch group managed by a regional manager (empty for other roles)
+    managed_branches = db.relationship(
+        'Branch',
+        secondary=regional_manager_branches,
+        lazy='selectin',
+        backref=db.backref('regional_managers', lazy='selectin'),
+    )
     
     # Status
     is_active = db.Column(db.Boolean, default=True, nullable=False)
@@ -57,6 +96,20 @@ class User(db.Model):
     def __repr__(self):
         return f'<User {self.username} ({self.role.value})>'
 
+    @property
+    def managed_branch_ids(self):
+        """IDs of branches this user manages as a regional manager."""
+        return [b.id for b in self.managed_branches]
+
+    @property
+    def rank(self):
+        """Position in the staff hierarchy (higher outranks lower)."""
+        return ROLE_RANK.get(self.role, 0)
+
+    def outranks(self, other_role):
+        """True if this user strictly outranks the given UserRole."""
+        return self.rank > ROLE_RANK.get(other_role, 0)
+
     def set_password(self, password):
         """Hash and set password"""
         self.password_hash = pbkdf2_sha256.hash(password)
@@ -77,6 +130,7 @@ class User(db.Model):
             'gym_id': self.gym_id,
             'branch_id': self.branch_id,
             'branch_name': self.branch.name if self.branch else None,
+            'managed_branch_ids': self.managed_branch_ids,
             'is_active': self.is_active,
             'preferred_language': self.preferred_language,
             'created_at': self.created_at.isoformat(),

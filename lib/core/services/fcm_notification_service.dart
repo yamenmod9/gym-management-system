@@ -16,6 +16,25 @@ class FcmNotificationService {
   static const String _fcmTokenKey = 'fcm_device_token';
   static const String _notifEnabledKey = 'notifications_enabled';
 
+  /// Web Push (VAPID) public key — required by getToken() on web only.
+  ///
+  /// It's a public key delivered to browsers, not a secret. Two ways to supply
+  /// it, whichever is easier:
+  ///   1. Build with `--dart-define=FCM_VAPID_KEY=<key>` (the deploy path), or
+  ///   2. paste it into [_fallbackVapidKey] below and commit.
+  /// Empty in both means web push stays cleanly disabled.
+  ///
+  /// Get it from Firebase console → Project settings → Cloud Messaging → "Web
+  /// Push certificates" → the key pair (generate one if none exists). It's the
+  /// long string that begins with "B…".
+  static const String _fallbackVapidKey =
+      'BOOrLSQzfgzVNPeNbRNh8UD7Dfr5V97Ad9EaV5aTnOnaPsBPuJnW6ZCxYOvF3Gce4ymgvn9UUN6_ROZmzoxvytM';
+
+  static String get _webVapidKey {
+    const fromDefine = String.fromEnvironment('FCM_VAPID_KEY');
+    return fromDefine.isNotEmpty ? fromDefine : _fallbackVapidKey;
+  }
+
   String? _currentToken;
   String? get currentToken => _currentToken;
 
@@ -45,15 +64,15 @@ class FcmNotificationService {
   // ─── Initialisation ───
 
   /// Initialize FCM: request permission, get token, and listen for refresh.
+  ///
+  /// Runs on web too now. The one web-specific twist is that getToken() needs a
+  /// VAPID key; without it, permission and listeners still set up but no token
+  /// is minted (so nothing registers and no push arrives) rather than throwing.
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
 
     if (!_supportsMessaging) {
-      return;
-    }
-
-    if (kIsWeb) {
       return;
     }
 
@@ -63,7 +82,7 @@ class FcmNotificationService {
     final storedPref = await _storage.read(key: _notifEnabledKey);
     _notificationsEnabled = storedPref != 'false'; // default true
 
-    // Request permission (Android 13+ & iOS)
+    // Request permission (Android 13+, iOS, and the browser prompt on web)
     final settings = await _messaging!.requestPermission(
       alert: true,
       badge: true,
@@ -72,8 +91,8 @@ class FcmNotificationService {
     );
     debugPrint('FCM permission status: ${settings.authorizationStatus}');
 
-    // Get current token
-    _currentToken = await _messaging!.getToken();
+    // Get current token. Web must pass the VAPID key; mobile must not.
+    _currentToken = await _getToken();
     if (_currentToken != null) {
       await _storage.write(key: _fcmTokenKey, value: _currentToken);
     }
@@ -103,6 +122,27 @@ class FcmNotificationService {
     }
   }
 
+  /// Mint an FCM token. Web requires the VAPID key and returns null (with a
+  /// clear log) when it's absent, so a missing build-time key degrades to
+  /// "no web push" instead of an exception.
+  Future<String?> _getToken() async {
+    try {
+      if (kIsWeb) {
+        if (_webVapidKey.isEmpty) {
+          debugPrint(
+              'FCM web: FCM_VAPID_KEY not set at build time — web push disabled. '
+              'Build with --dart-define=FCM_VAPID_KEY=<key>.');
+          return null;
+        }
+        return await _messaging!.getToken(vapidKey: _webVapidKey);
+      }
+      return await _messaging!.getToken();
+    } catch (e) {
+      debugPrint('FCM: getToken failed: $e');
+      return null;
+    }
+  }
+
   // ─── Backend registration ───
 
   /// Resolve the correct endpoint path depending on which API service is in
@@ -125,7 +165,7 @@ class FcmNotificationService {
     required dynamic apiService,
     required String appType,
   }) async {
-    if (kIsWeb || !_supportsMessaging) return;
+    if (!_supportsMessaging) return;
 
     // Cache for later (settings toggle, token refresh)
     _apiService = apiService;
@@ -136,7 +176,7 @@ class FcmNotificationService {
       return;
     }
 
-    final token = _currentToken ?? await _messaging!.getToken();
+    final token = _currentToken ?? await _getToken();
     if (token == null) {
       debugPrint('FCM: No token available to register');
       return;
@@ -153,7 +193,7 @@ class FcmNotificationService {
         data: {
           'fcm_token': token,
           'app_type': appType,
-          'platform': 'android',
+          'platform': kIsWeb ? 'web' : 'android',
         },
       );
 
@@ -171,7 +211,7 @@ class FcmNotificationService {
 
   /// Unregister the device token on logout (or when user disables notifications).
   Future<void> unregisterToken({required dynamic apiService}) async {
-    if (kIsWeb || !_supportsMessaging) return;
+    if (!_supportsMessaging) return;
 
     final token = _currentToken;
     if (token == null) return;
@@ -197,7 +237,7 @@ class FcmNotificationService {
     _notificationsEnabled = enabled;
     await _storage.write(key: _notifEnabledKey, value: enabled.toString());
 
-    if (kIsWeb || !_supportsMessaging) return;
+    if (!_supportsMessaging) return;
 
     if (_apiService == null || _appType == null) return;
 

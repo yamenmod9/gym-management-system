@@ -4,7 +4,7 @@ Authentication service - handles login, JWT, and user management
 from datetime import datetime
 from flask_jwt_extended import create_access_token, create_refresh_token
 from app.extensions import db
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, BRANCH_GROUP_ROLES
 from app.models.gym import Gym
 
 
@@ -70,16 +70,24 @@ class AuthService:
         #         return None, "Owner account already exists. Only ONE owner is allowed."
         role = UserRole(data['role'])
         
-        # Validate branch requirement for branch-specific roles
+        # Validate branch requirement for branch-specific roles. The plain
+        # ACCOUNTANT is included so a "normal" accountant can never end up
+        # unscoped and thereby control more than the one branch they're tied to.
         branch_specific_roles = [
             UserRole.BRANCH_MANAGER,
             UserRole.FRONT_DESK,
-            UserRole.BRANCH_ACCOUNTANT
+            UserRole.BRANCH_ACCOUNTANT,
+            UserRole.ACCOUNTANT,
         ]
-        
+
         if role in branch_specific_roles and not data.get('branch_id'):
             return None, f"{role.value} must be assigned to a branch"
-        
+
+        # Regional roles need a branch group instead of a single branch
+        managed_branch_ids = data.get('managed_branch_ids') or []
+        if role in BRANCH_GROUP_ROLES and not managed_branch_ids:
+            return None, f"{role.value} must be assigned at least one branch"
+
         # Create user
         user = User(
             username=data['username'],
@@ -92,7 +100,14 @@ class AuthService:
             is_active=data.get('is_active', True)
         )
         user.set_password(data['password'])
-        
+
+        if role in BRANCH_GROUP_ROLES:
+            from app.models.branch import Branch
+            branches = Branch.query.filter(Branch.id.in_(managed_branch_ids)).all()
+            if len(branches) != len(set(managed_branch_ids)):
+                return None, "One or more managed branches do not exist"
+            user.managed_branches = branches
+
         db.session.add(user)
         db.session.commit()
 
@@ -128,7 +143,11 @@ class AuthService:
             user.is_active = data['is_active']
         if 'branch_id' in data:
             user.branch_id = data['branch_id']
-        
+        if 'managed_branch_ids' in data and user.role in BRANCH_GROUP_ROLES:
+            from app.models.branch import Branch
+            ids = data['managed_branch_ids'] or []
+            user.managed_branches = Branch.query.filter(Branch.id.in_(ids)).all()
+
         db.session.commit()
         return user, None
     

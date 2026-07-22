@@ -19,9 +19,13 @@ fi
 # Keep the build configurable without changing Flutter source code.
 ENVIRONMENT="${ENVIRONMENT:-production}"
 API_BASE_URL="${API_BASE_URL:-https://yamenmod91.pythonanywhere.com}"
+# Web Push (VAPID) public key. Set FCM_VAPID_KEY in the deploy environment to
+# turn on browser notifications; leave it unset and web push simply stays off.
+FCM_VAPID_KEY="${FCM_VAPID_KEY:-}"
 
 echo "Using ENVIRONMENT: $ENVIRONMENT"
 echo "Using API_BASE_URL: $API_BASE_URL"
+echo "Web push (FCM_VAPID_KEY): $([ -n "$FCM_VAPID_KEY" ] && echo enabled || echo disabled)"
 
 # Build the production web bundle that Vercel will serve.
 flutter config --enable-web
@@ -29,4 +33,5 @@ flutter build web --release \
   -t lib/web_main.dart \
   --dart-define=APP_ENV="$ENVIRONMENT" \
   --dart-define=ENVIRONMENT="$ENVIRONMENT" \
-  --dart-define=API_BASE_URL="$API_BASE_URL"
+  --dart-define=API_BASE_URL="$API_BASE_URL" \
+  --dart-define=FCM_VAPID_KEY="$FCM_VAPID_KEY"

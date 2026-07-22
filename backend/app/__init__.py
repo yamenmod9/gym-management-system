@@ -79,6 +79,23 @@ def _ensure_db_schema(app):
                 DeviceToken.__table__.create(db.engine)
                 app.logger.info('Auto-migration: created device_tokens table')
 
+            # Create the regional manager's branch group table if it doesn't exist.
+            #
+            # This one is load-bearing for every request, not just the new role:
+            # User.managed_branches loads eagerly (selectin), so a missing table
+            # fails *any* query that touches a user — including login. Without
+            # this the deploy is a full outage rather than one broken feature.
+            if 'regional_manager_branches' not in existing_tables:
+                from app.models.user import regional_manager_branches
+                regional_manager_branches.create(db.engine)
+                app.logger.info('Auto-migration: created regional_manager_branches table')
+
+            # Staff-to-staff issues (distinct from member complaints).
+            if 'issues' not in existing_tables:
+                from app.models.issue import Issue
+                Issue.__table__.create(db.engine)
+                app.logger.info('Auto-migration: created issues table')
+
             # Add gym_id column to users table if missing
             if 'users' in existing_tables:
                 columns = [col['name'] for col in inspector.get_columns('users')]
@@ -195,6 +212,32 @@ def _ensure_db_schema(app):
                     app.logger.info(
                         f'Auto-migration: normalised {len(stray)} expense category value(s): {stray}'
                     )
+
+            # Backfill indexes the models declare but that existing (already
+            # created) tables predate — complaints.customer_id gets scanned
+            # by every "this customer's complaints" lookup, and
+            # daily_closings.closed_by by every "this staffer's closings" one.
+            if 'complaints' in existing_tables:
+                indexed_columns = {
+                    col for idx in inspector.get_indexes('complaints') for col in idx['column_names']
+                }
+                if 'customer_id' not in indexed_columns:
+                    db.session.execute(text(
+                        'CREATE INDEX ix_complaints_customer_id ON complaints (customer_id)'
+                    ))
+                    db.session.commit()
+                    app.logger.info('Auto-migration: added index on complaints.customer_id')
+
+            if 'daily_closings' in existing_tables:
+                indexed_columns = {
+                    col for idx in inspector.get_indexes('daily_closings') for col in idx['column_names']
+                }
+                if 'closed_by' not in indexed_columns:
+                    db.session.execute(text(
+                        'CREATE INDEX ix_daily_closings_closed_by ON daily_closings (closed_by)'
+                    ))
+                    db.session.commit()
+                    app.logger.info('Auto-migration: added index on daily_closings.closed_by')
         except Exception as e:
             app.logger.warning(f'Schema migration check: {e}')
 

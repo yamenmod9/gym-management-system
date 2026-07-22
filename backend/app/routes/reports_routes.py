@@ -9,11 +9,14 @@ from app.models.transaction import PaymentMethod, TransactionType
 from app.models.subscription import SubscriptionStatus
 from app.models.complaint import ComplaintStatus
 from app.models.expense import ExpenseStatus
-from app.utils import success_response, error_response, get_current_user, role_required, get_current_gym_id
+from app.utils import (
+    success_response, error_response, get_current_user, role_required,
+    get_current_gym_id, get_accessible_branch_ids, scope_query_to_branches
+)
 from app.models.user import UserRole
 from app.extensions import db
 from datetime import date, datetime, timedelta
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from collections import defaultdict
 
 reports_bp = Blueprint('reports', __name__, url_prefix='/api/reports')
@@ -21,11 +24,11 @@ reports_bp = Blueprint('reports', __name__, url_prefix='/api/reports')
 
 @reports_bp.route('/revenue', methods=['GET'])
 @jwt_required()
-@role_required([UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT, UserRole.ACCOUNTANT])
+@role_required([UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT, UserRole.ACCOUNTANT, UserRole.BRANCH_MANAGER])
 def get_revenue_report():
     """
     Revenue report with breakdown by branch, service, and payment method
-    
+
     Query params:
         - branch_id: Filter by specific branch
         - date_from: Start date (YYYY-MM-DD)
@@ -34,17 +37,14 @@ def get_revenue_report():
     branch_id = request.args.get('branch_id', type=int)
     date_from = request.args.get('date_from')
     date_to = request.args.get('date_to')
-    
+
     current_user = get_current_user()
-    
+
     # Build query
     query = Transaction.query
-    
+
     # Role-based filtering
-    if current_user.role == UserRole.BRANCH_ACCOUNTANT:
-        query = query.filter(Transaction.branch_id == current_user.branch_id)
-    elif branch_id:
-        query = query.filter(Transaction.branch_id == branch_id)
+    query = scope_query_to_branches(query, Transaction.branch_id, current_user, branch_id)
     
     # Date range
     if date_from:
@@ -173,10 +173,7 @@ def get_daily_report():
     )
     
     # Role-based filtering
-    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        query = query.filter(Transaction.branch_id == current_user.branch_id)
-    elif branch_id:
-        query = query.filter(Transaction.branch_id == branch_id)
+    query = scope_query_to_branches(query, Transaction.branch_id, current_user, branch_id)
 
     transactions = query.all()
     
@@ -201,10 +198,7 @@ def get_daily_report():
         func.date(Subscription.start_date) == report_date
     )
     
-    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        sub_query = sub_query.filter(Subscription.branch_id == current_user.branch_id)
-    elif branch_id:
-        sub_query = sub_query.filter(Subscription.branch_id == branch_id)
+    sub_query = scope_query_to_branches(sub_query, Subscription.branch_id, current_user, branch_id)
     
     new_subscriptions = sub_query.count()
     
@@ -268,10 +262,7 @@ def get_weekly_report():
     )
     
     # Role-based filtering
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        query = query.filter(Transaction.branch_id == current_user.branch_id)
-    elif branch_id:
-        query = query.filter(Transaction.branch_id == branch_id)
+    query = scope_query_to_branches(query, Transaction.branch_id, current_user, branch_id)
     
     transactions = query.all()
     
@@ -337,17 +328,14 @@ def get_monthly_report():
         )
     )
     
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        query = query.filter(Transaction.branch_id == current_user.branch_id)
-    elif branch_id:
-        query = query.filter(Transaction.branch_id == branch_id)
-    
+    query = scope_query_to_branches(query, Transaction.branch_id, current_user, branch_id)
+
     transactions = query.all()
-    
+
     # Calculate metrics
     total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
     total_transactions = len(transactions)
-    
+
     # New subscriptions this month
     sub_query = Subscription.query.filter(
         and_(
@@ -355,19 +343,13 @@ def get_monthly_report():
             Subscription.start_date <= month_end.date()
         )
     )
-    
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        sub_query = sub_query.filter(Subscription.branch_id == current_user.branch_id)
-    elif branch_id:
-        sub_query = sub_query.filter(Subscription.branch_id == branch_id)
-    
+
+    sub_query = scope_query_to_branches(sub_query, Subscription.branch_id, current_user, branch_id)
+
     new_subscriptions = sub_query.count()
     active_subscriptions = Subscription.query.filter_by(status=SubscriptionStatus.ACTIVE)
-    
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        active_subscriptions = active_subscriptions.filter(Subscription.branch_id == current_user.branch_id)
-    elif branch_id:
-        active_subscriptions = active_subscriptions.filter(Subscription.branch_id == branch_id)
+
+    active_subscriptions = scope_query_to_branches(active_subscriptions, Subscription.branch_id, current_user, branch_id)
     
     active_subscriptions_count = active_subscriptions.count()
     
@@ -451,10 +433,7 @@ def get_revenue_trend():
             Branch.gym_id == gym_id
         )
 
-    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        query = query.filter(Transaction.branch_id == current_user.branch_id)
-    elif branch_id:
-        query = query.filter(Transaction.branch_id == branch_id)
+    query = scope_query_to_branches(query, Transaction.branch_id, current_user, branch_id)
 
     revenue_by_bucket = defaultdict(float)
     count_by_bucket = defaultdict(int)
@@ -534,11 +513,7 @@ def get_expenses_by_category():
             Branch.gym_id == gym_id
         )
 
-    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER,
-                                 UserRole.CENTRAL_ACCOUNTANT, UserRole.ACCOUNTANT]:
-        query = query.filter(Expense.branch_id == current_user.branch_id)
-    elif branch_id:
-        query = query.filter(Expense.branch_id == branch_id)
+    query = scope_query_to_branches(query, Expense.branch_id, current_user, branch_id)
 
     if date_from:
         try:
@@ -622,42 +597,72 @@ def get_branch_comparison():
         branch_query = branch_query.filter_by(gym_id=gym_id)
 
     # Branch managers get the same report scoped to their own branch — never a
-    # view of peer branches' revenue.
-    if current_user.role == UserRole.BRANCH_MANAGER:
-        if not current_user.branch_id:
+    # view of peer branches' revenue. Regional managers see their branch group.
+    accessible = get_accessible_branch_ids(current_user)
+    if accessible is not None:
+        if not accessible:
             return success_response([])
-        branch_query = branch_query.filter(Branch.id == current_user.branch_id)
+        branch_query = branch_query.filter(Branch.id.in_(accessible))
 
     branches = branch_query.all()
+    branch_ids = [b.id for b in branches]
 
     branch_data = []
-    
-    for branch in branches:
-        # Revenue
-        transactions = Transaction.query.filter(
-            and_(
-                Transaction.branch_id == branch.id,
-                Transaction.created_at >= datetime.combine(month_start.date(), datetime.min.time()),
-                Transaction.created_at <= datetime.combine(month_end.date(), datetime.max.time())
-            )
-        ).all()
-        
-        revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
 
-        # Customers
-        customers = Customer.query.filter_by(branch_id=branch.id, is_active=True).count()
-        
-        # Active subscriptions
-        active_subs = Subscription.query.filter_by(
-            branch_id=branch.id,
-            status=SubscriptionStatus.ACTIVE
-        ).count()
-        
-        # Complaints
+    if branch_ids:
         from app.models import Complaint
-        from app.models.complaint import ComplaintStatus
-        complaints = Complaint.query.filter_by(branch_id=branch.id).count()
-        open_complaints = Complaint.query.filter_by(branch_id=branch.id, status=ComplaintStatus.OPEN).count()
+
+        window_start = datetime.combine(month_start.date(), datetime.min.time())
+        window_end = datetime.combine(month_end.date(), datetime.max.time())
+
+        revenue_by_branch = dict(
+            db.session.query(
+                Transaction.branch_id,
+                func.sum(Transaction.amount - func.coalesce(Transaction.discount, 0))
+            ).filter(
+                Transaction.branch_id.in_(branch_ids),
+                Transaction.created_at >= window_start,
+                Transaction.created_at <= window_end,
+            ).group_by(Transaction.branch_id).all()
+        )
+
+        customers_by_branch = dict(
+            db.session.query(Customer.branch_id, func.count(Customer.id))
+            .filter(Customer.branch_id.in_(branch_ids), Customer.is_active == True)
+            .group_by(Customer.branch_id).all()
+        )
+
+        active_subs_by_branch = dict(
+            db.session.query(Subscription.branch_id, func.count(Subscription.id))
+            .filter(Subscription.branch_id.in_(branch_ids), Subscription.status == SubscriptionStatus.ACTIVE)
+            .group_by(Subscription.branch_id).all()
+        )
+
+        complaints_by_branch = dict(
+            db.session.query(Complaint.branch_id, func.count(Complaint.id))
+            .filter(Complaint.branch_id.in_(branch_ids))
+            .group_by(Complaint.branch_id).all()
+        )
+
+        open_complaints_by_branch = dict(
+            db.session.query(Complaint.branch_id, func.count(Complaint.id))
+            .filter(Complaint.branch_id.in_(branch_ids), Complaint.status == ComplaintStatus.OPEN)
+            .group_by(Complaint.branch_id).all()
+        )
+
+        staff_by_branch = dict(
+            db.session.query(User.branch_id, func.count(User.id))
+            .filter(User.branch_id.in_(branch_ids), User.is_active == True)
+            .group_by(User.branch_id).all()
+        )
+
+    for branch in branches:
+        revenue = float(revenue_by_branch.get(branch.id) or 0)
+        customers = customers_by_branch.get(branch.id, 0)
+        active_subs = active_subs_by_branch.get(branch.id, 0)
+        complaints = complaints_by_branch.get(branch.id, 0)
+        open_complaints = open_complaints_by_branch.get(branch.id, 0)
+        staff_count = staff_by_branch.get(branch.id, 0)
 
         # Calculate performance score (simple metric)
         performance_score = min(100, int(
@@ -665,9 +670,6 @@ def get_branch_comparison():
             (revenue / 100000 * 30) +  # Revenue factor
             (max(0, 20 - open_complaints * 2))  # Penalty for complaints
         ))
-        
-        # Staff count
-        staff_count = User.query.filter_by(branch_id=branch.id, is_active=True).count()
 
         branch_data.append({
             'id': branch.id,
@@ -710,14 +712,18 @@ def get_employee_performance():
     month_str = request.args.get('month')
     
     current_user = get_current_user()
-    
-    # Branch managers can only see their branch
+
+    # Branch managers can only see their branch; regional managers their group
+    accessible = get_accessible_branch_ids(current_user)
     if current_user.role == UserRole.BRANCH_MANAGER:
         branch_id = current_user.branch_id
+    elif accessible is not None and branch_id and branch_id not in accessible:
+        return error_response('Access denied to this branch', 403)
 
     gym_id = get_current_gym_id(current_user)
 
-    if not branch_id and current_user.role not in [UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.CENTRAL_ACCOUNTANT]:
+    if (not branch_id and accessible is None
+            and current_user.role not in [UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.CENTRAL_ACCOUNTANT]):
         return error_response('branch_id is required', 400)
     
     if start_str and end_str:
@@ -754,7 +760,9 @@ def get_employee_performance():
     
     if branch_id:
         staff_query = staff_query.filter_by(branch_id=branch_id)
-    
+    elif accessible is not None:
+        staff_query = staff_query.filter(User.branch_id.in_(accessible))
+
     staff_members = staff_query.all()
     
     performance_data = []
@@ -772,54 +780,83 @@ def get_employee_performance():
         transactions_count = len(transactions)
         total_revenue = float(sum(float(t.amount) - float(t.discount or 0) for t in transactions))
 
-        # Share of this staff member's sales that were renewals rather than new
-        # business. Null rather than 0 when they sold nothing in the window, so
-        # "no sales" never renders as "0% renewals".
+        # Renewal rate = renewals / membership sales (new signups + renewals).
+        #
+        # The old version divided renewals by *every* transaction, so a protein
+        # shake or a freeze fee dragged the rate down — a made-up number. The
+        # honest question is "of the memberships this person sold, how many were
+        # repeat business rather than brand-new signups", so only SUBSCRIPTION
+        # and RENEWAL transactions belong in the denominator. Null when they
+        # sold no memberships at all, so "no sales" never reads as "0%".
+        new_sub_count = sum(
+            1 for t in transactions if t.transaction_type == TransactionType.SUBSCRIPTION
+        )
         renewals_count = sum(
             1 for t in transactions if t.transaction_type == TransactionType.RENEWAL
         )
+        membership_sales = new_sub_count + renewals_count
         renewal_rate = (
-            renewals_count / transactions_count * 100 if transactions_count else None
+            renewals_count / membership_sales * 100 if membership_sales else None
         )
 
-        # Retention: of the customers this staff member signed up during the
-        # window, how many still hold an active subscription now. Attribution is
-        # via Subscription.created_by, so it credits whoever filed the signup.
-        signed_customer_ids = {
-            row[0]
-            for row in db.session.query(Subscription.customer_id).filter(
-                and_(
-                    Subscription.created_by == staff.id,
-                    Subscription.created_at >= datetime.combine(month_start.date(), datetime.min.time()),
-                    Subscription.created_at <= datetime.combine(month_end.date(), datetime.max.time())
-                )
-            ).distinct()
-        }
-        if signed_customer_ids:
-            retained_customer_ids = {
-                row[0]
-                for row in db.session.query(Subscription.customer_id).filter(
-                    and_(
-                        Subscription.customer_id.in_(signed_customer_ids),
-                        Subscription.status == SubscriptionStatus.ACTIVE
+        # Retention rate = of the subscriptions this staff member opened in the
+        # window that have SINCE ENDED, how many the same member came back from.
+        #
+        # The old version asked "does this customer have any active subscription
+        # right now" — but a member who signed up last week is trivially still
+        # active, so it climbed toward 100% and measured nothing. Real retention
+        # can only be judged once a subscription has had the chance to lapse, so
+        # the denominator is subscriptions whose end_date has already passed, and
+        # the numerator is those whose member holds a later or currently-active
+        # subscription. Null until at least one has ended — not a fake 100%.
+        created_subs = Subscription.query.filter(
+            and_(
+                Subscription.created_by == staff.id,
+                Subscription.created_at >= datetime.combine(month_start.date(), datetime.min.time()),
+                Subscription.created_at <= datetime.combine(month_end.date(), datetime.max.time())
+            )
+        ).all()
+
+        report_today = date.today()
+        ended_subs = [s for s in created_subs if s.end_date and s.end_date < report_today]
+        retained = 0
+        if ended_subs:
+            # One query for every candidate "came back" subscription across
+            # this staffer's ended subs, instead of one query per ended sub.
+            customer_ids = list({s.customer_id for s in ended_subs})
+            candidates_by_customer = defaultdict(list)
+            for cs in Subscription.query.filter(Subscription.customer_id.in_(customer_ids)).all():
+                candidates_by_customer[cs.customer_id].append(cs)
+
+            for sub in ended_subs:
+                came_back = any(
+                    cs.id != sub.id and (
+                        cs.start_date >= sub.end_date or cs.status == SubscriptionStatus.ACTIVE
                     )
-                ).distinct()
-            }
-            retention_rate = len(retained_customer_ids) / len(signed_customer_ids) * 100
-        else:
-            retention_rate = None
+                    for cs in candidates_by_customer.get(sub.customer_id, [])
+                )
+                if came_back:
+                    retained += 1
+        retention_rate = (retained / len(ended_subs) * 100) if ended_subs else None
 
         performance_data.append({
             'staff_id': staff.id,
+            'id': staff.id,
             'staff_name': staff.username,
             'full_name': staff.full_name,
+            'email': staff.email,
+            'phone': staff.phone,
             'role': staff.role.value,
+            'is_active': staff.is_active,
+            'branch_id': staff.branch_id,
             'branch_name': staff.branch.name if staff.branch else 'N/A',
             'transactions_count': transactions_count,
             'total_revenue': total_revenue,
+            'new_subscriptions': new_sub_count,
             'renewals_count': renewals_count,
             'renewal_rate': renewal_rate,
-            'customers_signed': len(signed_customer_ids),
+            'customers_signed': len(created_subs),
+            'subscriptions_ended': len(ended_subs),
             'retention_rate': retention_rate
         })
     

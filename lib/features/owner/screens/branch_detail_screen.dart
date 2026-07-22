@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../shared/widgets/skeleton_loader.dart';
-import '../../../shared/widgets/stat_card.dart';
+import '../../../shared/widgets/dashboard_shell.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../core/api/api_service.dart';
 import '../../../core/api/api_endpoints.dart';
 import '../../../core/localization/app_strings.dart';
+import '../../reception/screens/customers_list_screen.dart';
 
+/// Full drill-down into one branch, opened from the owner's and regional
+/// manager's branch lists. Everything the branch holds is reachable from
+/// here: headline numbers, the member roster (tap-through to the same
+/// customer detail the front desk uses), revenue by service, staff and
+/// daily operations.
 class BranchDetailScreen extends StatefulWidget {
   final int branchId;
   final String branchName;
@@ -21,7 +27,8 @@ class BranchDetailScreen extends StatefulWidget {
   State<BranchDetailScreen> createState() => _BranchDetailScreenState();
 }
 
-class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTickerProviderStateMixin {
+class _BranchDetailScreenState extends State<BranchDetailScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = true;
   Map<String, dynamic>? _branchData;
@@ -30,7 +37,7 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadBranchData();
   }
 
@@ -89,10 +96,11 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
           controller: _tabController,
           isScrollable: true,
           tabs: [
-            Tab(text: S.overview, icon: Icon(Icons.dashboard)),
-            Tab(text: S.revenue, icon: Icon(Icons.attach_money)),
-            Tab(text: S.staff, icon: Icon(Icons.people)),
-            Tab(text: S.operations, icon: Icon(Icons.settings)),
+            Tab(text: S.overview),
+            Tab(text: S.members),
+            Tab(text: S.revenue),
+            Tab(text: S.staff),
+            Tab(text: S.operations),
           ],
         ),
       ),
@@ -127,6 +135,7 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
                   controller: _tabController,
                   children: [
                     _buildOverviewTab(),
+                    _buildMembersTab(),
                     _buildRevenueTab(),
                     _buildStaffTab(),
                     _buildOperationsTab(),
@@ -135,83 +144,88 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
     );
   }
 
+  // ─── OVERVIEW ────────────────────────────────────────────────────────
+
   Widget _buildOverviewTab() {
     final data = _branchData ?? {};
+    final accent = Theme.of(context).colorScheme.primary;
     final totalRevenue = (data['total_revenue'] ?? 0).toDouble();
     final totalCustomers = data['total_customers'] ?? 0;
     final activeSubscriptions = data['active_subscriptions'] ?? 0;
-    final capacity = data['capacity'] ?? 0;
+    final checkIns = data['check_ins_count'] ?? 0;
+    final newCustomers = data['new_customers'] ?? 0;
+    final openComplaints = data['open_complaints'] ?? 0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Key Metrics
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.4,
-            children: [
-              StatCard(
-                title: S.totalRevenue,
+          DashKpiGrid(cards: [
+            DashKpiCard(
+                label: S.totalRevenue,
                 value: NumberHelper.formatCurrency(totalRevenue),
                 icon: Icons.attach_money,
-                color: Colors.green,
-              ),
-              StatCard(
-                title: S.totalCustomers,
+                iconColor: accent),
+            DashKpiCard(
+                label: S.totalCustomers,
                 value: NumberHelper.formatNumber(totalCustomers),
                 icon: Icons.people,
-                color: Colors.blue,
-              ),
-              StatCard(
-                title: S.activeSubscriptions,
+                iconColor: DashColors.blue),
+            DashKpiCard(
+                label: S.activeSubs,
                 value: NumberHelper.formatNumber(activeSubscriptions),
                 icon: Icons.card_membership,
-                color: Colors.purple,
-              ),
-              StatCard(
-                title: S.capacity,
-                value: NumberHelper.formatNumber(capacity),
-                icon: Icons.fitness_center,
-                color: Colors.orange,
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Additional Info
-          Text(
-            S.branchInformation,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildInfoRow(S.branchId, '#${widget.branchId}'),
-                  const Divider(),
-                  _buildInfoRow(S.branchName, widget.branchName),
-                  const Divider(),
-                  _buildInfoRow(S.status, data['status'] ?? S.active),
-                  if (data['address'] != null) ...[
-                    const Divider(),
-                    _buildInfoRow(S.address, data['address']),
-                  ],
+                iconColor: DashColors.emerald,
+                valueColor: DashColors.emerald),
+            DashKpiCard(
+                label: S.checkInsThisMonth,
+                value: NumberHelper.formatNumber(checkIns),
+                icon: Icons.login,
+                iconColor: DashColors.amber),
+            DashKpiCard(
+                label: S.newCustomers,
+                value: NumberHelper.formatNumber(newCustomers),
+                icon: Icons.person_add,
+                iconColor: DashColors.blue),
+            DashKpiCard(
+                label: S.openComplaints,
+                value: NumberHelper.formatNumber(openComplaints),
+                icon: Icons.report_problem,
+                iconColor: openComplaints > 0 ? Colors.red : DashColors.emerald),
+          ]),
+          const SizedBox(height: 20),
+          DashSectionCard(
+            title: S.branchInformation,
+            accent: accent,
+            child: Column(
+              children: [
+                _buildInfoRow(S.branchId, '#${widget.branchId}'),
+                const Divider(height: 20),
+                _buildInfoRow(S.branchName, widget.branchName),
+                const Divider(height: 20),
+                _buildInfoRow(S.status, data['status'] ?? S.active),
+                if (data['address'] != null) ...[
+                  const Divider(height: 20),
+                  _buildInfoRow(S.address, data['address']),
                 ],
-              ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+
+  // ─── MEMBERS ─────────────────────────────────────────────────────────
+
+  // The exact member list the front desk and branch manager use, scoped to
+  // this branch — so every role sees identical member information, with the
+  // same tap-through to full member detail.
+  Widget _buildMembersTab() =>
+      CustomersListScreen(branchId: widget.branchId, embedded: true);
+
+  // ─── REVENUE ─────────────────────────────────────────────────────────
 
   Widget _buildRevenueTab() {
     final data = _branchData ?? {};
@@ -237,13 +251,15 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
         children: [
           Text(
             S.revenueByService,
-            style: Theme.of(context).textTheme.titleLarge,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 12),
           if (revenueByService.isEmpty)
             Card(
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Center(child: Text(S.noRevenueData)),
               ),
             )
@@ -251,23 +267,23 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
             ...revenueByService.map<Widget>((service) {
               final name = service['service_name'] ?? service['name'] ?? 'Unknown';
               final revenue = (service['revenue'] ?? 0).toDouble();
-              final customers = service['customers'] ?? service['customer_count'] ?? 0;
 
               return Card(
-                margin: const EdgeInsets.only(bottom: 12),
+                margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
+                  dense: true,
                   leading: Icon(
                     Icons.fitness_center,
+                    size: 20,
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   title: Text(name),
-                  subtitle: Text(S.customersCount(customers as int)),
                   trailing: Text(
                     NumberHelper.formatCurrency(revenue),
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.green,
-                      fontSize: 16,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -277,6 +293,8 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
       ),
     );
   }
+
+  // ─── STAFF ───────────────────────────────────────────────────────────
 
   Widget _buildStaffTab() {
     final data = _branchData ?? {};
@@ -289,20 +307,22 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
         children: [
           Text(
             S.branchStaff,
-            style: Theme.of(context).textTheme.titleLarge,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 12),
           if (staff.isEmpty)
             Card(
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Center(child: Text(S.noStaffData)),
               ),
             )
           else
             ...staff.map<Widget>((member) {
               final name = member['staff_name'] ?? member['name'] ?? member['full_name'] ?? 'Unknown';
-              final role = member['role'] ?? 'Staff';
+              final role = (member['role'] ?? 'Staff').toString().replaceAll('_', ' ');
               final isActive = member['is_active'] ?? true;
               final revenue = (member['total_revenue'] ?? 0).toDouble();
               final txCount = member['transactions_count'] ?? 0;
@@ -310,11 +330,15 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
+                  dense: true,
                   leading: CircleAvatar(
+                    radius: 18,
                     child: Text(name[0].toUpperCase()),
                   ),
-                  title: Text(name),
-                  subtitle: Text('$role • ${S.txCount(txCount as int)}'),
+                  title: Text(name,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('$role • ${S.txCount(txCount as int)}',
+                      style: const TextStyle(fontSize: 12)),
                   trailing: revenue > 0
                       ? Text(
                           NumberHelper.formatCurrency(revenue),
@@ -323,11 +347,21 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
                             color: Colors.green,
                           ),
                         )
-                      : Chip(
-                          label: Text(isActive ? S.active : S.inactive),
-                          backgroundColor: isActive
-                              ? Colors.green.withValues(alpha: 0.2)
-                              : Colors.red.withValues(alpha: 0.2),
+                      : Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? Colors.green.withValues(alpha: 0.12)
+                                : Colors.red.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            isActive ? S.active : S.inactive,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: isActive ? Colors.green : Colors.red),
+                          ),
                         ),
                 ),
               );
@@ -337,63 +371,45 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> with SingleTick
     );
   }
 
+  // ─── OPERATIONS ──────────────────────────────────────────────────────
+
   Widget _buildOperationsTab() {
     final data = _branchData ?? {};
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            S.dailyOperations,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildInfoRow(S.checkInsThisMonth, (data['check_ins_count'] ?? 0).toString()),
-                  const Divider(),
-                  _buildInfoRow(S.activeSubscriptions, (data['active_subscriptions'] ?? 0).toString()),
-                  const Divider(),
-                  _buildInfoRow(S.openComplaints, (data['open_complaints'] ?? 0).toString()),
-                  const Divider(),
-                  _buildInfoRow(S.expiredThisMonth, (data['expired_subscriptions'] ?? 0).toString()),
-                  const Divider(),
-                  _buildInfoRow(S.frozenSubscriptions, (data['frozen_subscriptions'] ?? 0).toString()),
-                  const Divider(),
-                  _buildInfoRow(S.newCustomers, (data['new_customers'] ?? 0).toString()),
-                ],
-              ),
-            ),
-          ),
-        ],
+      child: DashSectionCard(
+        title: S.dailyOperations,
+        accent: Theme.of(context).colorScheme.primary,
+        child: Column(
+          children: [
+            _buildInfoRow(S.checkInsThisMonth, (data['check_ins_count'] ?? 0).toString()),
+            const Divider(height: 20),
+            _buildInfoRow(S.activeSubscriptions, (data['active_subscriptions'] ?? 0).toString()),
+            const Divider(height: 20),
+            _buildInfoRow(S.openComplaints, (data['open_complaints'] ?? 0).toString()),
+            const Divider(height: 20),
+            _buildInfoRow(S.expiredThisMonth, (data['expired_subscriptions'] ?? 0).toString()),
+            const Divider(height: 20),
+            _buildInfoRow(S.frozenSubscriptions, (data['frozen_subscriptions'] ?? 0).toString()),
+            const Divider(height: 20),
+            _buildInfoRow(S.newCustomers, (data['new_customers'] ?? 0).toString()),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 16),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 14)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        ),
+      ],
     );
   }
 }

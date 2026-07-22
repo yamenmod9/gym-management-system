@@ -10,6 +10,7 @@ from .subscription import Subscription, SubscriptionStatus
 from .transaction import Transaction, PaymentMethod, TransactionType
 from .expense import Expense, ExpenseStatus
 from .complaint import Complaint, ComplaintType, ComplaintStatus
+from .issue import Issue, IssueStatus, IssuePriority
 from .freeze_history import FreezeHistory
 from .daily_closing import DailyClosing
 from .fingerprint import Fingerprint
@@ -36,6 +37,9 @@ __all__ = [
     'Complaint',
     'ComplaintType',
     'ComplaintStatus',
+    'Issue',
+    'IssueStatus',
+    'IssuePriority',
     'FreezeHistory',
     'DailyClosing',
     'Fingerprint',

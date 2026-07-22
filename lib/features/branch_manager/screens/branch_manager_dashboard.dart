@@ -6,7 +6,13 @@ import '../../../core/providers/gym_branding_provider.dart';
 import '../../../shared/widgets/skeleton_loader.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../shared/widgets/dashboard_shell.dart';
+import '../../../shared/widgets/dash_charts.dart';
 import '../../../core/utils/helpers.dart';
+import '../../finance/screens/money_management_view.dart';
+import '../../owner/widgets/add_staff_dialog.dart';
+import '../../owner/widgets/staff_actions.dart';
+import '../../reception/screens/customers_list_screen.dart';
+import '../../issues/screens/issues_screen.dart';
 import '../providers/branch_manager_provider.dart';
 import 'branch_manager_settings_screen.dart';
 
@@ -28,7 +34,8 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
     });
   }
 
-  static List<String> get _titles => [S.overview, S.staff, S.complaints];
+  static List<String> get _titles =>
+      [S.overview, S.members, S.staff, S.moneyManagement, S.complaints, S.issues];
 
   @override
   Widget build(BuildContext context) {
@@ -60,8 +67,11 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
       pageSub: _selectedIndex == 0 ? S.performanceOverview : null,
       navItems: [
         DashNavItem(Icons.dashboard_outlined, S.overview),
-        DashNavItem(Icons.people_outline, S.staff),
+        DashNavItem(Icons.people_outline, S.members),
+        DashNavItem(Icons.badge_outlined, S.staff),
+        DashNavItem(Icons.account_balance_wallet_outlined, S.moneyManagement),
         DashNavItem(Icons.report_problem_outlined, S.complaints),
+        DashNavItem(Icons.flag_outlined, S.issues),
       ],
       actions: [
         DashIconAction(
@@ -78,18 +88,71 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
         ),
       ],
       onLogout: authProvider.logout,
+      floatingActionButton: _selectedIndex == 2
+          ? FloatingActionButton.extended(
+              onPressed: () => _showAddStaffDialog(context),
+              icon: const Icon(Icons.person_add),
+              label: Text(S.addStaff),
+              backgroundColor: Colors.green,
+            )
+          : null,
       body: body,
     );
   }
 
   Widget _buildCurrentTab(BuildContext context, BranchManagerProvider provider, AuthProvider authProvider) {
-    if (_selectedIndex == 0) {
-      return _buildOverviewTab(context, provider, authProvider);
-    } else if (_selectedIndex == 1) {
-      return _buildStaffTab(provider);
-    } else {
-      return _buildComplaintsTab(provider);
+    switch (_selectedIndex) {
+      case 0:
+        return _buildOverviewTab(context, provider, authProvider);
+      case 1:
+        // Members: the same customer console the front desk uses, scoped
+        // server-side to this manager's branch.
+        return const CustomersListScreen();
+      case 2:
+        return _buildStaffTab(provider);
+      case 3:
+        return _buildMoneyTab(context, provider, authProvider);
+      case 4:
+        return _buildComplaintsTab(provider);
+      case 5:
+        return const IssuesScreen(embedded: true);
+      default:
+        return const SizedBox();
     }
+  }
+
+  Widget _buildMoneyTab(BuildContext context, BranchManagerProvider provider,
+      AuthProvider authProvider) {
+    final performance = provider.branchPerformance ?? {};
+    final earnings = (performance['total_revenue'] ?? 0).toDouble();
+    final branchId = int.tryParse(authProvider.branchId ?? '');
+
+    return MoneyManagementView(
+      earnings: earnings,
+      expenses: provider.expenses,
+      categoryTotals: provider.expensesByCategory,
+      branches: branchId != null
+          ? [
+              {'id': branchId, 'name': S.branchManagerRole}
+            ]
+          : const [],
+      defaultBranchId: branchId,
+      canReview: true,
+      onRefresh: () => provider.refresh(),
+    );
+  }
+
+  void _showAddStaffDialog(BuildContext context) {
+    final provider = context.read<BranchManagerProvider>();
+    final creatorRole = context.read<AuthProvider>().userRole;
+    showDialog(
+      context: context,
+      builder: (_) => AddStaffDialog(
+        apiService: provider.apiService,
+        creatorRole: creatorRole,
+        onStaffCreated: () => provider.refresh(),
+      ),
+    );
   }
 
   Widget _buildOverviewTab(BuildContext context, BranchManagerProvider provider,
@@ -142,6 +205,18 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
                 icon: expiringCount > 0 ? Icons.timer_off : Icons.report_problem,
                 iconColor: DashColors.amber),
           ]),
+          const SizedBox(height: 20),
+          DashRevenueTrendCard(
+            points: provider.revenueTrend,
+            period: provider.trendPeriod,
+            onPeriodChanged: provider.setTrendPeriod,
+            accent: accent,
+          ),
+          const SizedBox(height: 20),
+          DashExpenseCategoryCard(
+            categories: provider.expensesByCategory,
+            accent: accent,
+          ),
         ],
       ),
     );
@@ -295,6 +370,12 @@ class _BranchManagerDashboardState extends State<BranchManagerDashboard> {
                         ],
                       ],
                     ),
+                  ),
+                  StaffActions(
+                    staff: Map<String, dynamic>.from(member as Map),
+                    apiService: provider.apiService,
+                    viewerRole: context.read<AuthProvider>().userRole,
+                    onChanged: () => provider.loadDashboardData(),
                   ),
                 ],
               ),

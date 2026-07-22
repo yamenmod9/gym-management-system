@@ -15,6 +15,10 @@ class BranchManagerProvider extends ChangeNotifier {
   List<dynamic> _complaints = [];
   Map<String, dynamic>? _revenueByService;
   Map<String, dynamic>? _dailyOperations;
+  List<dynamic> _expenses = [];
+  List<dynamic> _expensesByCategory = [];
+  List<dynamic> _revenueTrend = [];
+  String _trendPeriod = 'daily';
 
   BranchManagerProvider(this._apiService, this.branchId);
 
@@ -27,6 +31,7 @@ class BranchManagerProvider extends ChangeNotifier {
   }
 
   // Getters
+  ApiService get apiService => _apiService;
   bool get isLoading => _isLoading;
   String? get error => _error;
   Map<String, dynamic>? get branchPerformance => _branchPerformance;
@@ -35,6 +40,19 @@ class BranchManagerProvider extends ChangeNotifier {
   List<dynamic> get complaints => _complaints;
   Map<String, dynamic>? get revenueByService => _revenueByService;
   Map<String, dynamic>? get dailyOperations => _dailyOperations;
+  List<dynamic> get expenses => _expenses;
+  List<dynamic> get expensesByCategory => _expensesByCategory;
+  List<dynamic> get revenueTrend => _revenueTrend;
+  String get trendPeriod => _trendPeriod;
+
+  /// Switches the revenue trend between daily/weekly/monthly buckets.
+  Future<void> setTrendPeriod(String period) async {
+    if (period == _trendPeriod) return;
+    _trendPeriod = period;
+    notifyListeners();
+    await _loadRevenueTrend();
+    notifyListeners();
+  }
 
   Future<void> loadDashboardData() async {
     _isLoading = true;
@@ -46,6 +64,9 @@ class BranchManagerProvider extends ChangeNotifier {
         _loadBranchManagerDashboard(),
         _loadComplaints(),
         _loadStaff(),
+        _loadExpenses(),
+        _loadExpensesByCategory(),
+        _loadRevenueTrend(),
       ]);
       _error = null;
     } catch (e) {
@@ -280,6 +301,64 @@ class BranchManagerProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('⚠️ Daily operations failed: $e');
+    }
+  }
+
+  /// Expense rows for the money tab (scoped server-side to this branch).
+  Future<void> _loadExpenses() async {
+    try {
+      final response = await _apiService.get(
+        ApiEndpoints.financeExpenses,
+        queryParameters: {'branch_id': branchId, 'limit': 100},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] ?? response.data;
+        if (data is Map) {
+          _expenses = List<dynamic>.from(data['items'] ?? data['expenses'] ?? []);
+        } else if (data is List) {
+          _expenses = List<dynamic>.from(data);
+        }
+        debugPrint('✅ Branch expenses loaded: ${_expenses.length}');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Branch expenses failed: $e');
+      _expenses = [];
+    }
+  }
+
+  /// Approved spend per category, aggregated server-side.
+  Future<void> _loadExpensesByCategory() async {
+    try {
+      final response = await _apiService.get(
+        ApiEndpoints.reportsExpensesByCategory,
+        queryParameters: {'branch_id': branchId},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] ?? response.data;
+        _expensesByCategory = List<dynamic>.from(data['categories'] ?? []);
+        debugPrint('✅ Branch expense categories: ${_expensesByCategory.length}');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Branch expense categories failed: $e');
+      _expensesByCategory = [];
+    }
+  }
+
+  /// Revenue trend for this branch.
+  Future<void> _loadRevenueTrend() async {
+    try {
+      final response = await _apiService.get(
+        ApiEndpoints.reportsRevenueTrend,
+        queryParameters: {'period': _trendPeriod, 'branch_id': branchId},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] ?? response.data;
+        _revenueTrend = List<dynamic>.from(data['points'] ?? []);
+        debugPrint('✅ Branch revenue trend: ${_revenueTrend.length} points');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Branch revenue trend failed: $e');
+      _revenueTrend = [];
     }
   }
 

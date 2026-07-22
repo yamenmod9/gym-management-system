@@ -33,6 +33,7 @@ class S {
   static String get apply => _t('تطبيق', 'Apply');
   static String get clear => _t('مسح', 'Clear');
   static String get submit => _t('إرسال', 'Submit');
+  static String get send => _t('إرسال', 'Send');
   static String get ok => _t('حسناً', 'OK');
   static String get yes => _t('نعم', 'Yes');
   static String get no => _t('لا', 'No');
@@ -58,6 +59,28 @@ class S {
   static String get pending => _t('معلق', 'Pending');
   static String get approved => _t('موافق عليه', 'Approved');
   static String get change => _t('تغيير', 'Change');
+  static String get print => _t('طباعة', 'Print');
+  static String get share => _t('مشاركة', 'Share');
+
+  // ─── ISSUES (staff → staff) ─────────────────────────────────
+  static String get issuesInbox => _t('واردة إليّ', 'Inbox');
+  static String get issuesRaised => _t('التي رفعتها', 'Raised by me');
+  static String get raiseIssue => _t('رفع مشكلة', 'Raise an issue');
+  static String get noIssuesInbox => _t('لا توجد مشكلات مرفوعة إليك', 'No issues raised to you');
+  static String get noIssuesRaised => _t('لم ترفع أي مشكلة', 'You have not raised any issues');
+  static String get issueTitle => _t('عنوان المشكلة', 'Issue title');
+  static String get issueDescription => _t('وصف المشكلة', 'Describe the issue');
+  static String get priority => _t('الأولوية', 'Priority');
+  static String get priorityLow => _t('منخفضة', 'Low');
+  static String get priorityMedium => _t('متوسطة', 'Medium');
+  static String get priorityHigh => _t('عالية', 'High');
+  static String get assignToOptional => _t('توجيه إلى (اختياري)', 'Assign to (optional)');
+  static String get anyoneAbove => _t('أي مسؤول أعلى', 'Anyone above me');
+  static String get assignedTo => _t('موجهة إلى', 'Assigned to');
+  static String get resolutionNotes => _t('ملاحظات الحل', 'Resolution notes');
+  static String get statusOpen => _t('مفتوحة', 'Open');
+  static String get statusInProgress => _t('قيد المعالجة', 'In progress');
+  static String get statusResolved => _t('تم حلها', 'Resolved');
 
   // ─── LOGIN SCREEN ───────────────────────────────────────────
   static String get managementSystem => _t('نظام الإدارة', 'Management System');
@@ -283,6 +306,9 @@ class S {
 
   // ─── ADD STAFF DIALOG ──────────────────────────────────────
   static String get addNewStaff => _t('إضافة موظف جديد', 'Add new staff member');
+  static String get editStaffMember => _t('تعديل بيانات الموظف', 'Edit staff member');
+  static String get staffActivated => _t('تم تفعيل الموظف', 'Staff member activated');
+  static String get staffDeactivated => _t('تم إلغاء تفعيل الموظف', 'Staff member deactivated');
   static String get fullName => _t('الاسم الكامل', 'Full name');
   static String get fullNameRequired => _t('الاسم الكامل *', 'Full name *');
   static String get fullNameHint => _t('مثال: أحمد حسن', 'e.g. Ahmed Hassan');
@@ -300,10 +326,14 @@ class S {
   static String get phoneOptional => _t('الهاتف (اختياري)', 'Phone (optional)');
   static String get roleRequired => _t('الدور *', 'Role *');
   static String get branchManager => _t('مدير فرع', 'Branch manager');
+  static String get regionalManager => _t('مدير إقليمي', 'Regional manager');
+  static String get regionalAccountant => _t('محاسب إقليمي', 'Regional accountant');
   static String get frontDesk => _t('الاستقبال', 'Front desk');
   static String get branchAccountant => _t('محاسب فرع', 'Branch accountant');
   static String get centralAccountant => _t('محاسب مركزي', 'Central accountant');
   static String get branchRequired => _t('الفرع *', 'Branch *');
+  static String get managedBranchesRequired => _t('الفروع المُدارة *', 'Managed branches *');
+  static String get selectAtLeastOneBranch => _t('اختر فرعاً واحداً على الأقل', 'Select at least one branch');
   static String get noBranchesCreateFirst => _t('لا توجد فروع. أنشئ فرعاً أولاً.', 'No branches. Create one first.');
   static String get selectBranch => _t('اختر فرعاً', 'Select a branch');
   static String get creating => _t('جاري الإنشاء...', 'Creating...');
@@ -378,6 +408,9 @@ class S {
   static String get dailyClosing => _t('الإغلاق اليومي', 'Daily closing');
   static String get finalizeTodayTransactions => _t('إنهاء عمليات اليوم', 'Finalize today\'s transactions');
   static String get recordPayment => _t('تسجيل دفعة', 'Record payment');
+  static String get notesOptional => _t('ملاحظات', 'Notes');
+  static String get paymentRecorded2 => _t('تم تسجيل الدفعة', 'Payment recorded');
+  static String get failedToRecord => _t('فشل تسجيل الدفعة', 'Failed to record payment');
   static String get submitComplaint => _t('تقديم شكوى', 'Submit complaint');
   static String get dailyClosingConfirm => _t('هل أنت متأكد من إجراء الإغلاق اليومي؟ سيتم إنهاء جميع عمليات اليوم.', 'Are you sure you want to run the daily closing? This will finalize all of today\'s transactions.');
   static String get dailyClosingCompleted => _t('تم الإغلاق اليومي بنجاح', 'Daily closing completed successfully');
@@ -563,6 +596,7 @@ class S {
   static String get stop => _t('إيقاف', 'Stop');
   static String get subscriptionStopped => _t('تم إيقاف الاشتراك بنجاح', 'Subscription stopped successfully');
   static String get failedToStop => _t('فشل إيقاف الاشتراك', 'Failed to stop subscription');
+  static String get stopWillDeactivate => _t('سيؤدي هذا إلى إلغاء وصول العميل فوراً', 'This will immediately deactivate member access');
   static String get willDeactivateAccess => _t('سيتم إلغاء وصول العميل فوراً', 'The member\'s access will be revoked immediately');
 
   // ─── SUBMIT COMPLAINT DIALOG ───────────────────────────────
@@ -589,6 +623,28 @@ class S {
   // ─── BRANCH MANAGER SETTINGS ───────────────────────────────
   static String get manager => _t('المدير', 'Manager');
   static String get branchManagerRole => _t('مدير فرع', 'Branch manager');
+
+  // ─── REGIONAL MANAGER DASHBOARD ────────────────────────────
+  static String get regionalManagerRole => _t('مدير إقليمي', 'Regional manager');
+  static String get regionalManagerTitle => _t('لوحة المدير الإقليمي', 'Regional Manager Dashboard');
+  static String get yourBranches => _t('فروعك', 'Your branches');
+  static String get members => _t('الأعضاء', 'Members');
+  static String get money => _t('الأموال', 'Money');
+
+  // ─── SUPER ADMIN (PLATFORM) ────────────────────────────────
+  static String get gyms => _t('الأندية', 'Gyms');
+  static String get allGyms => _t('كل الأندية', 'All gyms');
+  static String get totalGyms => _t('إجمالي الأندية', 'Total gyms');
+  static String get activeGyms => _t('أندية نشطة', 'Active gyms');
+  static String get totalBranches => _t('إجمالي الفروع', 'Total branches');
+  static String get totalStaff => _t('إجمالي الموظفين', 'Total staff');
+  static String get allStaff => _t('كل الموظفين', 'All staff');
+  static String get noGymsYet => _t('لا توجد أندية بعد', 'No gyms yet');
+  static String get gymActivated => _t('تم تفعيل النادي', 'Gym activated');
+  static String get gymDeactivated => _t('تم إلغاء تفعيل النادي', 'Gym deactivated');
+  static String get viewBranches => _t('عرض الفروع', 'View branches');
+  static String get noBranchesInGym => _t('لا توجد فروع في هذا النادي', 'No branches in this gym');
+  static String get noGymForOwner => _t('لا يوجد نادٍ مرتبط بهذا المالك بعد', 'This owner has no gym yet');
 
   // ─── ACCOUNTANT DASHBOARD ──────────────────────────────────
   static String get accountantDashboard => _t('لوحة تحكم المحاسب', 'Accountant Dashboard');
@@ -701,6 +757,7 @@ class S {
   static String get amount => _t('المبلغ', 'Amount');
   static String get date => _t('التاريخ', 'Date');
   static String get printReceipt => _t('طباعة الإيصال', 'Print receipt');
+  static String get printOrShareReceipt => _t('طباعة / مشاركة الإيصال', 'Print / share receipt');
   static String get receiptFailed =>
       _t('تعذر إنشاء الإيصال', 'Could not generate the receipt');
 
@@ -820,6 +877,9 @@ class S {
   static String onlyCoinsRemaining(dynamic n) => _t('$n عملة متبقية فقط', 'Only $n coins remaining');
   static String onlySessionsRemaining(dynamic n) => _t('$n جلسة متبقية فقط', 'Only $n sessions remaining');
   static String get subscription => _t('الاشتراك', 'Subscription');
+  static String get subscriptionRequired => _t('الاشتراك *', 'Subscription *');
+  static String get pleaseSelectSubscription => _t('يرجى اختيار الاشتراك', 'Please select a subscription');
+  static String get noSubscriptionsForMember => _t('لا توجد اشتراكات مطابقة لهذا العضو', 'No matching subscriptions for this member');
   static String get type => _t('النوع', 'Type');
   static String get expiresLabel => _t('ينتهي', 'Expires');
   static String get myQRCode => _t('رمز QR الخاص بي', 'My QR code');

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import '../core/auth/auth_provider.dart';
 import '../core/constants/app_constants.dart';
 import '../core/providers/gym_branding_provider.dart';
+import '../core/utils/role_utils.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/gym_setup_wizard.dart';
 import '../features/auth/screens/staff_language_setup_screen.dart';
 import '../features/owner/screens/owner_dashboard.dart';
+import '../features/regional_manager/screens/regional_manager_dashboard.dart';
 import '../features/branch_manager/screens/branch_manager_dashboard.dart';
 import '../features/reception/screens/reception_main_screen.dart';
 import '../features/accountant/screens/accountant_dashboard.dart';
@@ -56,29 +57,16 @@ class AppRouter {
 
       // Authenticated, on login page, redirect to role dashboard
       if (isLoginRoute) {
-        switch (userRole) {
-          case AppConstants.roleOwner:
-            return '/owner';
-          case AppConstants.roleBranchManager:
-            return '/branch-manager';
-          case AppConstants.roleFrontDesk:  // Backend returns 'front_desk'
-            return '/reception';
-          case AppConstants.roleCentralAccountant:  // Backend returns 'central_accountant'
-          case AppConstants.roleBranchAccountant:   // Backend returns 'branch_accountant'
-            return '/accountant';
-          // Legacy support (in case old role names are used)
-          case 'reception':
-            return '/reception';
-          case 'accountant':
-            return '/accountant';
-          default:
-            // Unknown role - log out and stay on login
-            return '/login';
-        }
+        return RoleUtils.dashboardRoute(userRole) == '/login'
+            ? '/login'
+            : RoleUtils.dashboardRoute(userRole);
       }
 
       // Check if user has access to requested route
       if (state.matchedLocation.startsWith('/owner') && userRole != AppConstants.roleOwner) {
+        return _getDefaultRoute(userRole);
+      }
+      if (state.matchedLocation.startsWith('/regional-manager') && userRole != AppConstants.roleRegionalManager) {
         return _getDefaultRoute(userRole);
       }
       if (state.matchedLocation.startsWith('/branch-manager') && userRole != AppConstants.roleBranchManager) {
@@ -90,11 +78,9 @@ class AppRouter {
           userRole != 'reception') {
         return _getDefaultRoute(userRole);
       }
-      // Allow both central and branch accountants to access accountant routes
+      // Any accountant tier (central, regional, branch) may use the console
       if (state.matchedLocation.startsWith('/accountant') &&
-          userRole != AppConstants.roleCentralAccountant &&
-          userRole != AppConstants.roleBranchAccountant &&
-          userRole != 'accountant') {
+          !RoleUtils.isAccountant(userRole)) {
         return _getDefaultRoute(userRole);
       }
 
@@ -116,6 +102,10 @@ class AppRouter {
       GoRoute(
         path: '/owner',
         builder: (context, state) => const OwnerDashboard(),
+      ),
+      GoRoute(
+        path: '/regional-manager',
+        builder: (context, state) => const RegionalManagerDashboard(),
       ),
       GoRoute(
         path: '/branch-manager',
@@ -154,21 +144,6 @@ class AppRouter {
     ),
   );
 
-  String _getDefaultRoute(String? role) {
-    switch (role) {
-      case AppConstants.roleOwner:
-        return '/owner';
-      case AppConstants.roleBranchManager:
-        return '/branch-manager';
-      case AppConstants.roleFrontDesk:  // Backend: 'front_desk'
-      case 'reception':  // Legacy support
-        return '/reception';
-      case AppConstants.roleCentralAccountant:  // Backend: 'central_accountant'
-      case AppConstants.roleBranchAccountant:   // Backend: 'branch_accountant'
-      case 'accountant':  // Legacy support
-        return '/accountant';
-      default:
-        return '/login';
-    }
-  }
+  // Single source of truth shared with web_main and the language-setup screen.
+  String _getDefaultRoute(String? role) => RoleUtils.dashboardRoute(role);
 }
