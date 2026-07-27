@@ -39,6 +39,8 @@ class ApiEndpoints {
   static const String branches = '/api/branches';
   static String branchById(int id) => '/api/branches/$id';
   static String branchPerformance(int id) => '/api/branches/$id/performance';
+  static String branchDeactivate(int id) => '/api/branches/$id/deactivate';
+  static String branchActivate(int id) => '/api/branches/$id/activate';
   
   // Service Endpoints
   static const String services = '/api/services';

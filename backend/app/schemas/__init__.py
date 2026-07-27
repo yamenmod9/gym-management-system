@@ -186,8 +186,18 @@ class ComplaintSchema(Schema):
     id = fields.Int(dump_only=True)
     title = fields.Str(required=True, validate=validate.Length(min=3, max=200))
     description = fields.Str(required=True, validate=validate.Length(min=10))
-    complaint_type = fields.Str(required=True, validate=validate.OneOf([c.value for c in ComplaintType]))
-    status = fields.Str(validate=validate.OneOf([s.value for s in ComplaintStatus]))
+    # Enum columns: dump the bare value ('open'), not the enum's repr. Plain
+    # fields.Str serialises 'ComplaintStatus.OPEN', which surfaced verbatim in
+    # the owner's complaints list. Load stays the raw string for the route.
+    complaint_type = fields.Function(
+        lambda obj: obj.complaint_type.value if hasattr(obj.complaint_type, 'value') else obj.complaint_type,
+        deserialize=lambda v: v,
+        required=True,
+    )
+    status = fields.Function(
+        lambda obj: obj.status.value if hasattr(obj.status, 'value') else obj.status,
+        deserialize=lambda v: v,
+    )
     branch_id = fields.Int(required=True)
     branch_name = fields.Str(dump_only=True)
     customer_id = fields.Int(allow_none=True)

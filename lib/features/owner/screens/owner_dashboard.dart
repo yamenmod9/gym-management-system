@@ -12,6 +12,7 @@ import '../../finance/screens/money_management_view.dart';
 import '../providers/owner_dashboard_provider.dart';
 import '../widgets/add_staff_dialog.dart';
 import '../widgets/staff_actions.dart';
+import '../widgets/branch_actions.dart';
 import '../../issues/screens/issues_screen.dart';
 import 'smart_alerts_screen.dart';
 import 'staff_leaderboard_screen.dart';
@@ -522,6 +523,11 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                           ),
                         if (!isActive)
                           Chip(label: Text(S.inactive), backgroundColor: Color(0xFF9AA3B8)),
+                        BranchActions(
+                          branch: Map<String, dynamic>.from(branch as Map),
+                          apiService: provider.apiService,
+                          onChanged: () => provider.refresh(),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),

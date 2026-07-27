@@ -12,6 +12,7 @@ import '../../finance/screens/money_management_view.dart';
 import '../../owner/providers/owner_dashboard_provider.dart';
 import '../../owner/widgets/add_staff_dialog.dart';
 import '../../owner/widgets/staff_actions.dart';
+import '../../owner/widgets/branch_actions.dart';
 import '../../owner/screens/smart_alerts_screen.dart';
 import '../../owner/screens/branch_detail_screen.dart';
 import '../../issues/screens/issues_screen.dart';
@@ -431,6 +432,15 @@ class _RegionalManagerDashboardState extends State<RegionalManagerDashboard> {
                                 ),
                             ],
                           ),
+                        ),
+                        if (!(branch['is_active'] ?? true))
+                          Chip(
+                              label: Text(S.inactive),
+                              backgroundColor: const Color(0xFF9AA3B8)),
+                        BranchActions(
+                          branch: Map<String, dynamic>.from(branch as Map),
+                          apiService: provider.apiService,
+                          onChanged: () => provider.refresh(),
                         ),
                       ],
                     ),

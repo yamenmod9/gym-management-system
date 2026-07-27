@@ -192,7 +192,13 @@ def update_gym(gym_id):
         if field in data:
             setattr(gym, field, data[field])
     if 'is_active' in data:
-        gym.is_active = bool(data['is_active'])
+        new_active = bool(data['is_active'])
+        # Switching a gym off shuts down everything under it: its branches and
+        # every staff member and client attached to them.
+        if gym.is_active and not new_active:
+            from app.services.cascade_service import deactivate_gym_members
+            deactivate_gym_members(gym.id)
+        gym.is_active = new_active
     if 'is_setup_complete' in data:
         gym.is_setup_complete = bool(data['is_setup_complete'])
 

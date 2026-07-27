@@ -643,6 +643,13 @@ class S {
   static String get gymActivated => _t('تم تفعيل النادي', 'Gym activated');
   static String get gymDeactivated => _t('تم إلغاء تفعيل النادي', 'Gym deactivated');
   static String get viewBranches => _t('عرض الفروع', 'View branches');
+  static String get deactivateBranch => _t('إلغاء تفعيل الفرع', 'Deactivate branch');
+  static String get activateBranch => _t('تفعيل الفرع', 'Activate branch');
+  static String get confirmDeactivateBranch => _t(
+      'سيتم إلغاء تفعيل هذا الفرع وجميع موظفيه وعملائه فوراً، وسيتم إشعار الإدارة. هل تريد المتابعة؟',
+      'This will immediately deactivate the branch and all of its staff and members, and notify the admin. Continue?');
+  static String get branchDeactivated => _t('تم إلغاء تفعيل الفرع', 'Branch deactivated');
+  static String get branchActivated => _t('تم تفعيل الفرع', 'Branch activated');
   static String get noBranchesInGym => _t('لا توجد فروع في هذا النادي', 'No branches in this gym');
   static String get noGymForOwner => _t('لا يوجد نادٍ مرتبط بهذا المالك بعد', 'This owner has no gym yet');
 

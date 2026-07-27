@@ -437,7 +437,21 @@ class _MoneyManagementViewState extends State<MoneyManagementView> {
     );
 
     if (result['success'] == true) {
-      await widget.onRefresh();
+      // Reflect the decision in place instead of reloading the tab. A full
+      // refresh gates the whole dashboard behind a spinner and springs the
+      // scroll back to the top; mutating the row (it's the same Map the host
+      // provider holds) and rebuilding just this subtree updates the status
+      // instantly and keeps the reviewer where they were.
+      if (mounted) {
+        setState(() {
+          if (expense is Map) {
+            expense['status'] = approve ? 'approved' : 'rejected';
+            if (notes != null && notes.isNotEmpty) {
+              expense['review_notes'] = notes;
+            }
+          }
+        });
+      }
       messenger.showSnackBar(
         SnackBar(
           content: Text(approve ? S.expenseApproved : S.expenseRejected),

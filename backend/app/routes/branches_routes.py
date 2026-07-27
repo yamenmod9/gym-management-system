@@ -156,13 +156,21 @@ def update_branch(branch_id):
     except ValidationError as e:
         return error_response("Validation error", 400, e.messages)
     
+    # A branch being switched off must take its people with it — otherwise
+    # staff and clients keep live accounts on a closed branch.
+    turning_off = 'is_active' in data and not data['is_active'] and branch.is_active
+
     # Update fields
     for field in ['name', 'address', 'phone', 'city', 'is_active']:
         if field in data:
             setattr(branch, field, data[field])
-    
+
+    if turning_off:
+        from app.services.cascade_service import deactivate_branch_members
+        deactivate_branch_members(branch.id)
+
     db.session.commit()
-    
+
     return success_response(branch.to_dict(), "Branch updated successfully")
 
 
@@ -179,10 +187,76 @@ def delete_branch(branch_id):
     if not user_can_access_branch(branch):
         return error_response("Access denied to this branch", 403)
 
+    from app.services.cascade_service import deactivate_branch_members
     branch.is_active = False
+    deactivate_branch_members(branch.id)
     db.session.commit()
-    
+
     return success_response(message="Branch deactivated successfully")
+
+
+@branches_bp.route('/<int:branch_id>/deactivate', methods=['POST'])
+@jwt_required()
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.REGIONAL_MANAGER)
+def deactivate_branch(branch_id):
+    """Deactivate a branch and everyone attached to it, then notify the admin.
+
+    The owner-facing "deactivate branch" button lands here. Beyond flipping the
+    flag it cascades to the branch's staff and clients (so no one keeps access
+    to a closed branch) and pushes a notification to the super admin.
+    """
+    branch = db.session.get(Branch, branch_id)
+
+    if not branch:
+        return error_response("Branch not found", 404)
+
+    if not user_can_access_branch(branch):
+        return error_response("Access denied to this branch", 403)
+
+    from app.services.cascade_service import deactivate_branch_members
+    branch.is_active = False
+    staff_count, customer_count = deactivate_branch_members(branch.id)
+    db.session.commit()
+
+    # Tell the system admin a branch just went dark, and who it took with it.
+    try:
+        from app.services.fcm_service import notify_role
+        actor = get_current_user()
+        notify_role(
+            'super_admin',
+            '🏢 تم إلغاء تفعيل فرع',
+            f'{branch.name} — {actor.full_name if actor else ""}',
+            {
+                'type': 'branch_deactivated',
+                'branch_id': str(branch.id),
+                'staff_deactivated': str(staff_count),
+                'customers_deactivated': str(customer_count),
+            },
+        )
+    except Exception as e:  # push must never block the state change
+        import logging
+        logging.getLogger(__name__).exception('Deactivation push failed: %s', e)
+
+    return success_response(branch.to_dict(), "Branch deactivated successfully")
+
+
+@branches_bp.route('/<int:branch_id>/activate', methods=['POST'])
+@jwt_required()
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.REGIONAL_MANAGER)
+def activate_branch(branch_id):
+    """Reactivate a branch. Members stay as they are (see cascade_service)."""
+    branch = db.session.get(Branch, branch_id)
+
+    if not branch:
+        return error_response("Branch not found", 404)
+
+    if not user_can_access_branch(branch):
+        return error_response("Access denied to this branch", 403)
+
+    branch.is_active = True
+    db.session.commit()
+
+    return success_response(branch.to_dict(), "Branch activated successfully")
 
 
 @branches_bp.route('/<int:branch_id>/performance', methods=['GET'])

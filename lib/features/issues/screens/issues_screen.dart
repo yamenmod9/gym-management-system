@@ -310,8 +310,14 @@ class _IssuesScreenState extends State<IssuesScreen>
                                     'resolution_notes': notesController.text.trim(),
                                   },
                                 );
+                                // Update the row in place rather than reloading
+                                // the whole list — the new status shows at once
+                                // and the list keeps its scroll position.
+                                issue['status'] = status;
+                                issue['resolution_notes'] =
+                                    notesController.text.trim();
                                 if (ctx.mounted) Navigator.pop(ctx);
-                                await _load();
+                                if (mounted) setState(() {});
                               } catch (e) {
                                 setSheet(() => saving = false);
                                 if (ctx.mounted) {
