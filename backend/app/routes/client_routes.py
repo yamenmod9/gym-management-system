@@ -7,6 +7,7 @@ from app.models import (
     Customer, Subscription, SubscriptionStatus, EntryLog, EntryType, EntryStatus, Transaction,
 )
 from app.services.qr_service import QRService
+from app.services.gym_rules import gym_rule
 from app.utils import success_response, error_response, paginate, format_pagination_response
 from app.utils.client_auth import client_token_required, get_current_client
 from app.extensions import db
@@ -283,28 +284,39 @@ def get_client_subscription():
     if not customer:
         return error_response('Customer not found', 404)
     
-    # Get active subscription
-    subscription = Subscription.query.filter_by(
-        customer_id=customer.id,
-        status=SubscriptionStatus.ACTIVE
-    ).first()
-    
-    if not subscription:
+    # A member can hold several at once (gym entry, private training with a
+    # captain, a combined package). The top-level fields stay the single
+    # "headline" subscription so existing clients keep parsing this response
+    # unchanged; `subscriptions` carries the full picture for the ones that
+    # render a list.
+    active = Subscription.active_for(customer.id)
+
+    if not active:
         return error_response('No active subscription found', 404)
-    
-    subscription_data = subscription.to_dict()
-    
-    # Add service details
-    if subscription.service:
-        subscription_data['service'] = {
-            'id': subscription.service.id,
-            'name': subscription.service.name,
-            'service_type': subscription.service.service_type.value,
-            'has_visits': subscription.service.has_visits,
-            'has_classes': subscription.service.has_classes,
-            'duration_days': subscription.service.duration_days
-        }
-    
+
+    # Headline = whatever opens the door, falling back to the newest.
+    entry = Subscription.entry_subscription_for(customer.id)
+    subscription = next(
+        (s for s in active if entry is not None and s.id == entry.id),
+        active[0],
+    )
+
+    def _with_service(sub):
+        data = sub.to_dict()
+        if sub.service:
+            data['service'] = {
+                'id': sub.service.id,
+                'name': sub.service.name,
+                'service_type': sub.service.service_type.value,
+                'has_visits': sub.service.has_visits,
+                'has_classes': sub.service.has_classes,
+                'duration_days': sub.service.duration_days,
+            }
+        return data
+
+    subscription_data = _with_service(subscription)
+    subscription_data['subscriptions'] = [_with_service(s) for s in active]
+
     return success_response(subscription_data)
 
 
@@ -451,15 +463,20 @@ def get_client_qr():
     if not customer:
         return error_response('Customer not found', 404)
     
-    # Get active subscription
-    subscription = Subscription.query.filter_by(
-        customer_id=customer.id,
-        status=SubscriptionStatus.ACTIVE
-    ).first()
-    
-    if not subscription:
+    # This QR opens the door, so it has to be backed by the subscription that
+    # grants entry — issuing one against a private-training package would let
+    # the scan meter the wrong thing.
+    subscription = Subscription.entry_subscription_for(
+        customer.id,
+        allow_non_entry=gym_rule(
+            customer.branch.gym_id if customer.branch else None,
+            'pt_only_members_may_enter',
+        ),
+    )
+
+    if not subscription or subscription.status != SubscriptionStatus.ACTIVE:
         return error_response('No active subscription. Please purchase a subscription.', 403)
-    
+
     # Validate subscription
     is_valid, reason, _, _ = QRService.validate_entry(customer.id, subscription.id)
     
@@ -633,17 +650,21 @@ def get_client_stats():
     # Current streak (simplified - consecutive days)
     current_streak = _calculate_streak(customer.id)
     
-    # Active subscription
-    active_subscription = Subscription.query.filter_by(
-        customer_id=customer.id,
-        status=SubscriptionStatus.ACTIVE
-    ).first()
-    
+    # Headline subscription stays a single object for existing clients;
+    # `active_subscriptions` carries the rest for members holding several.
+    active = Subscription.active_for(customer.id)
+    entry = Subscription.entry_subscription_for(customer.id)
+    headline = next(
+        (s for s in active if entry is not None and s.id == entry.id),
+        active[0] if active else None,
+    )
+
     return success_response({
         'total_visits': total_visits,
         'visits_this_month': visits_this_month,
         'current_streak': current_streak,
-        'active_subscription': active_subscription.to_dict() if active_subscription else None
+        'active_subscription': headline.to_dict() if headline else None,
+        'active_subscriptions': [s.to_dict() for s in active],
     })
 
 
@@ -660,6 +681,98 @@ def _busy_level(count):
     if count >= _BUSY_MODERATE_FROM:
         return 'moderate'
     return 'quiet'
+
+
+@client_bp.route('/class-feedback/pending', methods=['GET'])
+@client_token_required
+def pending_class_feedback():
+    """Classes this member attended that they haven't rated yet."""
+    from app.models import ClassAttendance, ClassSession, ClassFeedback, ClassSessionStatus
+
+    customer = get_current_client()
+    if not customer:
+        return error_response('Customer not found', 404)
+
+    rated = {
+        row.session_id for row in
+        ClassFeedback.query.filter_by(customer_id=customer.id).all()
+    }
+
+    rows = (
+        db.session.query(ClassSession, ClassAttendance)
+        .join(ClassAttendance, ClassAttendance.session_id == ClassSession.id)
+        .filter(
+            ClassAttendance.customer_id == customer.id,
+            ClassSession.status == ClassSessionStatus.CLOSED,
+        )
+        .order_by(ClassSession.ended_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    return success_response([
+        {
+            'session_id': session.id,
+            'class_id': session.class_id,
+            'class_name': session.gym_class.name if session.gym_class else None,
+            'trainer_name': session.trainer.full_name if session.trainer else None,
+            'session_date': session.session_date.isoformat(),
+            'ended_at': session.ended_at.isoformat() if session.ended_at else None,
+        }
+        for session, _ in rows if session.id not in rated
+    ])
+
+
+@client_bp.route('/class-feedback', methods=['POST'])
+@client_token_required
+def submit_class_feedback():
+    """Rate a class this member actually attended."""
+    from app.models import ClassAttendance, ClassSession, ClassFeedback, ClassSessionStatus
+
+    customer = get_current_client()
+    if not customer:
+        return error_response('Customer not found', 404)
+
+    data = request.json or {}
+    session_id = data.get('session_id')
+    try:
+        rating = int(data.get('rating'))
+    except (TypeError, ValueError):
+        return error_response('rating must be a whole number from 1 to 5', 400)
+    if not 1 <= rating <= 5:
+        return error_response('rating must be between 1 and 5', 400)
+
+    session = db.session.get(ClassSession, session_id) if session_id else None
+    if not session:
+        return error_response('Session not found', 404)
+
+    # Only people who were actually marked present may rate it.
+    attended = ClassAttendance.query.filter_by(
+        session_id=session.id, customer_id=customer.id
+    ).first()
+    if not attended:
+        return error_response('You did not attend that class', 403)
+
+    if session.status != ClassSessionStatus.CLOSED:
+        return error_response('That class has not finished yet', 400)
+
+    existing = ClassFeedback.query.filter_by(
+        session_id=session.id, customer_id=customer.id
+    ).first()
+    if existing:
+        return error_response('You have already rated that class', 409)
+
+    comment = (data.get('comment') or '').strip() or None
+    feedback = ClassFeedback(
+        session_id=session.id,
+        customer_id=customer.id,
+        rating=rating,
+        comment=comment,
+    )
+    db.session.add(feedback)
+    db.session.commit()
+
+    return success_response(feedback.to_dict(include_member=False), 'Thanks for the feedback', 201)
 
 
 @client_bp.route('/branch-activity', methods=['GET'])

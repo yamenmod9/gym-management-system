@@ -13,6 +13,7 @@ from app.utils import (
     get_accessible_branch_ids
 )
 from app.models.user import UserRole
+from app.services.gym_rules import gym_rule
 from app.extensions import db
 
 logger = logging.getLogger(__name__)
@@ -94,18 +95,20 @@ def scan_qr_code():
     if accessible is not None and customer.branch_id not in accessible:
         return error_response("Customer not found", 404)
 
-    # Look for an active *or* frozen subscription. Filtering to ACTIVE alone
-    # made the "subscription is frozen" branch below unreachable, so a frozen
-    # member was turned away with a bare "No active subscription" instead of
-    # the reason and the date it was frozen.
-    subscription = Subscription.query.filter(
-        Subscription.customer_id == customer.id,
-        Subscription.status.in_(
-            [SubscriptionStatus.ACTIVE, SubscriptionStatus.FROZEN]
-        )
-    ).order_by(
-        (Subscription.status == SubscriptionStatus.ACTIVE).desc()
-    ).first()
+    # The subscription that opens the door — not merely the first one this
+    # member happens to hold. Someone with a gym package *and* a private
+    # training package has two, and metering the training package at the
+    # turnstile would burn sessions they never used.
+    #
+    # Active is preferred over frozen inside the helper so the "subscription is
+    # frozen" branch below stays reachable and can report the freeze reason.
+    subscription = Subscription.entry_subscription_for(
+        customer.id,
+        allow_non_entry=gym_rule(
+            customer.branch.gym_id if customer.branch else None,
+            'pt_only_members_may_enter',
+        ),
+    )
 
     # Check if no active subscription
     if not subscription:

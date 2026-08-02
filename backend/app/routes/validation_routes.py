@@ -11,9 +11,25 @@ from app.utils import (
     scope_query_to_branches,
 )
 from app.models.user import UserRole
+from app.services.gym_rules import gym_rule
 from app.extensions import db
 
 validation_bp = Blueprint('validation', __name__, url_prefix='/api/validation')
+
+
+def _entry_subscription(customer):
+    """The member's subscription that grants gym entry, honouring gym rules.
+
+    A member may hold several at once; metering a private-training package at
+    the door would consume sessions the captain never delivered.
+    """
+    return Subscription.entry_subscription_for(
+        customer.id,
+        allow_non_entry=gym_rule(
+            customer.branch.gym_id if customer.branch else None,
+            'pt_only_members_may_enter',
+        ),
+    )
 
 
 @validation_bp.route('/qr', methods=['POST'])
@@ -143,12 +159,9 @@ def validate_barcode():
     if error:
         return error_response(error, 400)
     
-    # Find active subscription
-    subscription = Subscription.query.filter_by(
-        customer_id=customer.id,
-        status=SubscriptionStatus.ACTIVE
-    ).first()
-    
+    # The subscription that grants entry — not just any the member holds.
+    subscription = _entry_subscription(customer)
+
     if not subscription:
         # Create denied entry
         entry = EntryLog.create_denied_entry(
@@ -258,12 +271,9 @@ def manual_entry():
     if not customer.is_active:
         return error_response('Customer account is inactive', 403)
     
-    # Find active subscription
-    subscription = Subscription.query.filter_by(
-        customer_id=customer_id,
-        status=SubscriptionStatus.ACTIVE
-    ).first()
-    
+    # The subscription that grants entry — not just any the member holds.
+    subscription = _entry_subscription(customer)
+
     if not subscription:
         return error_response('No active subscription found', 403)
     

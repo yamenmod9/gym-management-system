@@ -58,23 +58,41 @@ class Fingerprint(db.Model):
         """Check if fingerprint can grant access"""
         if not self.is_active:
             return False, "Fingerprint is deactivated"
-        
-        # Check customer subscriptions
-        from app.models.subscription import SubscriptionStatus
-        active_subscriptions = self.customer.subscriptions.filter_by(
-            status=SubscriptionStatus.ACTIVE
-        ).all()
-        
+
+        # Only subscriptions that grant gym entry count here. A member whose
+        # only active package is private training has bought a captain's time,
+        # not floor access, so their finger must not open the door.
+        from app.models.subscription import Subscription, SubscriptionStatus
+        from app.models.service import Service
+        from app.services.gym_rules import gym_rule
+
+        customer = self.customer
+        allow_non_entry = gym_rule(
+            customer.branch.gym_id if customer and customer.branch else None,
+            'pt_only_members_may_enter',
+        )
+
+        query = Subscription.query.join(
+            Service, Subscription.service_id == Service.id
+        ).filter(
+            Subscription.customer_id == self.customer_id,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        )
+        if not allow_non_entry:
+            query = query.filter(Service.grants_gym_entry.is_(True))
+
+        active_subscriptions = query.all()
+
         if not active_subscriptions:
             return False, "No active subscriptions"
-        
+
         # Check if any subscription allows access
         for sub in active_subscriptions:
             if sub.can_access():
                 self.last_used = datetime.utcnow()
                 db.session.commit()
                 return True, "Access granted"
-        
+
         return False, "No valid active subscriptions"
 
     def deactivate(self, reason):

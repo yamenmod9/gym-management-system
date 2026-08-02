@@ -9,7 +9,11 @@ from werkzeug.utils import secure_filename
 from app.extensions import db
 from app.models.gym import Gym
 from app.models.user import UserRole
-from app.utils import success_response, error_response, get_current_user, role_required
+from app.utils import (
+    success_response, error_response, get_current_user, role_required,
+    get_current_gym_id,
+)
+from app.services.gym_rules import all_rules_for, set_rules
 
 gyms_bp = Blueprint('gyms', __name__, url_prefix='/api/gyms')
 
@@ -60,6 +64,57 @@ def _storage_delete(path):
         requests.delete(url, headers=_storage_auth_headers(), json={'prefixes': [path]}, timeout=10)
     except requests.RequestException:
         pass
+
+
+@gyms_bp.route('/settings', methods=['GET'])
+@jwt_required()
+def get_gym_settings():
+    """The gym's house rules, with their current and default values.
+
+    Readable by any member of staff — the rules change how their own screens
+    behave (whether a class deducts a coin, whether feedback is requested), so
+    hiding them from the people working under them helps nobody. Only an owner
+    may write them.
+    """
+    user = get_current_user()
+    if not user:
+        return error_response("Session expired. Please log in again.", 401)
+
+    gym_id = get_current_gym_id(user)
+    if gym_id is None and user.role != UserRole.SUPER_ADMIN:
+        return error_response("No gym found for this user", 404)
+
+    return success_response({'gym_id': gym_id, 'rules': all_rules_for(gym_id)})
+
+
+@gyms_bp.route('/settings', methods=['PUT'])
+@jwt_required()
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER)
+def update_gym_settings():
+    """Switch house rules on or off. Owner (or super admin) only."""
+    user = get_current_user()
+    if not user:
+        return error_response("Session expired. Please log in again.", 401)
+
+    gym_id = get_current_gym_id(user)
+    if user.role == UserRole.SUPER_ADMIN:
+        gym_id = (request.json or {}).get('gym_id', gym_id)
+    if gym_id is None:
+        return error_response("No gym found for this user", 404)
+
+    updates = (request.json or {}).get('rules')
+    if not isinstance(updates, dict) or not updates:
+        return error_response("Provide a 'rules' object of rule -> true/false", 400)
+
+    try:
+        set_rules(gym_id, updates)
+    except KeyError as e:
+        return error_response(str(e).strip("\"'"), 400)
+
+    return success_response(
+        {'gym_id': gym_id, 'rules': all_rules_for(gym_id)},
+        "Gym rules updated",
+    )
 
 
 @gyms_bp.route('/my-gym', methods=['GET'])

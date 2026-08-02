@@ -95,12 +95,10 @@ def client_login():
     # Generate client JWT
     access_token = create_client_token(customer.id)
     
-    # Get active subscription
-    from app.models.subscription import Subscription, SubscriptionStatus
-    active_subscription = Subscription.query.filter_by(
-        customer_id=customer.id,
-        status=SubscriptionStatus.ACTIVE
-    ).first()
+    # "Do they have anything active?" — any subscription counts here, since
+    # this only drives a boolean badge on the client app's home screen.
+    from app.models.subscription import Subscription
+    active_subscriptions = Subscription.active_for(customer.id)
     
     # Get gym branding through customer's branch (multi-tenant compatible)
     from app.models.gym import Gym
@@ -122,7 +120,8 @@ def client_login():
             'qr_code': customer.qr_code,
             'branch_id': customer.branch_id,
             'branch_name': customer.branch.name if customer.branch else None,
-            'has_active_subscription': active_subscription is not None,
+            'has_active_subscription': bool(active_subscriptions),
+            'active_subscription_count': len(active_subscriptions),
             'preferred_language': customer.preferred_language,
         },
         'account_deletion': deletion_status,

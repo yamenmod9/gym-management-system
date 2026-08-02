@@ -12,6 +12,7 @@ class ServiceType(enum.Enum):
     SWIMMING_EDUCATION = 'swimming_education'
     SWIMMING_RECREATION = 'swimming_recreation'
     KARATE = 'karate'
+    PERSONAL_TRAINING = 'personal_training'
     BUNDLE = 'bundle'
 
 
@@ -42,9 +43,20 @@ class Service(db.Model):
     freeze_is_paid = db.Column(db.Boolean, default=False)  # Is freeze paid
     freeze_cost = db.Column(db.Numeric(10, 2), default=0)  # Cost per freeze
     
+    # Does holding this open the gym door?
+    #
+    # A member may hold several subscriptions at once — typically gym entry plus
+    # private training with a named captain — and only some of them are a reason
+    # to let them through the turnstile. Personal training alone is not: the
+    # captain books them in, it does not buy them floor access. Defaults to True
+    # so every service that existed before this column keeps working exactly as
+    # it did, and so an owner adding a package opts *out* of door access rather
+    # than having to remember to opt in.
+    grants_gym_entry = db.Column(db.Boolean, default=True, nullable=False)
+
     # Status
     is_active = db.Column(db.Boolean, default=True, nullable=False)
-    
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -81,6 +93,7 @@ class Service(db.Model):
             'freeze_max_days': self.freeze_max_days,
             'freeze_is_paid': self.freeze_is_paid,
             'freeze_cost': float(self.freeze_cost),
+            'grants_gym_entry': self.grants_gym_entry,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat()
         }

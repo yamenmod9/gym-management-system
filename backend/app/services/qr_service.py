@@ -104,10 +104,17 @@ class QRService:
             if subscription and subscription.customer_id != customer_id:
                 return False, "Subscription does not belong to this customer", None, 0
         else:
-            subscription = Subscription.query.filter_by(
-                customer_id=customer_id,
-                status=SubscriptionStatus.ACTIVE
-            ).first()
+            # The one that grants entry: a member holding gym *and* private
+            # training has more than one, and only the gym package should be
+            # metered by a scan at the door.
+            from app.services.gym_rules import gym_rule
+            subscription = Subscription.entry_subscription_for(
+                customer_id,
+                allow_non_entry=gym_rule(
+                    customer.branch.gym_id if customer.branch else None,
+                    'pt_only_members_may_enter',
+                ),
+            )
         
         if not subscription:
             return False, "No active subscription found", None, 0

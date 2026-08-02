@@ -11,6 +11,7 @@ from app.utils import (
     success_response, error_response, get_current_user, role_required,
     get_accessible_branch_ids
 )
+from app.services.gym_rules import gym_rule
 from app.extensions import db
 from datetime import datetime
 
@@ -41,13 +42,20 @@ def _parse_coin_count(raw):
 
 
 def _usable_subscription(customer):
-    """The customer's active, unexpired subscription, or (None, error)."""
-    subscription = Subscription.query.filter_by(
-        customer_id=customer.id,
-        status=SubscriptionStatus.ACTIVE
-    ).first()
+    """The subscription this scan should meter, or (None, error).
 
-    if not subscription:
+    Specifically the one that grants gym entry — a member who also holds a
+    private-training package must not have its sessions deducted at the door.
+    """
+    subscription = Subscription.entry_subscription_for(
+        customer.id,
+        allow_non_entry=gym_rule(
+            customer.branch.gym_id if customer.branch else None,
+            'pt_only_members_may_enter',
+        ),
+    )
+
+    if not subscription or subscription.status != SubscriptionStatus.ACTIVE:
         return None, error_response('No active subscription found for this customer', 403)
 
     # Status alone is not enough: nothing flips a subscription to EXPIRED when

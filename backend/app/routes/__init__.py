@@ -32,6 +32,8 @@ from .gyms_routes import gyms_bp
 from .notifications_routes import notifications_bp
 from .privacy_routes import privacy_bp
 from .pricing_routes import pricing_bp
+from .classes_routes import classes_bp
+from .private_training_routes import private_bp
 
 
 def register_blueprints(app, include_dev_tools=True):
@@ -81,3 +83,5 @@ def register_blueprints(app, include_dev_tools=True):
     app.register_blueprint(notifications_bp)
     app.register_blueprint(privacy_bp)
     app.register_blueprint(pricing_bp)
+    app.register_blueprint(classes_bp)
+    app.register_blueprint(private_bp)

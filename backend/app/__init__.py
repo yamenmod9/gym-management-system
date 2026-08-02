@@ -230,6 +230,30 @@ def _ensure_db_schema(app):
                     db.session.commit()
                     app.logger.info('Auto-migration: added preferred_language column to customers table')
 
+            # Does holding this service open the door? Defaults true so every
+            # service that predates the column behaves exactly as before —
+            # only a personal-training package opts out.
+            if 'services' in existing_tables:
+                columns = [col['name'] for col in inspector.get_columns('services')]
+                if 'grants_gym_entry' not in columns:
+                    db.session.execute(text(
+                        'ALTER TABLE services ADD COLUMN grants_gym_entry BOOLEAN NOT NULL DEFAULT 1'
+                        if db.engine.dialect.name == 'sqlite' else
+                        'ALTER TABLE services ADD COLUMN grants_gym_entry BOOLEAN NOT NULL DEFAULT TRUE'
+                    ))
+                    db.session.commit()
+                    app.logger.info('Auto-migration: added grants_gym_entry column to services table')
+
+            # The captain a member trains with, on private-training subscriptions.
+            if 'subscriptions' in existing_tables:
+                columns = [col['name'] for col in inspector.get_columns('subscriptions')]
+                if 'trainer_id' not in columns:
+                    db.session.execute(text(
+                        'ALTER TABLE subscriptions ADD COLUMN trainer_id INTEGER REFERENCES users(id)'
+                    ))
+                    db.session.commit()
+                    app.logger.info('Auto-migration: added trainer_id column to subscriptions table')
+
             # Add created_by to subscriptions if missing.
             #
             # The model has declared it for a while but no migration ever added

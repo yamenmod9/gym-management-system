@@ -30,7 +30,9 @@ from app.models import (
     Service, ServiceType, Subscription, SubscriptionStatus,
     Transaction, PaymentMethod, TransactionType,
     Expense, ExpenseStatus, Complaint, ComplaintType, ComplaintStatus,
-    Fingerprint, FreezeHistory, DailyClosing, EntryLog
+    Fingerprint, FreezeHistory, DailyClosing, EntryLog,
+    GymClass, ClassSession, ClassAttendance, ClassFeedback, ClassSessionStatus,
+    PrivateSession, PrivateSessionStatus,
 )
 from app.models.entry_log import EntryType, EntryStatus
 from app.models.expense import ExpenseCategory
@@ -373,6 +375,8 @@ def build_gym(spec, services):
     create_daily_closings(branches, staff)
     create_entry_logs(subscriptions, branches, spec)
     create_issues(gym, branches, staff)
+    private_subs = create_private_training(customers, services, branches, staff)
+    classes = create_classes(gym, branches, staff, customers)
 
     return {
         'spec': spec,
@@ -381,7 +385,181 @@ def build_gym(spec, services):
         'staff': staff,
         'customers': customers,
         'subscriptions': subscriptions,
+        'private_subs': private_subs,
+        'classes': classes,
     }
+
+
+def create_private_training(customers, services, branches, staff):
+    """Private-training packages, each assigned to a captain at that branch.
+
+    Deliberately given to members who *already* hold a gym subscription: that
+    is the combination that used to break the door scan, so a fresh seed
+    reproduces it and the check-in path can be exercised against it by hand.
+    """
+    trainers = [t for t in staff.get('trainers', []) if t.is_active]
+    if not trainers:
+        return []
+
+    pt_services = [
+        s for s in services
+        if s.service_type == ServiceType.PERSONAL_TRAINING and s.is_active
+    ]
+    if not pt_services:
+        return []
+
+    by_branch = {}
+    for trainer in trainers:
+        by_branch.setdefault(trainer.branch_id, []).append(trainer)
+
+    created = []
+    for trainer_branch, branch_trainers in by_branch.items():
+        pool = [c for c in customers if c.branch_id == trainer_branch][:6]
+        for index, customer in enumerate(pool):
+            trainer = branch_trainers[index % len(branch_trainers)]
+            service = pt_services[index % len(pt_services)]
+            total = 8 if '8' in service.name else 12
+            used = random.randint(0, 3)
+
+            start = date.today() - timedelta(days=random.randint(5, 30))
+            sub = Subscription(
+                customer_id=customer.id,
+                service_id=service.id,
+                branch_id=trainer_branch,
+                start_date=start,
+                end_date=start + timedelta(days=service.duration_days),
+                status=SubscriptionStatus.ACTIVE,
+                subscription_type='sessions',
+                total_sessions=total,
+                remaining_sessions=total - used,
+                trainer_id=trainer.id,
+                created_by=trainer.id,
+            )
+            db.session.add(sub)
+            db.session.flush()
+            created.append(sub)
+
+            # A short history of delivered sessions, ending in one the member
+            # has not answered yet and — for the first member of each branch —
+            # one they disputed, so the manager's queue is never empty.
+            for n in range(used):
+                db.session.add(PrivateSession(
+                    subscription_id=sub.id, customer_id=customer.id,
+                    trainer_id=trainer.id, branch_id=trainer_branch,
+                    status=PrivateSessionStatus.CONFIRMED,
+                    notes='Strength and conditioning',
+                    logged_at=datetime.combine(start, datetime.min.time())
+                    + timedelta(days=n * 3, hours=10),
+                    answered_at=datetime.utcnow() - timedelta(days=1),
+                ))
+
+            if index == 0:
+                sub.remaining_sessions = max(0, sub.remaining_sessions - 1)
+                db.session.add(PrivateSession(
+                    subscription_id=sub.id, customer_id=customer.id,
+                    trainer_id=trainer.id, branch_id=trainer_branch,
+                    status=PrivateSessionStatus.DISPUTED,
+                    notes='Upper body',
+                    dispute_reason='I was travelling that week and did not attend.',
+                    logged_at=datetime.utcnow() - timedelta(hours=6),
+                    answered_at=datetime.utcnow() - timedelta(hours=4),
+                ))
+            elif index == 1:
+                sub.remaining_sessions = max(0, sub.remaining_sessions - 1)
+                db.session.add(PrivateSession(
+                    subscription_id=sub.id, customer_id=customer.id,
+                    trainer_id=trainer.id, branch_id=trainer_branch,
+                    status=PrivateSessionStatus.PENDING,
+                    notes='Legs and core',
+                    logged_at=datetime.utcnow() - timedelta(hours=2),
+                ))
+
+    db.session.flush()
+    print(f'  ✓ Private training: {len(created)} package(s) across {len(by_branch)} branch(es)')
+    return created
+
+
+CLASS_TEMPLATES = [
+    ('Spinning', 'High-intensity indoor cycling', [0, 2, 4], '18:00', 45, 20),
+    ('Yoga Flow', 'Vinyasa flow for all levels', [1, 3], '09:00', 60, 15),
+    ('HIIT Circuit', 'Twenty minutes of work, ten of mobility', [5], '11:00', 30, 12),
+]
+
+
+def create_classes(gym, branches, staff, customers):
+    """Scheduled classes, plus one finished session with a register and ratings.
+
+    One class per branch runs *today* so a trainer can start a session the
+    moment the seed finishes, and one already-closed session carries feedback
+    so the trainer's and the manager's rating screens are not empty on a fresh
+    database.
+    """
+    trainers = [t for t in staff.get('trainers', []) if t.is_active]
+    if not trainers:
+        return []
+
+    created = []
+    for position, trainer in enumerate(trainers):
+        name, description, days, start_time, minutes, capacity = (
+            CLASS_TEMPLATES[position % len(CLASS_TEMPLATES)]
+        )
+        # Guarantee at least one class per trainer is scheduled for today.
+        if position % len(CLASS_TEMPLATES) == 0:
+            days = sorted(set(days) | {date.today().weekday()})
+
+        gym_class = GymClass(
+            name=f'{name} — {trainer.full_name.split()[0]}',
+            description=description,
+            branch_id=trainer.branch_id,
+            gym_id=gym.id,
+            trainer_id=trainer.id,
+            capacity=capacity,
+            days_of_week=','.join(str(d) for d in days),
+            start_time=start_time,
+            duration_minutes=minutes,
+            is_active=True,
+        )
+        db.session.add(gym_class)
+        db.session.flush()
+        created.append(gym_class)
+
+        # A closed session from last week, with attendance and ratings.
+        held_on = date.today() - timedelta(days=7)
+        session = ClassSession(
+            class_id=gym_class.id,
+            branch_id=trainer.branch_id,
+            trainer_id=trainer.id,
+            session_date=held_on,
+            started_at=datetime.combine(held_on, datetime.min.time()) + timedelta(hours=18),
+            ended_at=datetime.combine(held_on, datetime.min.time()) + timedelta(hours=19),
+            status=ClassSessionStatus.CLOSED,
+        )
+        db.session.add(session)
+        db.session.flush()
+
+        attendees = [c for c in customers if c.branch_id == trainer.branch_id][:5]
+        for rank, customer in enumerate(attendees):
+            db.session.add(ClassAttendance(
+                session_id=session.id, customer_id=customer.id, coin_deducted=False,
+            ))
+            # Leave the last attendee unrated so the client app has a pending
+            # feedback prompt to render.
+            if rank < len(attendees) - 1:
+                db.session.add(ClassFeedback(
+                    session_id=session.id,
+                    customer_id=customer.id,
+                    rating=random.choice([4, 5, 5, 3]),
+                    comment=random.choice([
+                        'Great energy, well paced.',
+                        'Loved it — would book again.',
+                        None,
+                        'Room was a bit warm but the class was good.',
+                    ]),
+                ))
+
+    db.session.flush()
+    print(f'  ✓ Classes: {len(created)} scheduled, each with one rated past session')
+    return created
 
 
 # Realistic staff-raised issues, phrased as things the front line escalates
@@ -699,6 +877,39 @@ def create_services():
             freeze_count_limit=2, freeze_max_days=15, freeze_is_paid=False,
             is_active=True,
         ),
+        # Private training. grants_gym_entry=False is the point of these: they
+        # buy a captain's time, not floor access, so holding one alone must not
+        # open the door — and a member who also has a gym package must be
+        # metered on *that* at the turnstile, never on these sessions.
+        Service(
+            name='Private Training - 8 Sessions',
+            service_type=ServiceType.PERSONAL_TRAINING,
+            description='8 one-to-one sessions with an assigned captain',
+            price=2400, duration_days=60, allowed_days_per_week=7,
+            freeze_count_limit=1, freeze_max_days=14, freeze_is_paid=False,
+            grants_gym_entry=False,
+            is_active=True,
+        ),
+        Service(
+            name='Private Training - 12 Sessions',
+            service_type=ServiceType.PERSONAL_TRAINING,
+            description='12 one-to-one sessions with an assigned captain',
+            price=3300, duration_days=90, allowed_days_per_week=7,
+            freeze_count_limit=1, freeze_max_days=14, freeze_is_paid=False,
+            grants_gym_entry=False,
+            is_active=True,
+        ),
+        # The combined package: one subscription that covers both, so a member
+        # holding only this still gets through the door.
+        Service(
+            name='Gym + Private Training Package',
+            service_type=ServiceType.BUNDLE,
+            description='Full gym access plus 8 private sessions',
+            price=2800, duration_days=60, allowed_days_per_week=7,
+            freeze_count_limit=2, freeze_max_days=15, freeze_is_paid=False,
+            grants_gym_entry=True,
+            is_active=True,
+        ),
         # Retired line item: proves the UI filters inactive services out of the
         # sell flow while old subscriptions that reference it still render.
         Service(
@@ -808,7 +1019,12 @@ def create_subscriptions(customers, services, branches, staff):
     are about to lapse.
     """
     subscriptions = []
-    sellable = [s for s in services if s.is_active]
+    # Only memberships that actually open the door. Private-training packages
+    # are sold separately by create_private_training and attached to a named
+    # captain — handing one out here would produce members whose sole
+    # subscription cannot get them into the building, which is realistic for
+    # nobody and makes the seeded data misleading to test against.
+    sellable = [s for s in services if s.is_active and s.grants_gym_entry]
     default_service = sellable[0]  # Monthly Gym Membership
     branch_by_id = {b.id: b for b in branches.values()}
 

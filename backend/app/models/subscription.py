@@ -62,6 +62,12 @@ class Subscription(db.Model):
     # Who created this subscription (staff member)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
 
+    # The captain on a private-training subscription; NULL for everything else.
+    # Distinct from created_by: reception creates the subscription, the trainer
+    # named here is who the member actually trains with.
+    trainer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
+    trainer = db.relationship('User', foreign_keys=[trainer_id])
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -71,6 +77,54 @@ class Subscription(db.Model):
 
     def __repr__(self):
         return f'<Subscription {self.id} - {self.customer.full_name} - {self.service.name}>'
+
+    # ── Lookups ──────────────────────────────────────────────────────────
+    #
+    # A member may hold several subscriptions at once (gym entry, private
+    # training with a captain, a combined package). Every caller that used to
+    # ask for "the" subscription with .first() was really asking one of two
+    # different questions, and answering the wrong one silently drains the
+    # wrong package — a door scan deducting a coin from someone's training
+    # sessions. The two helpers below are those two questions, named.
+
+    @staticmethod
+    def entry_subscription_for(customer_id, allow_non_entry=False):
+        """The subscription that should open the door for this member, if any.
+
+        Only subscriptions whose service grants gym entry qualify, so a member
+        holding private training alone is turned away — unless the gym has
+        switched on the rule that lets them in, which is what
+        ``allow_non_entry`` carries.
+
+        Active is preferred over frozen so the caller can still distinguish
+        "no subscription" from "frozen" and report the freeze reason; returning
+        a frozen one first would make that branch unreachable.
+        """
+        from app.models.service import Service
+
+        query = Subscription.query.join(Service, Subscription.service_id == Service.id).filter(
+            Subscription.customer_id == customer_id,
+            Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.FROZEN]),
+        )
+        if not allow_non_entry:
+            query = query.filter(Service.grants_gym_entry.is_(True))
+
+        return query.order_by(
+            (Subscription.status == SubscriptionStatus.ACTIVE).desc(),
+            Subscription.end_date.desc(),
+        ).first()
+
+    @staticmethod
+    def active_for(customer_id):
+        """Every active subscription this member holds, newest expiry first.
+
+        For display: the member's app and their profile should show the whole
+        picture, not whichever row the database happened to return first.
+        """
+        return Subscription.query.filter(
+            Subscription.customer_id == customer_id,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        ).order_by(Subscription.end_date.desc()).all()
 
     def is_expired(self):
         """Check if subscription is expired"""
@@ -200,6 +254,9 @@ class Subscription(db.Model):
             'service_id': self.service_id,
             'service_name': self.service.name,
             'service_type': self.service.service_type.value,
+            'grants_gym_entry': self.service.grants_gym_entry,
+            'trainer_id': self.trainer_id,
+            'trainer_name': self.trainer.full_name if self.trainer else None,
             'branch_id': self.branch_id,
             'branch_name': self.branch.name,
             'start_date': self.start_date.isoformat(),

@@ -4,6 +4,7 @@ Database models initialization
 from .user import User, UserRole
 from .branch import Branch
 from .gym import Gym
+from .gym_setting import GymSetting
 from .customer import Customer, Gender
 from .service import Service, ServiceType
 from .subscription import Subscription, SubscriptionStatus
@@ -17,12 +18,17 @@ from .fingerprint import Fingerprint
 from .activation_code import ActivationCode, ActivationCodeType
 from .entry_log import EntryLog, EntryType, EntryStatus
 from .device_token import DeviceToken
+from .gym_class import (
+    GymClass, ClassSession, ClassAttendance, ClassFeedback, ClassSessionStatus,
+)
+from .private_session import PrivateSession, PrivateSessionStatus
 
 __all__ = [
     'User',
     'UserRole',
     'Branch',
     'Gym',
+    'GymSetting',
     'Customer',
     'Gender',
     'Service',
@@ -49,4 +55,11 @@ __all__ = [
     'EntryType',
     'EntryStatus',
     'DeviceToken',
+    'GymClass',
+    'ClassSession',
+    'ClassAttendance',
+    'ClassFeedback',
+    'ClassSessionStatus',
+    'PrivateSession',
+    'PrivateSessionStatus',
 ]
