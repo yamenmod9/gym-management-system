@@ -12,7 +12,17 @@ class Gym(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False, default='My Gym')
-    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True, index=True)
+    # use_alter+name: gyms.owner_id -> users, users.gym_id -> gyms, and
+    # users.branch_id -> branches -> gyms.gym_id form two FK cycles through
+    # this column. Without a named, deferred constraint here, SQLAlchemy
+    # can create the tables (via an anonymous ALTER TABLE) but can't work out
+    # a DROP order — db.drop_all() (and any tool built on it, e.g. seed.py)
+    # fails with CircularDependencyError on a fresh, empty database.
+    owner_id = db.Column(
+        db.Integer,
+        db.ForeignKey('users.id', use_alter=True, name='fk_gyms_owner_id'),
+        nullable=False, unique=True, index=True,
+    )
     logo_url = db.Column(db.String(500), nullable=True)
     primary_color = db.Column(db.String(10), nullable=False, default='#DC2626')
     secondary_color = db.Column(db.String(10), nullable=False, default='#EF4444')
