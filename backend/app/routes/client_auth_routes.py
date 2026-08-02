@@ -1,7 +1,7 @@
 """
 Client authentication routes - Code-based authentication for mobile app
 """
-from flask import Blueprint, request
+from flask import Blueprint, current_app, request
 from datetime import datetime, timedelta
 from app.models import Customer, ActivationCode, ActivationCodeType
 from app.services.notification_service import get_notification_service
@@ -104,8 +104,7 @@ def client_login():
     gym = None
     if customer.branch and hasattr(customer.branch, 'gym_id') and customer.branch.gym_id:
         gym = Gym.query.get(customer.branch.gym_id)
-    if not gym:
-        gym = Gym.query.first()  # fallback for single-tenant
+    # Deliberately no `Gym.query.first()` fallback — see verify-code below.
     gym_data = gym.to_dict() if gym else None
 
     return success_response({
@@ -199,14 +198,18 @@ def request_activation_code():
     # Send code via notification service
     notification_service = get_notification_service()
     try:
-        print(f"\n{'='*70}", flush=True)
-        print(f"🔐 ACTIVATION CODE REQUESTED", flush=True)
-        print(f"{'='*70}", flush=True)
-        print(f"📱 Phone: {delivery_target}", flush=True)
-        print(f"🔢 CODE: {plain_code}", flush=True)
-        print(f"👤 Customer: {customer.full_name}", flush=True)
-        print(f"{'='*70}\n", flush=True)
-        
+        # The code itself is a credential — it only goes to stdout when the
+        # app is running in debug, never in a deployed environment where the
+        # log stream is readable by anyone with dashboard access.
+        if current_app.debug:
+            print(f"\n{'='*70}", flush=True)
+            print("🔐 ACTIVATION CODE REQUESTED", flush=True)
+            print(f"{'='*70}", flush=True)
+            print(f"📱 Phone: {delivery_target}", flush=True)
+            print(f"🔢 CODE: {plain_code}", flush=True)
+            print(f"👤 Customer: {customer.full_name}", flush=True)
+            print(f"{'='*70}\n", flush=True)
+
         notification_service.send_activation_code(
             delivery_method=delivery_method,
             target=delivery_target,
@@ -227,7 +230,6 @@ def request_activation_code():
     }
     
     # Add code to response in development mode only
-    from flask import current_app
     if current_app.debug:
         response_data['code'] = plain_code  # DEV ONLY - Remove in production!
         response_data['note'] = 'Code included in response for testing only'
@@ -296,8 +298,9 @@ def verify_activation_code():
     gym = None
     if customer.branch and hasattr(customer.branch, 'gym_id') and customer.branch.gym_id:
         gym = Gym.query.get(customer.branch.gym_id)
-    if not gym:
-        gym = Gym.query.first()
+    # No `Gym.query.first()` fallback: a customer whose branch has no gym would
+    # otherwise be shown an arbitrary other tenant's name, logo and colours.
+    # Better to send no branding and let the client app use its defaults.
     gym_data = gym.to_dict() if gym else None
 
     return success_response({

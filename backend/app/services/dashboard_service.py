@@ -11,6 +11,7 @@ from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.transaction import Transaction, PaymentMethod
 from app.models.expense import Expense, ExpenseStatus
 from app.models.complaint import Complaint, ComplaintStatus
+from app.models.transaction import net_amount
 from app.utils.helpers import (
     get_expiring_subscriptions,
     get_open_complaints,
@@ -56,7 +57,7 @@ class DashboardService:
         }
 
         # Revenue summary (last 30 days)
-        total_revenue = branch_scoped(db.session.query(func.sum(Transaction.amount)).filter(
+        total_revenue = branch_scoped(db.session.query(func.sum(net_amount())).filter(
             Transaction.transaction_date >= thirty_days_ago
         ), Transaction.branch_id).scalar() or 0
 
@@ -94,10 +95,10 @@ class DashboardService:
         staff_revenue = branch_scoped(db.session.query(
             User.id,
             User.full_name,
-            func.sum(Transaction.amount).label('total')
+            func.sum(net_amount()).label('total')
         ).join(Transaction, Transaction.created_by == User.id).filter(
             Transaction.transaction_date >= thirty_days_ago
-        ), Transaction.branch_id).group_by(User.id, User.full_name).order_by(func.sum(Transaction.amount).desc()).limit(5).all()
+        ), Transaction.branch_id).group_by(User.id, User.full_name).order_by(func.sum(net_amount()).desc()).limit(5).all()
         
         return {
             'alerts': alerts,
@@ -161,11 +162,11 @@ class DashboardService:
                 today_summary['transfer'] += amount
         
         # Monthly revenue
-        current_month_revenue = scoped(db.session.query(func.sum(Transaction.amount)).filter(
+        current_month_revenue = scoped(db.session.query(func.sum(net_amount())).filter(
             Transaction.transaction_date >= current_month_start
         ), Transaction.branch_id)
 
-        last_month_revenue = scoped(db.session.query(func.sum(Transaction.amount)).filter(
+        last_month_revenue = scoped(db.session.query(func.sum(net_amount())).filter(
             and_(
                 Transaction.transaction_date >= last_month_start,
                 Transaction.transaction_date < current_month_start
@@ -274,7 +275,7 @@ class DashboardService:
         if group_by == 'day':
             results = db.session.query(
                 func.date(Transaction.transaction_date).label('date'),
-                func.sum(Transaction.amount).label('total'),
+                func.sum(net_amount()).label('total'),
                 func.count(Transaction.id).label('count')
             ).filter(
                 and_(
@@ -298,7 +299,7 @@ class DashboardService:
             results = db.session.query(
                 extract('year', Transaction.transaction_date).label('year'),
                 extract('month', Transaction.transaction_date).label('month'),
-                func.sum(Transaction.amount).label('total')
+                func.sum(net_amount()).label('total')
             ).filter(
                 and_(
                     Transaction.transaction_date >= start_date,

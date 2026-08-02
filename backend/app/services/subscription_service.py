@@ -42,6 +42,25 @@ class SubscriptionService:
         return 'time_based'
 
     @staticmethod
+    def _resolve_amount(data, service):
+        """The price to book for this subscription.
+
+        Reception types the figure they actually charged — multi-month
+        packages, negotiated rates and discounts all differ from the service's
+        list price. Falls back to the list price when the caller sends
+        nothing, which is what every caller effectively did before.
+        """
+        amount = data.get('amount')
+        if amount in (None, ''):
+            return service.price
+        try:
+            amount = float(amount)
+        except (TypeError, ValueError):
+            return service.price
+        # Never book a negative sale; treat nonsense as "use the list price".
+        return amount if amount >= 0 else service.price
+
+    @staticmethod
     def create_subscription(data, created_by_user_id):
         """Create a new subscription"""
         # Validate customer
@@ -124,7 +143,7 @@ class SubscriptionService:
         
         # Create transaction
         transaction = Transaction(
-            amount=service.price,
+            amount=SubscriptionService._resolve_amount(data, service),
             payment_method=PaymentMethod(data.get('payment_method', 'cash')),
             transaction_type=TransactionType.SUBSCRIPTION,
             branch_id=data['branch_id'],
@@ -166,7 +185,18 @@ class SubscriptionService:
         else:
             start_date = date.today()
         
-        end_date = start_date + timedelta(days=service.duration_days)
+        # Honour a duration override the same way create_subscription does —
+        # renewing a 6-month package used to silently fall back to the
+        # service's default duration.
+        duration_days = service.duration_days
+        if data.get('duration_days_override'):
+            duration_days = int(data['duration_days_override'])
+        elif data.get('duration_months'):
+            try:
+                duration_days = int(data['duration_months']) * 30
+            except (TypeError, ValueError):
+                pass
+        end_date = start_date + timedelta(days=int(duration_days))
 
         # ── Derive / preserve subscription type ──────────────────────────
         sub_type = (
@@ -226,7 +256,7 @@ class SubscriptionService:
 
         # Create renewal transaction
         transaction = Transaction(
-            amount=service.price,
+            amount=SubscriptionService._resolve_amount(data, service),
             payment_method=PaymentMethod(data.get('payment_method', 'cash')),
             transaction_type=TransactionType.RENEWAL,
             branch_id=subscription.branch_id,

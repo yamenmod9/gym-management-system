@@ -102,21 +102,23 @@ def create_complaint():
     db.session.add(complaint)
     db.session.commit()
     
-    # Notify owner/branch manager about the new complaint
+    # Notify this gym's owner and branch managers about the new complaint.
     try:
+        from app.models.branch import Branch
         from app.services.fcm_service import notify_role
-        notify_role(
-            'owner',
-            '📋 شكوى جديدة',
-            f'{complaint.title}',
-            {'type': 'new_complaint', 'complaint_id': str(complaint.id)},
-        )
-        notify_role(
-            'branch_manager',
-            '📋 شكوى جديدة',
-            f'{complaint.title}',
-            {'type': 'new_complaint', 'complaint_id': str(complaint.id)},
-        )
+
+        branch = db.session.get(Branch, complaint.branch_id)
+        gym_id = branch.gym_id if branch else None
+        payload = {'type': 'new_complaint', 'complaint_id': str(complaint.id)}
+
+        for role in ('owner', 'branch_manager'):
+            notify_role(
+                role,
+                '📋 شكوى جديدة',
+                f'{complaint.title}',
+                payload,
+                gym_id=gym_id,
+            )
     except Exception as e:
         logger.exception('Push notification failed: %s', e)
 

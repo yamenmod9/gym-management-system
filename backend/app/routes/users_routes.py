@@ -111,16 +111,43 @@ def get_employees():
     } for u in users])
 
 
+def _can_administer(actor, target):
+    """Whether `actor` may read or act on the `target` user.
+
+    Both /users/<id> GET and DELETE previously had no scope check at all, so
+    any owner could read — and deactivate — staff belonging to a different
+    gym just by guessing an id.
+    """
+    if actor is None:
+        return False
+    if actor.role == UserRole.SUPER_ADMIN:
+        return True
+    if actor.id == target.id:
+        return True
+
+    actor_gym = get_current_gym_id(actor)
+    if actor_gym is None or target.gym_id != actor_gym:
+        return False
+
+    accessible = get_accessible_branch_ids(actor)
+    if accessible is not None and target.branch_id not in accessible:
+        return False
+    return True
+
+
 @users_bp.route('/<int:user_id>', methods=['GET'])
 @jwt_required()
 @role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER)
 def get_user(user_id):
     """Get user by ID"""
     user = db.session.get(User, user_id)
-    
+
     if not user:
         return error_response("User not found", 404)
-    
+
+    if not _can_administer(get_current_user(), user):
+        return error_response("User not found", 404)
+
     return success_response(user.to_dict())
 
 
@@ -210,13 +237,24 @@ def update_user(user_id):
 def delete_user(user_id):
     """Deactivate user (soft delete)"""
     user = db.session.get(User, user_id)
-    
+
     if not user:
         return error_response("User not found", 404)
-    
+
+    actor = get_current_user()
+    if not _can_administer(actor, user):
+        return error_response("User not found", 404)
+
     if user.role == UserRole.OWNER:
         return error_response("Cannot delete owner account", 403)
-    
+
+    # Same rank rule the edit path enforces: you cannot deactivate a peer or
+    # someone above you.
+    if actor.id != user.id and not actor.outranks(user.role):
+        return error_response(
+            "You cannot deactivate an account at or above your own rank", 403
+        )
+
     user.is_active = False
     db.session.commit()
     

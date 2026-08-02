@@ -93,3 +93,16 @@ class Transaction(db.Model):
             'transaction_date': self.transaction_date.isoformat(),
             'created_at': self.created_at.isoformat()
         }
+
+
+def net_amount():
+    """SQL expression for a transaction's revenue, net of any discount.
+
+    Revenue is `amount - discount` everywhere it is reported to a human —
+    reports, finance, branch performance, the member's payment history. The
+    dashboards summed the gross `amount` instead, so the owner's headline
+    revenue read higher than the report for the same period by exactly the
+    discounts given. Use this in aggregates so the two agree.
+    """
+    from sqlalchemy import func
+    return Transaction.amount - func.coalesce(Transaction.discount, 0)

@@ -17,6 +17,12 @@ logger = logging.getLogger(__name__)
 _firebase_app = None
 
 
+def db_session():
+    """The active SQLAlchemy session (imported lazily to avoid a cycle)."""
+    from app.extensions import db
+    return db.session
+
+
 def _init_firebase():
     """Initialise Firebase Admin SDK once."""
     global _firebase_app
@@ -157,10 +163,22 @@ def notify_customer(customer_id: int, title: str, body: str, data: Optional[Dict
     return sent
 
 
-def notify_role(role_value: str, title: str, body: str, data: Optional[Dict[str, str]] = None) -> int:
+def notify_role(
+    role_value: str,
+    title: str,
+    body: str,
+    data: Optional[Dict[str, str]] = None,
+    gym_id: Optional[int] = None,
+) -> int:
     """
-    Send a push notification to ALL users with a given role.
+    Send a push notification to users with a given role.
+
     role_value: 'owner', 'branch_manager', 'front_desk', 'super_admin', etc.
+    gym_id:     restrict delivery to that gym's staff. Callers should always
+                pass this. Without it the notification goes to every holder of
+                the role in the entire system — which is how a complaint filed
+                at one gym ended up pushed, title and all, to the owners and
+                branch managers of every other gym on the platform.
     """
     from app.models.device_token import DeviceToken
     from app.models.user import User, UserRole
@@ -171,7 +189,20 @@ def notify_role(role_value: str, title: str, body: str, data: Optional[Dict[str,
         logger.warning(f'Unknown role: {role_value}')
         return 0
 
-    user_ids = [u.id for u in User.query.filter_by(role=role_enum, is_active=True).all()]
+    query = User.query.filter_by(role=role_enum, is_active=True)
+    if gym_id is not None:
+        from app.models.gym import Gym
+        # An owner's gym is expressed by Gym.owner_id; staff carry gym_id.
+        # Match either so owners are not silently skipped.
+        owner_ids = [
+            row[0] for row in
+            db_session().query(Gym.owner_id).filter(Gym.id == gym_id).all()
+        ]
+        query = query.filter(
+            (User.gym_id == gym_id) | (User.id.in_(owner_ids or [-1]))
+        )
+
+    user_ids = [u.id for u in query.all()]
     if not user_ids:
         return 0
 
@@ -187,12 +218,30 @@ def notify_role(role_value: str, title: str, body: str, data: Optional[Dict[str,
     return send_push_to_tokens(fcm_list, title, body, data)
 
 
-def notify_all_customers(title: str, body: str, data: Optional[Dict[str, str]] = None) -> int:
-    """Send a push notification to ALL registered client devices."""
+def notify_all_customers(
+    title: str,
+    body: str,
+    data: Optional[Dict[str, str]] = None,
+    gym_id: Optional[int] = None,
+) -> int:
+    """Send a push notification to registered client devices.
+
+    gym_id restricts delivery to members of that gym's branches. It has no
+    callers yet; the parameter exists so the first one cannot accidentally
+    broadcast one tenant's announcement to every member on the platform.
+    """
     from app.models.device_token import DeviceToken
-    tokens = DeviceToken.query.filter_by(
-        app_type='client', is_active=True,
-    ).all()
+
+    query = DeviceToken.query.filter_by(app_type='client', is_active=True)
+    if gym_id is not None:
+        from app.models.branch import Branch
+        from app.models.customer import Customer
+        member_ids = db_session().query(Customer.id).join(
+            Branch, Customer.branch_id == Branch.id
+        ).filter(Branch.gym_id == gym_id)
+        query = query.filter(DeviceToken.customer_id.in_(member_ids))
+
+    tokens = query.all()
     fcm_list = [dt.fcm_token for dt in tokens]
     if not fcm_list:
         return 0

@@ -9,6 +9,7 @@ from app.models.transaction import Transaction, PaymentMethod, TransactionType
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.expense import Expense, ExpenseStatus
 from app.models.complaint import Complaint, ComplaintStatus
+from app.models.transaction import net_amount
 
 
 def calculate_branch_revenue(branch_id, start_date=None, end_date=None):
@@ -20,7 +21,7 @@ def calculate_branch_revenue(branch_id, start_date=None, end_date=None):
     if end_date:
         query = query.filter(Transaction.transaction_date <= end_date)
     
-    total = db.session.query(func.sum(Transaction.amount)).filter(
+    total = db.session.query(func.sum(net_amount())).filter(
         Transaction.branch_id == branch_id
     )
     
@@ -148,7 +149,7 @@ def compare_branches_performance(start_date=None, end_date=None):
         return []
 
     revenue_query = db.session.query(
-        Transaction.branch_id, func.sum(Transaction.amount)
+        Transaction.branch_id, func.sum(net_amount())
     ).filter(Transaction.branch_id.in_(branch_ids))
     if start_date:
         revenue_query = revenue_query.filter(Transaction.transaction_date >= start_date)

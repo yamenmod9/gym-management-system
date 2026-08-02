@@ -4,6 +4,7 @@ import '../../../core/api/api_service.dart';
 import '../../../core/api/api_endpoints.dart';
 import '../../../shared/models/customer_model.dart';
 import '../../../shared/models/service_model.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../core/utils/helpers.dart';
 
 class ReceptionProvider extends ChangeNotifier {
@@ -703,27 +704,35 @@ class ReceptionProvider extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> dailyClosing() async {
+  /// Close the till for today. [actualCash] is the amount counted in the
+  /// drawer; the backend compares it against the transactions on record and
+  /// stores the difference.
+  Future<Map<String, dynamic>> dailyClosing({required double actualCash}) async {
     try {
       final response = await _apiService.post(
         ApiEndpoints.dailyClosing,
         data: {
           'branch_id': branchId,
-          'closing_date': DateTime.now().toIso8601String().split('T')[0],
+          'date': DateTime.now().toIso8601String().split('T')[0],
+          'actual_cash': actualCash,
         },
       );
 
-      if (response.statusCode == 200) {
+      // The endpoint answers 201 on success; checking only for 200 reported
+      // a failure even when the closing had been written.
+      if (response.statusCode == 200 || response.statusCode == 201) {
         return {
           'success': true,
-          'message': 'Daily closing completed successfully',
+          'message': S.dailyClosingCompleted,
           'data': response.data,
         };
       }
 
       return {
         'success': false,
-        'message': response.data?['message'] ?? 'Failed to complete daily closing',
+        'message': response.data?['error'] ??
+            response.data?['message'] ??
+            S.dailyClosingFailed,
       };
     } catch (e) {
       return {
@@ -736,6 +745,7 @@ class ReceptionProvider extends ChangeNotifier {
   Future<Map<String, dynamic>> submitComplaint({
     required String title,
     required String description,
+    required String complaintType,
     int? customerId,
   }) async {
     try {
@@ -744,6 +754,9 @@ class ReceptionProvider extends ChangeNotifier {
         data: {
           'title': title,
           'description': description,
+          // Required by the backend's ComplaintSchema — omitting it fails
+          // validation with a 400 before the complaint is ever created.
+          'complaint_type': complaintType,
           'branch_id': branchId,
           if (customerId != null) 'customer_id': customerId,
         },
@@ -981,44 +994,35 @@ class ReceptionProvider extends ChangeNotifier {
     try {
       debugPrint('🔄 Regenerating QR code for customer $customerId...');
 
-      // Try backend endpoint first
-      try {
-        final response = await _apiService.post(
-          ApiEndpoints.regenerateQRCode(customerId),
-          data: {},
-        );
+      final response = await _apiService.post(
+        ApiEndpoints.regenerateQRCode(customerId),
+        data: {},
+      );
 
-        debugPrint('🔄 QR Regenerate Response Status: ${response.statusCode}');
-        debugPrint('🔄 QR Regenerate Response Data: ${response.data}');
+      debugPrint('🔄 QR Regenerate Response Status: ${response.statusCode}');
+      debugPrint('🔄 QR Regenerate Response Data: ${response.data}');
 
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          final qrCode = response.data['qr_code'] ??
-                        response.data['data']?['qr_code'] ??
-                        'customer_id:$customerId';
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final qrCode =
+            response.data['qr_code'] ?? response.data['data']?['qr_code'];
 
-          debugPrint('✅ QR code regenerated from backend: $qrCode');
+        if (qrCode != null) {
+          debugPrint('✅ QR code regenerated: $qrCode');
 
           return {
             'success': true,
-            'message': 'QR code regenerated successfully',
+            'message': S.qrRegenerated,
             'qr_code': qrCode,
           };
         }
-      } catch (e) {
-        debugPrint('⚠️ Backend endpoint not available: $e');
-        // Continue to fallback method
       }
 
-      // Fallback: Generate QR code locally if backend endpoint doesn't exist
-      debugPrint('📱 Generating QR code locally (backend endpoint not available)');
-      final qrCode = 'customer_id:$customerId';
-
-      debugPrint('✅ QR code generated locally: $qrCode');
-
+      // No local fallback: regenerating exists to retire a QR code that has
+      // been copied, and only the server can actually do that. Inventing a
+      // code here would report success while the old one stayed valid.
       return {
-        'success': true,
-        'message': 'QR code generated successfully',
-        'qr_code': qrCode,
+        'success': false,
+        'message': response.data?['message'] ?? S.failedToRegenerateQR,
       };
     } catch (e, stackTrace) {
       debugPrint('❌ Error regenerating QR code: $e');
@@ -1026,7 +1030,7 @@ class ReceptionProvider extends ChangeNotifier {
 
       return {
         'success': false,
-        'message': 'Error: $e',
+        'message': S.failedToRegenerateQR,
       };
     }
   }

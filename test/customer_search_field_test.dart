@@ -10,6 +10,11 @@ import 'package:provider/provider.dart';
 
 /// Stands in for the backend: records what was asked and replays canned rows.
 class _FakeApiService extends ApiService {
+  // `flutter test` runs without --dart-define, so the real base URL is not
+  // resolvable here; pass a placeholder rather than letting the constructor
+  // throw. No request made by this fake ever leaves the process.
+  _FakeApiService() : super(baseUrl: 'http://localhost');
+
   final List<String> requestedPaths = [];
   final Map<String, dynamic> queries = {};
 

@@ -159,7 +159,7 @@ def validate_barcode():
         
         return error_response('No active subscription found', 403, {
             'entry_id': entry.id,
-            'customer': customer.to_dict()
+            'customer': customer.to_dict(include_temp_password=True)
         })
     
     # Validate entry
@@ -183,7 +183,7 @@ def validate_barcode():
         
         return error_response(reason, 403, {
             'entry_id': entry.id,
-            'customer': customer.to_dict(),
+            'customer': customer.to_dict(include_temp_password=True),
             'subscription': subscription.to_dict()
         })
     
@@ -206,7 +206,7 @@ def validate_barcode():
     
     return success_response({
         'entry': entry.to_dict(),
-        'customer': customer.to_dict(),
+        'customer': customer.to_dict(include_temp_password=True),
         'subscription': {
             'id': subscription.id,
             'service_name': subscription.service.name if subscription.service else None,
@@ -306,7 +306,7 @@ def manual_entry():
     
     return success_response({
         'entry': entry.to_dict(),
-        'customer': customer.to_dict(),
+        'customer': customer.to_dict(include_temp_password=True),
         'subscription': {
             'id': subscription.id,
             'service_name': subscription.service.name if subscription.service else None,

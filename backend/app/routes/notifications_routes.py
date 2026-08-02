@@ -5,10 +5,36 @@ from flask import Blueprint, request
 from flask_jwt_extended import decode_token, jwt_required
 from app.extensions import db
 from app.models.device_token import DeviceToken
-from app.models.user import User
-from app.utils import success_response, error_response
+from app.models.user import User, UserRole
+from app.utils import success_response, error_response, role_required
 
 notifications_bp = Blueprint('notifications', __name__, url_prefix='/api/notifications')
+
+
+def _identity_from_request():
+    """Resolve (user_id, customer_id) from the Authorization header.
+
+    Returns (None, None) when the header is absent or the token is not valid;
+    ``decode_token`` verifies both the signature and the expiry.
+    """
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None, None
+
+    try:
+        decoded = decode_token(auth_header.split(' ', 1)[1])
+    except Exception:
+        return None, None
+
+    if decoded.get('scope') == 'client':
+        cid = decoded.get('customer_id')
+        return None, (int(cid) if cid else None)
+
+    identity = decoded.get('sub')
+    if not identity:
+        return None, None
+    user = db.session.get(User, int(identity))
+    return (user.id if user else None), None
 
 
 @notifications_bp.route('/register-device', methods=['POST'])
@@ -32,30 +58,7 @@ def register_device():
     app_type = data['app_type']
     platform = data.get('platform', 'android')
 
-    user_id = None
-    customer_id = None
-
-    # Decode the JWT from Authorization header
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header.startswith('Bearer '):
-        token_str = auth_header.split(' ', 1)[1]
-        try:
-            decoded = decode_token(token_str)
-            scope = decoded.get('scope')
-            identity = decoded.get('sub')
-
-            if scope == 'client':
-                # Client token — customer_id is in claims
-                cid = decoded.get('customer_id')
-                if cid:
-                    customer_id = int(cid)
-            elif identity:
-                # Staff/admin token — identity is user id
-                user = db.session.get(User, int(identity))
-                if user:
-                    user_id = user.id
-        except Exception:
-            pass
+    user_id, customer_id = _identity_from_request()
 
     if user_id is None and customer_id is None:
         return error_response('Unable to identify user from token', 401)
@@ -100,8 +103,17 @@ def unregister_device():
     if not data or not data.get('fcm_token'):
         return error_response('fcm_token is required', 400)
 
+    # Scoped to the caller's own registrations. Unauthenticated, this let
+    # anyone who learned a device token silence that device's notifications.
+    # The client unregisters during logout, while its token is still valid.
+    user_id, customer_id = _identity_from_request()
+    if user_id is None and customer_id is None:
+        return error_response('Unable to identify user from token', 401)
+
     count = DeviceToken.query.filter_by(
         fcm_token=data['fcm_token'],
+        user_id=user_id,
+        customer_id=customer_id,
     ).update({'is_active': False})
     db.session.commit()
 
@@ -110,19 +122,15 @@ def unregister_device():
 
 @notifications_bp.route('/debug-tokens', methods=['GET'])
 @jwt_required()
+@role_required(UserRole.SUPER_ADMIN)
 def debug_tokens():
     """
     Debug endpoint: list all registered device tokens.
-    Only accessible to authenticated staff/admin users.
+
+    Super admin only. This dumps raw FCM tokens across every gym, so any
+    authenticated staffer having it — which was the case — handed one tenant
+    the push identifiers of every other tenant's staff and members.
     """
-    from app.models.user import User
-    from flask_jwt_extended import get_jwt_identity
-
-    identity = get_jwt_identity()
-    user = db.session.get(User, int(identity)) if identity else None
-    if not user:
-        return error_response('Staff access required', 403)
-
     tokens = DeviceToken.query.order_by(DeviceToken.id.desc()).limit(50).all()
     return success_response({
         'total': DeviceToken.query.count(),

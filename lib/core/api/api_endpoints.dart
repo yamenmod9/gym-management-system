@@ -7,7 +7,7 @@ class ApiEndpoints {
   // Auth Endpoints
   static const String login = '/api/auth/login';
   static const String logout = '/api/auth/logout';
-  static const String profile = '/api/auth/profile';
+  static const String profile = '/api/auth/me';
   
   // Customer Endpoints
   static const String customers = '/api/customers';
@@ -23,9 +23,9 @@ class ApiEndpoints {
   static const String renewSubscription = '/api/subscriptions/renew';
   static const String stopSubscription = '/api/subscriptions/stop';
   static const String freezeSubscription = '/api/subscriptions/freeze';
-  static String deductSession(int subscriptionId) => '/api/subscriptions/$subscriptionId/deduct-session';
-  static String useCoins(int subscriptionId) => '/api/subscriptions/$subscriptionId/use-coins';
-  
+  static String unfreezeSubscription(int id) => '/api/subscriptions/$id/unfreeze';
+
+
   // Payment Endpoints
   static const String payments = '/api/payments';
   static const String recordPayment = '/api/payments/record';
@@ -46,9 +46,9 @@ class ApiEndpoints {
   static const String services = '/api/services';
   static String serviceById(int id) => '/api/services/$id';
   
-  // Complaint Endpoints
+  // Complaint Endpoints (POST to the collection creates one)
   static const String complaints = '/api/complaints';
-  static const String submitComplaint = '/api/complaints/submit';
+  static const String submitComplaint = complaints;
   
   // Reports Endpoints
   static const String reportsRevenue = '/api/reports/revenue';
@@ -72,7 +72,6 @@ class ApiEndpoints {
   
   // Attendance Endpoints
   static const String attendance = '/api/attendance';
-  static const String attendanceByBranch = '/api/attendance/by-branch';
   
   // Alert Endpoints
   static const String alerts = '/api/alerts';

@@ -1,11 +1,12 @@
 """
-Additional test route - Debug data visibility
+Additional test route - Debug data visibility.
+
+Registered only outside production; see register_blueprints(include_dev_tools).
 """
 from flask import Blueprint, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import User, Customer, Subscription, Transaction, Branch
+from flask_jwt_extended import jwt_required
+from app.models import Customer, Subscription, Transaction, Branch
 from app.utils import get_current_user
-from app.extensions import db
 
 debug_bp = Blueprint('debug', __name__, url_prefix='/api/debug')
 
@@ -40,8 +41,13 @@ def my_data_summary():
     subscription_count = subscription_query.count()
     transaction_count = transaction_query.count()
     
-    # Get branch info
-    branches = Branch.query.all()
+    # Get branch info — scoped to the caller's gym. Listing every branch in
+    # the system (and the system-wide totals that used to sit below) handed
+    # any authenticated staffer a headcount of every other tenant's business.
+    branch_query = Branch.query
+    if user.gym_id:
+        branch_query = branch_query.filter_by(gym_id=user.gym_id)
+    branches = branch_query.all()
     branch_info = []
     for branch in branches:
         branch_customers = Customer.query.filter_by(branch_id=branch.id).count()
@@ -71,11 +77,5 @@ def my_data_summary():
             'transactions': transaction_count
         },
         'all_branches': branch_info,
-        'total_system_data': {
-            'total_customers': Customer.query.count(),
-            'total_subscriptions': Subscription.query.count(),
-            'total_transactions': Transaction.query.count(),
-            'total_branches': len(branches)
-        },
         'message': f"You should see {customer_count} customers, {subscription_count} subscriptions, and {transaction_count} transactions in the Flutter app."
     })

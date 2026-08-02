@@ -55,8 +55,15 @@ class Branch(db.Model):
     def __repr__(self):
         return f'<Branch {self.name} ({self.code})>'
 
-    def to_dict(self):
-        """Convert to dictionary"""
+    def to_dict(self, staff_count=None, customers_count=None):
+        """Convert to dictionary
+
+        Args:
+            staff_count, customers_count: pass precomputed totals when
+                rendering a page of branches. Left to their defaults, each
+                branch runs its own COUNT — two extra round-trips per row on
+                every listing. See Branch.batch_counts.
+        """
         return {
             'id': self.id,
             'name': self.name,
@@ -67,6 +74,34 @@ class Branch(db.Model):
             'gym_id': self.gym_id,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat(),
-            'staff_count': self.staff.count(),
-            'customers_count': self.customers.count()
+            'staff_count': self.staff.count() if staff_count is None else staff_count,
+            'customers_count': (
+                self.customers.count() if customers_count is None else customers_count
+            ),
         }
+
+    @staticmethod
+    def batch_counts(branch_ids):
+        """Staff and customer totals for several branches in two queries.
+
+        Returns (staff_by_branch, customers_by_branch) dicts keyed by branch id.
+        """
+        from sqlalchemy import func
+        from app.extensions import db
+        from app.models.customer import Customer
+        from app.models.user import User
+
+        if not branch_ids:
+            return {}, {}
+
+        staff = dict(
+            db.session.query(User.branch_id, func.count(User.id))
+            .filter(User.branch_id.in_(branch_ids))
+            .group_by(User.branch_id).all()
+        )
+        customers = dict(
+            db.session.query(Customer.branch_id, func.count(Customer.id))
+            .filter(Customer.branch_id.in_(branch_ids))
+            .group_by(Customer.branch_id).all()
+        )
+        return staff, customers

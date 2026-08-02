@@ -91,7 +91,8 @@ lib/
 
 ## 📡 Backend Integration
 
-**Base URL:** `https://yamenmod91.pythonanywhere.com`
+**Base URL:** set per build via the `API_BASE_URL` dart-define; production
+currently points at the Railway deployment (see [scripts/build_web.sh](scripts/build_web.sh)).
 
 **Authentication:** JWT Bearer Token
 
@@ -154,18 +155,24 @@ The workflow at [.github/workflows/deploy.yml](.github/workflows/deploy.yml) che
 
 Vercel should serve the generated Flutter web output as a single-page application. The root [vercel.json](vercel.json) file rewrites all routes to `index.html` so browser refresh and direct links do not return 404s.
 
-Use these Vercel settings:
+Vercel reads these from [vercel.json](vercel.json); they are listed here for reference:
 
-- Install command: `bash install_web.sh`
-- Build command: `bash build_web.sh`
+- Install command: `bash scripts/install_web.sh`
+- Build command: `bash scripts/build_web.sh`
 - Output directory: `build/web`
 
 ### Environment variables
 
 Use these variables for local builds, CI, and deployment settings:
 
-- `API_BASE_URL` - the FastAPI server base URL
+- `API_BASE_URL` - the Flask server base URL
 - `ENVIRONMENT` - `development`, `staging`, or `production`
+- `FCM_VAPID_KEY` - Web Push public key; leave unset to disable browser notifications
+
+The backend additionally requires `SECRET_KEY` and `JWT_SECRET_KEY` in its own
+environment when `FLASK_ENV=production` — it refuses to start without them, so
+that a deploy can never fall back to the development signing key. Set
+`CORS_ORIGINS` to a comma-separated allowlist to restrict browser origins.
 
 See [.env.example](.env.example) for the exact placeholders.
 

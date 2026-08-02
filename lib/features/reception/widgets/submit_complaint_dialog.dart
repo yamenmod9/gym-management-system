@@ -1,7 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../providers/reception_provider.dart';
+
+/// Complaint categories, matching the backend's ComplaintType enum. The value
+/// is what gets sent as `complaint_type`; the label is what reception sees.
+const _complaintTypes = <String, String Function()>{
+  'device': _deviceLabel,
+  'pool': _poolLabel,
+  'cleanliness': _cleanlinessLabel,
+  'service': _serviceLabel,
+  'other': _otherLabel,
+};
+
+String _deviceLabel() => S.complaintTypeDevice;
+String _poolLabel() => S.complaintTypePool;
+String _cleanlinessLabel() => S.complaintTypeCleanliness;
+String _serviceLabel() => S.complaintTypeService;
+String _otherLabel() => S.complaintTypeOther;
 
 class SubmitComplaintDialog extends StatefulWidget {
   const SubmitComplaintDialog({super.key});
@@ -16,6 +33,7 @@ class _SubmitComplaintDialogState extends State<SubmitComplaintDialog> {
   final _descriptionController = TextEditingController();
   final _customerIdController = TextEditingController();
 
+  String _complaintType = 'other';
   bool _isLoading = false;
 
   @override
@@ -35,6 +53,7 @@ class _SubmitComplaintDialogState extends State<SubmitComplaintDialog> {
     final result = await provider.submitComplaint(
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
+      complaintType: _complaintType,
       customerId: _customerIdController.text.trim().isEmpty
           ? null
           : int.tryParse(_customerIdController.text),
@@ -77,9 +96,12 @@ class _SubmitComplaintDialogState extends State<SubmitComplaintDialog> {
                 children: [
                   const Icon(Icons.report_problem),
                   const SizedBox(width: 12),
-                  const Text(
-                    'Submit Complaint',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Text(
+                    S.submitComplaint,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const Spacer(),
                   IconButton(
@@ -101,33 +123,66 @@ class _SubmitComplaintDialogState extends State<SubmitComplaintDialog> {
                     children: [
                       TextFormField(
                         controller: _customerIdController,
-                        decoration: const InputDecoration(
-                          labelText: 'Customer ID (Optional)',
-                          prefixIcon: Icon(Icons.person),
+                        decoration: InputDecoration(
+                          labelText: S.customerIdOptional,
+                          prefixIcon: const Icon(Icons.person),
                         ),
                         keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 12),
 
+                      DropdownButtonFormField<String>(
+                        initialValue: _complaintType,
+                        decoration: InputDecoration(
+                          labelText: S.complaintType,
+                          prefixIcon: const Icon(Icons.category),
+                        ),
+                        items: [
+                          for (final entry in _complaintTypes.entries)
+                            DropdownMenuItem(
+                              value: entry.key,
+                              child: Text(entry.value()),
+                            ),
+                        ],
+                        onChanged: (v) => setState(
+                          () => _complaintType = v ?? 'other',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
                       TextFormField(
                         controller: _titleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Title *',
-                          prefixIcon: Icon(Icons.title),
+                        decoration: InputDecoration(
+                          labelText: S.titleRequired,
+                          prefixIcon: const Icon(Icons.title),
                         ),
-                        validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
+                        // Length floors mirror the backend's ComplaintSchema
+                        // (title 3-200, description 10+); catching them here
+                        // turns an opaque 400 into an inline field error.
+                        validator: (v) {
+                          final value = v?.trim() ?? '';
+                          if (value.isEmpty) return S.required;
+                          if (value.length < 3) return S.minCharacters(3);
+                          return null;
+                        },
+                        maxLength: 200,
                       ),
                       const SizedBox(height: 12),
 
                       TextFormField(
                         controller: _descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'Description *',
-                          prefixIcon: Icon(Icons.description),
+                        decoration: InputDecoration(
+                          labelText: S.descriptionRequired,
+                          prefixIcon: const Icon(Icons.description),
                           alignLabelWithHint: true,
                         ),
                         maxLines: 5,
-                        validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
+                        validator: (v) {
+                          final value = v?.trim() ?? '';
+                          if (value.isEmpty) return S.required;
+                          if (value.length < 10) return S.minCharacters(10);
+                          return null;
+                        },
                       ),
                     ],
                   ),
@@ -148,14 +203,14 @@ class _SubmitComplaintDialogState extends State<SubmitComplaintDialog> {
                 children: [
                   TextButton(
                     onPressed: _isLoading ? null : () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                    child: Text(S.cancel),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: _isLoading ? null : _handleSubmit,
                     child: _isLoading
                         ? const SmallLoadingIndicator()
-                        : const Text('Submit'),
+                        : Text(S.submit),
                   ),
                 ],
               ),

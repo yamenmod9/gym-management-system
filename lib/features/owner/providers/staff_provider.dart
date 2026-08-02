@@ -30,11 +30,12 @@ class StaffProvider extends ChangeNotifier {
     try {
       debugPrint('👥 Loading all staff...');
       
-      // Try different endpoints for staff/users/employees
+      // /api/users is the real collection; /api/users/employees and
+      // /api/users/staff are aliases onto the same handler. The bare
+      // /api/employees and /api/staff paths this used to fall through to
+      // have never existed on the backend.
       final endpoints = [
         '/api/users',
-        '/api/employees',
-        '/api/staff',
       ];
 
       for (final endpoint in endpoints) {

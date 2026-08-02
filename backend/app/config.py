@@ -5,6 +5,29 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+class ConfigError(RuntimeError):
+    """Raised at import time when a required production setting is missing."""
+
+
+#: Settings that have no safe default outside development. Checked by
+#: ``ProductionConfig.validate()`` at app-creation time rather than at import
+#: time, so that importing this module in dev/test never explodes.
+REQUIRED_IN_PRODUCTION = ('SECRET_KEY', 'JWT_SECRET_KEY')
+
+
+def _parse_origins(raw, default):
+    """Turn a comma-separated CORS_ORIGINS env var into a list.
+
+    '*' stays a bare string because flask-cors treats the wildcard specially.
+    """
+    if not raw:
+        return default
+    origins = [origin.strip() for origin in raw.split(',') if origin.strip()]
+    if not origins or origins == ['*']:
+        return '*'
+    return origins
+
+
 def _normalize_database_url(url):
     """Railway/Heroku-style Postgres addons hand out `postgres://` URLs, but
     SQLAlchemy 1.4+ only recognizes the `postgresql://` dialect prefix and
@@ -50,7 +73,7 @@ class Config:
     
     # CORS Configuration
     # Allow all origins for development. Restrict in production.
-    CORS_ORIGINS = '*'  # or ['http://localhost:3000', 'http://localhost:5000'] for specific origins
+    CORS_ORIGINS = _parse_origins(os.getenv('CORS_ORIGINS'), default='*')
 
 
 class DevelopmentConfig(Config):
@@ -67,9 +90,27 @@ class ProductionConfig(Config):
     SQLALCHEMY_DATABASE_URI = _normalize_database_url(
         os.getenv('DATABASE_URL', 'sqlite:///gym_management.db')
     )
-    # CORS: Allow all origins for now, restrict later for security
-    # CORS_ORIGINS = ['https://your-frontend-domain.com', 'https://your-other-domain.com']
-    CORS_ORIGINS = '*'  # Change to specific origins in production for better security
+
+    # Set CORS_ORIGINS to a comma-separated allowlist of the front-end origins
+    # (e.g. "https://app.example.com,https://admin.example.com"). Left unset it
+    # stays permissive so existing deploys keep working.
+    CORS_ORIGINS = _parse_origins(os.getenv('CORS_ORIGINS'), default='*')
+
+    @staticmethod
+    def validate():
+        """Refuse to boot on the committed development secrets.
+
+        JWT_SECRET_KEY signs every access token, so a production deploy that
+        silently fell back to the default in ``Config`` would let anyone who
+        has read this file mint a valid owner/super-admin token.
+        """
+        missing = [name for name in REQUIRED_IN_PRODUCTION if not os.getenv(name)]
+        if missing:
+            raise ConfigError(
+                'Refusing to start in production without: '
+                + ', '.join(missing)
+                + '. Set them in the deployment environment.'
+            )
 
 
 class TestingConfig(Config):

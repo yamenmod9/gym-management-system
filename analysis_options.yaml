@@ -9,6 +9,15 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    # Gym_backend/ is a stale, gitignored duplicate of the whole project that
+    # still sits in the working tree. It is not part of any build, but the
+    # analyzer walks it anyway — reporting issues against files nobody ships
+    # and roughly doubling analysis time.
+    - Gym_backend/**
+    - build/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

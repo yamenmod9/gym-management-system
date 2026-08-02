@@ -8,7 +8,10 @@ from datetime import datetime
 from app.models import Customer, Subscription, EntryLog, Branch
 from app.models.subscription import SubscriptionStatus
 from app.models.entry_log import EntryType
-from app.utils import success_response, error_response, role_required, get_current_user
+from app.utils import (
+    success_response, error_response, role_required, get_current_user,
+    get_accessible_branch_ids
+)
 from app.models.user import UserRole
 from app.extensions import db
 
@@ -83,13 +86,27 @@ def scan_qr_code():
     
     if not customer:
         return error_response("Customer not found", 404)
-    
-    # Find active subscription
-    subscription = Subscription.query.filter_by(
-        customer_id=customer.id,
-        status=SubscriptionStatus.ACTIVE
+
+    # The member has to belong to a branch this staffer covers. customer_id
+    # comes from the request body, so without this a staffer could check in
+    # (and meter) a member of another gym entirely.
+    accessible = get_accessible_branch_ids(current_user)
+    if accessible is not None and customer.branch_id not in accessible:
+        return error_response("Customer not found", 404)
+
+    # Look for an active *or* frozen subscription. Filtering to ACTIVE alone
+    # made the "subscription is frozen" branch below unreachable, so a frozen
+    # member was turned away with a bare "No active subscription" instead of
+    # the reason and the date it was frozen.
+    subscription = Subscription.query.filter(
+        Subscription.customer_id == customer.id,
+        Subscription.status.in_(
+            [SubscriptionStatus.ACTIVE, SubscriptionStatus.FROZEN]
+        )
+    ).order_by(
+        (Subscription.status == SubscriptionStatus.ACTIVE).desc()
     ).first()
-    
+
     # Check if no active subscription
     if not subscription:
         # Check for expired subscription
@@ -215,12 +232,17 @@ def scan_qr_code():
     try:
         from app.services.fcm_service import notify_role
         low_threshold = 3
+        # Scoped to this gym — the member's name is in the body, so an
+        # unscoped send pushed one gym's member names to every other gym's
+        # front desk.
+        gym_id = branch.gym_id if branch else None
         if subscription.subscription_type == 'coins' and subscription.remaining_coins is not None and subscription.remaining_coins <= low_threshold:
             notify_role(
                 'front_desk',
                 '⚠️ رصيد منخفض',
                 f'{customer.full_name} لديه {subscription.remaining_coins} عملة متبقية فقط.',
                 {'type': 'low_balance', 'customer_id': str(customer.id)},
+                gym_id=gym_id,
             )
         elif subscription.subscription_type in ['sessions', 'training'] and subscription.remaining_sessions is not None and subscription.remaining_sessions <= low_threshold:
             notify_role(
@@ -228,6 +250,7 @@ def scan_qr_code():
                 '⚠️ حصص منخفضة',
                 f'{customer.full_name} لديه {subscription.remaining_sessions} حصة متبقية فقط.',
                 {'type': 'low_sessions', 'customer_id': str(customer.id)},
+                gym_id=gym_id,
             )
     except Exception as e:
         logger.exception('Push notification failed: %s', e)

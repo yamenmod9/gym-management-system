@@ -47,11 +47,16 @@ class _StopSubscriptionDialogState extends State<StopSubscriptionDialog> {
 
     if (confirmed != true) return;
 
+    // Resolve the provider and messenger before any await: reading them off
+    // `context` afterwards throws if this dialog was dismissed while the
+    // confirmation was open.
+    final provider = context.read<ReceptionProvider>();
+
     setState(() => _isLoading = true);
 
-    final provider = context.read<ReceptionProvider>();
     final result = await provider.stopSubscription(_subscriptionId!);
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (mounted) {

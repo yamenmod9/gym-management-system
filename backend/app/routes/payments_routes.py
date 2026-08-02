@@ -5,7 +5,7 @@ Maps /api/payments/* to transaction functionality for Flutter app compatibility
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from app.models import Transaction, DailyClosing, Branch
-from app.models.transaction import PaymentMethod
+from app.models.transaction import PaymentMethod, TransactionType
 from app.utils import (
     success_response, error_response, get_current_user, role_required,
     paginate, format_pagination_response, get_accessible_branch_ids,
@@ -151,12 +151,35 @@ def record_payment():
     except ValueError:
         return error_response('Invalid payment method. Use: cash, card, or online', 400)
     
+    try:
+        amount = float(data['amount'])
+        discount = float(data.get('discount', 0))
+    except (TypeError, ValueError):
+        return error_response('amount and discount must be numeric', 400)
+
+    if amount < 0 or discount < 0:
+        return error_response('amount and discount cannot be negative', 400)
+    if discount > amount:
+        return error_response('discount cannot exceed the amount', 400)
+
+    # transaction_type is NOT NULL and has no server default, so leaving it
+    # unset made every call to this endpoint fail with an IntegrityError —
+    # surfacing as a 500. A payment against an existing subscription is a
+    # renewal unless the caller says otherwise.
+    try:
+        transaction_type = TransactionType(
+            (data.get('transaction_type') or 'renewal').lower()
+        )
+    except ValueError:
+        return error_response('Invalid transaction_type', 400)
+
     transaction = Transaction(
         subscription_id=subscription.id,
         customer_id=subscription.customer_id,
         branch_id=subscription.branch_id,
-        amount=float(data['amount']),
-        discount=float(data.get('discount', 0)),
+        amount=amount,
+        discount=discount,
+        transaction_type=transaction_type,
         payment_method=payment_method_enum,
         notes=data.get('notes'),
         created_by=current_user.id
@@ -189,19 +212,23 @@ def daily_closing():
     if not data:
         return error_response('Request body is required', 400)
     
-    required_fields = ['branch_id', 'date', 'expected_cash', 'actual_cash']
-    for field in required_fields:
+    # `expected_cash` is deliberately NOT accepted from the caller — see below.
+    # `closing_date` is honoured alongside `date` because that is the key the
+    # reception app has always sent, which made this endpoint reject every
+    # request it received with "date is required".
+    for field in ['branch_id', 'actual_cash']:
         if field not in data:
             return error_response(f'{field} is required', 400)
-    
+
     branch_id = data['branch_id']
-    closing_date = data['date']
-    
-    # Verify branch access
+    closing_date = data.get('date') or data.get('closing_date') or date.today().isoformat()
+
+    # Verify branch access. Comparing against current_user.branch_id directly
+    # exempted owners entirely and skipped regional managers, who have none.
     current_user = get_current_user()
-    if current_user.role not in [UserRole.OWNER]:
-        if current_user.branch_id and branch_id != current_user.branch_id:
-            return error_response('Access denied', 403)
+    accessible = get_accessible_branch_ids(current_user)
+    if accessible is not None and branch_id not in accessible:
+        return error_response('Access denied', 403)
     
     # Check if already closed for this date
     try:
@@ -217,17 +244,30 @@ def daily_closing():
     if existing:
         return error_response('Daily closing already exists for this date', 409)
     
-    # Create daily closing
-    expected_cash = float(data['expected_cash'])
-    actual_cash = float(data['actual_cash'])
-    cash_difference = data.get('cash_difference', actual_cash - expected_cash)
-    
+    # Expected cash and the resulting difference are computed from the
+    # transactions on record, never taken from the request. Accepting them
+    # from the caller — as this endpoint used to — meant whoever closed the
+    # till could paper over a shortfall by sending numbers that agreed.
+    from app.routes.daily_closing_routes import _totals_by_payment_method
+
+    expected_cash, network_total, transfer_total, _ = _totals_by_payment_method(
+        branch_id, date_obj
+    )
+
+    try:
+        actual_cash = float(data['actual_cash'])
+    except (TypeError, ValueError):
+        return error_response('actual_cash must be numeric', 400)
+
     closing = DailyClosing(
         branch_id=branch_id,
         closing_date=date_obj,
         expected_cash=expected_cash,
         actual_cash=actual_cash,
-        cash_difference=float(cash_difference),
+        cash_difference=actual_cash - expected_cash,
+        network_total=network_total,
+        transfer_total=transfer_total,
+        total_revenue=expected_cash + network_total + transfer_total,
         notes=data.get('notes'),
         closed_by=current_user.id
     )

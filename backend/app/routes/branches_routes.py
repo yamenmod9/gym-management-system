@@ -51,36 +51,62 @@ def get_branches():
     # Enhanced: Add more details for each branch
     branch_list = []
     from app.models.user import User
-    from app.models.subscription import SubscriptionStatus
+    from app.models.subscription import Subscription, SubscriptionStatus
     from app.models.transaction import Transaction
-    from sqlalchemy import func, and_
+    from sqlalchemy import func
     from datetime import datetime, timedelta
     
     # Revenue period: last 90 days
     revenue_start = datetime.utcnow() - timedelta(days=90)
     
+    # Batch the three per-branch lookups into one query each. Done inside the
+    # loop they were 3 round-trips per branch — 60 queries for a 20-branch
+    # page, on an endpoint the dashboards hit on every load.
+    page_branch_ids = [b.id for b in items]
+
+    managers = {}
+    active_subs_by_branch = {}
+    revenue_by_branch = {}
+
+    if page_branch_ids:
+        managers = {
+            u.branch_id: u.full_name
+            for u in User.query.filter(
+                User.branch_id.in_(page_branch_ids),
+                User.role == UserRole.BRANCH_MANAGER,
+            ).all()
+        }
+        active_subs_by_branch = dict(
+            db.session.query(
+                Subscription.branch_id, func.count(Subscription.id)
+            ).filter(
+                Subscription.branch_id.in_(page_branch_ids),
+                Subscription.status == SubscriptionStatus.ACTIVE,
+            ).group_by(Subscription.branch_id).all()
+        )
+        revenue_by_branch = dict(
+            db.session.query(
+                Transaction.branch_id,
+                func.coalesce(
+                    func.sum(Transaction.amount - func.coalesce(Transaction.discount, 0)), 0
+                ),
+            ).filter(
+                Transaction.branch_id.in_(page_branch_ids),
+                Transaction.created_at >= revenue_start,
+            ).group_by(Transaction.branch_id).all()
+        )
+
+    staff_counts, customer_counts = Branch.batch_counts(page_branch_ids)
+
     for branch in items:
-        # Find branch manager
-        manager = User.query.filter_by(branch_id=branch.id, role=UserRole.BRANCH_MANAGER).first()
-        manager_name = manager.full_name if manager else None
-        # Count of active subscriptions
-        active_subs = branch.subscriptions.filter_by(status=SubscriptionStatus.ACTIVE).count()
-        # Revenue from transactions in last 90 days
-        revenue_result = db.session.query(
-            func.coalesce(func.sum(Transaction.amount - func.coalesce(Transaction.discount, 0)), 0)
-        ).filter(
-            and_(
-                Transaction.branch_id == branch.id,
-                Transaction.created_at >= revenue_start
-            )
-        ).scalar()
-        revenue = float(revenue_result or 0)
-        
-        branch_dict = branch.to_dict()
+        branch_dict = branch.to_dict(
+            staff_count=staff_counts.get(branch.id, 0),
+            customers_count=customer_counts.get(branch.id, 0),
+        )
         branch_dict.update({
-            'manager': manager_name,
-            'active_subscriptions': active_subs,
-            'revenue': revenue,
+            'manager': managers.get(branch.id),
+            'active_subscriptions': active_subs_by_branch.get(branch.id, 0),
+            'revenue': float(revenue_by_branch.get(branch.id, 0) or 0),
         })
         branch_list.append(branch_dict)
     return success_response({

@@ -18,6 +18,37 @@ from app.extensions import db
 daily_closing_bp = Blueprint('daily_closing', __name__, url_prefix='/api/daily-closings')
 
 
+def _totals_by_payment_method(branch_id, closing_date):
+    """Sum a branch's takings for one day, split by payment method.
+
+    Amounts are net of discount, matching how revenue is computed everywhere
+    else (reports, finance, branch performance, the client's payment list).
+    This module used to total the gross `amount`, so expected cash came out
+    high by exactly the discounts given — and the reconciliation then reported
+    a cash shortage of that size on every day anyone discounted anything.
+    """
+    transactions = Transaction.query.filter(
+        and_(
+            Transaction.branch_id == branch_id,
+            func.date(Transaction.transaction_date) == closing_date
+        )
+    ).all()
+
+    totals = {PaymentMethod.CASH: 0.0, PaymentMethod.NETWORK: 0.0,
+              PaymentMethod.TRANSFER: 0.0}
+    for txn in transactions:
+        net = float(txn.amount) - float(txn.discount or 0)
+        if txn.payment_method in totals:
+            totals[txn.payment_method] += net
+
+    return (
+        totals[PaymentMethod.CASH],
+        totals[PaymentMethod.NETWORK],
+        totals[PaymentMethod.TRANSFER],
+        len(transactions),
+    )
+
+
 @daily_closing_bp.route('', methods=['GET'])
 @jwt_required()
 @role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.BRANCH_ACCOUNTANT, UserRole.BRANCH_MANAGER)
@@ -100,37 +131,18 @@ def calculate_expected_cash():
     if _accessible is not None and branch_id not in _accessible:
         return error_response("Access denied to this branch", 403)
 
-    # Calculate totals from transactions
-    transactions = Transaction.query.filter(
-        and_(
-            Transaction.branch_id == branch_id,
-            func.date(Transaction.transaction_date) == closing_date
-        )
-    ).all()
-    
-    cash_total = 0
-    network_total = 0
-    transfer_total = 0
-    
-    for txn in transactions:
-        amount = float(txn.amount)
-        if txn.payment_method == PaymentMethod.CASH:
-            cash_total += amount
-        elif txn.payment_method == PaymentMethod.NETWORK:
-            network_total += amount
-        elif txn.payment_method == PaymentMethod.TRANSFER:
-            transfer_total += amount
-    
-    total_revenue = cash_total + network_total + transfer_total
-    
+    cash_total, network_total, transfer_total, txn_count = _totals_by_payment_method(
+        branch_id, closing_date
+    )
+
     return success_response({
         'branch_id': branch_id,
         'closing_date': closing_date.isoformat(),
         'expected_cash': cash_total,
         'network_total': network_total,
         'transfer_total': transfer_total,
-        'total_revenue': total_revenue,
-        'transaction_count': len(transactions)
+        'total_revenue': cash_total + network_total + transfer_total,
+        'transaction_count': txn_count
     })
 
 
@@ -178,26 +190,10 @@ def create_daily_closing():
         return error_response("Daily closing already exists for this date", 400)
     
     # Calculate expected values
-    transactions = Transaction.query.filter(
-        and_(
-            Transaction.branch_id == branch_id,
-            func.date(Transaction.transaction_date) == closing_date
-        )
-    ).all()
-    
-    expected_cash = 0
-    network_total = 0
-    transfer_total = 0
-    
-    for txn in transactions:
-        amount = float(txn.amount)
-        if txn.payment_method == PaymentMethod.CASH:
-            expected_cash += amount
-        elif txn.payment_method == PaymentMethod.NETWORK:
-            network_total += amount
-        elif txn.payment_method == PaymentMethod.TRANSFER:
-            transfer_total += amount
-    
+    expected_cash, network_total, transfer_total, _ = _totals_by_payment_method(
+        branch_id, closing_date
+    )
+
     total_revenue = expected_cash + network_total + transfer_total
     cash_difference = float(actual_cash) - expected_cash
     
@@ -244,21 +240,13 @@ def get_today_status():
         )
     ).first()
     
-    # Get today's transactions
-    transactions = Transaction.query.filter(
-        and_(
-            Transaction.branch_id == user.branch_id,
-            func.date(Transaction.transaction_date) == today
-        )
-    ).all()
-    
-    cash_total = sum(float(t.amount) for t in transactions if t.payment_method == PaymentMethod.CASH)
-    
+    cash_total, _, _, txn_count = _totals_by_payment_method(user.branch_id, today)
+
     return success_response({
         'branch_id': user.branch_id,
         'date': today.isoformat(),
         'is_closed': closing is not None,
         'closing': closing.to_dict() if closing else None,
         'expected_cash': cash_total,
-        'transaction_count': len(transactions)
+        'transaction_count': txn_count
     })

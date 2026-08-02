@@ -43,7 +43,6 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
   XFile? _selectedLogoFile;
   Uint8List? _selectedLogoBytes;
   String? _uploadedLogoUrl; // set after uploading to backend
-  bool _isUploadingLogo = false;
 
   // Step 3 — Colors
   Color _selectedPrimary = const Color(0xFFDC2626);
@@ -177,8 +176,6 @@ class _GymSetupWizardState extends State<GymSetupWizard> {
 
   @override
   Widget build(BuildContext context) {
-    final labels = [S.gymName, S.logo, S.brandColors, S.preferredLanguage];
-
     return Scaffold(
       body: SafeArea(
         child: Column(

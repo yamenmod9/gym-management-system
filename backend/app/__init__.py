@@ -20,16 +20,22 @@ def create_app(config_name='default'):
         Flask application instance
     """
     app = Flask(__name__)
-    
+
     # Load configuration
-    app.config.from_object(config[config_name])
-    
+    config_class = config[config_name]
+    if hasattr(config_class, 'validate'):
+        config_class.validate()
+    app.config.from_object(config_class)
+
     # Initialize extensions
     init_extensions(app)
+
+    # Register blueprints. Diagnostic endpoints stay out of production builds.
+    register_blueprints(app, include_dev_tools=config_name != 'production')
     
-    # Register blueprints
-    register_blueprints(app)
-    
+    # Reject tokens belonging to deactivated accounts
+    register_active_account_guard(app)
+
     # Register error handlers
     register_error_handlers(app)
     
@@ -70,7 +76,14 @@ def _ensure_db_schema(app):
             # this is a no-op — and safe to run on every boot — once the
             # schema is in place; the column/index patches below still run
             # after it for databases that predate a given model change.
-            import app.models  # noqa: F401 registers every model with db.metadata
+            #
+            # Imported as `from app import models`, not `import app.models`:
+            # the latter binds the name `app` in this function's scope, which
+            # would shadow the Flask instance passed in as the parameter and
+            # turn every `app.logger` call below — including the one in the
+            # except handler — into an AttributeError, taking down startup on
+            # the first boot that actually has a migration to run.
+            from app import models  # noqa: F401 registers every model with db.metadata
             db.create_all()
 
             inspector = sa_inspect(db.engine)
@@ -105,6 +118,20 @@ def _ensure_db_schema(app):
                 Issue.__table__.create(db.engine)
                 app.logger.info('Auto-migration: created issues table')
 
+            # Add template_hash to fingerprints if missing. The model has
+            # declared it for a while, and create_all() only builds whole
+            # tables, so databases that predate the column never got it.
+            # (Ported here from the old unauthenticated /api/admin/run-seed
+            # endpoint, which has been removed.)
+            if 'fingerprints' in existing_tables:
+                columns = [col['name'] for col in inspector.get_columns('fingerprints')]
+                if 'template_hash' not in columns:
+                    db.session.execute(text(
+                        'ALTER TABLE fingerprints ADD COLUMN template_hash VARCHAR(255)'
+                    ))
+                    db.session.commit()
+                    app.logger.info('Auto-migration: added template_hash column to fingerprints table')
+
             # Add gym_id column to users table if missing
             if 'users' in existing_tables:
                 columns = [col['name'] for col in inspector.get_columns('users')]
@@ -124,6 +151,29 @@ def _ensure_db_schema(app):
                     ))
                     db.session.commit()
                     app.logger.info('Auto-migration: added gym_id column to branches table')
+
+            # Backfill users.gym_id from the gym their branch belongs to. Runs
+            # after both gym_id columns are guaranteed to exist.
+            #
+            # Branch scope is now resolved through the user's gym (see
+            # get_accessible_branch_ids), and that resolution fails closed —
+            # so a staff row left with a NULL gym_id by the migration that
+            # merely *added* the column would see nothing at all.
+            if 'users' in existing_tables and 'branches' in existing_tables:
+                backfilled = db.session.execute(text('''
+                    UPDATE users
+                    SET gym_id = (
+                        SELECT b.gym_id FROM branches b
+                        WHERE b.id = users.branch_id
+                    )
+                    WHERE gym_id IS NULL
+                      AND branch_id IS NOT NULL
+                ''')).rowcount
+                db.session.commit()
+                if backfilled:
+                    app.logger.info(
+                        f'Auto-migration: backfilled gym_id for {backfilled} user(s) from their branch'
+                    )
 
             if 'transactions' in existing_tables:
                 columns = [col['name'] for col in inspector.get_columns('transactions')]
@@ -249,6 +299,82 @@ def _ensure_db_schema(app):
                     app.logger.info('Auto-migration: added index on daily_closings.closed_by')
         except Exception as e:
             app.logger.warning(f'Schema migration check: {e}')
+
+
+def register_active_account_guard(app):
+    """Reject any request whose JWT belongs to a deactivated account.
+
+    ``role_required`` checks ``is_active``, but roughly half the routes are
+    guarded by a bare ``@jwt_required()`` and read the user through
+    ``get_current_user()``, which does not. Deactivating a staff member or a
+    customer therefore left their existing token working until it expired —
+    up to 12 hours for staff and 7 days for a client. Doing the check here
+    covers every route at once, including ones added later.
+
+    Checking ``get_current_user()`` instead would not work: 71 of its 79 call
+    sites use the result without a None check, so returning None there turns a
+    revoked session into an AttributeError 500 rather than a clean 401.
+    """
+    from flask import jsonify, request
+    from flask_jwt_extended import get_jwt, verify_jwt_in_request
+    from app.extensions import db
+
+    @app.before_request
+    def _reject_inactive_accounts():
+        if request.method == 'OPTIONS':
+            return None
+
+        try:
+            # optional=True so unauthenticated routes still pass through. A
+            # malformed or expired token is left for the route's own decorator
+            # to reject, so that (for example) logging in again with a stale
+            # token in the header still works.
+            if verify_jwt_in_request(optional=True) is None:
+                return None
+            claims = get_jwt()
+        except Exception:
+            return None
+
+        # Read the flag as a scalar rather than loading the ORM object.
+        # db.session.get() answers from the identity map, so a session that
+        # already saw this row earlier would return a stale is_active and wave
+        # a revoked account straight through. A column query always issues a
+        # SELECT — and it also skips User.managed_branches, which is
+        # selectin-eager and would otherwise fire an extra query per request.
+        if claims.get('scope') == 'client':
+            from app.models.customer import Customer
+            customer_id = claims.get('customer_id')
+            if customer_id is None:
+                return None
+            is_active = db.session.query(Customer.is_active).filter(
+                Customer.id == customer_id
+            ).scalar()
+            if is_active is False:
+                return jsonify({
+                    'success': False,
+                    'error': 'This account is no longer active',
+                }), 401
+            return None
+
+        from app.models.user import User
+        try:
+            user_id = int(claims.get('sub'))
+        except (TypeError, ValueError):
+            return None
+
+        is_active = db.session.query(User.is_active).filter(
+            User.id == user_id
+        ).scalar()
+        if is_active is False:
+            # 401 rather than 403: the session itself is no longer valid, so
+            # the client should log out. The Flutter interceptor force-logs-out
+            # on 401 and only shows a "no permission" toast on 403, which would
+            # strand a deactivated user in a half-authenticated app.
+            return jsonify({
+                'success': False,
+                'error': 'User account is inactive',
+            }), 401
+        return None
 
 
 def register_error_handlers(app):

@@ -3,7 +3,6 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import '../../../core/api/api_service.dart';
 import '../../../core/api/api_endpoints.dart';
-import '../../../core/auth/auth_provider.dart';
 import '../../../core/localization/app_strings.dart';
 
 class QRScannerScreen extends StatefulWidget {

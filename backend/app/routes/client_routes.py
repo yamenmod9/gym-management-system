@@ -134,8 +134,8 @@ def get_client_profile():
     gym = None
     if customer.branch and hasattr(customer.branch, 'gym_id') and customer.branch.gym_id:
         gym = Gym.query.get(customer.branch.gym_id)
-    if not gym:
-        gym = Gym.query.first()
+    # No `Gym.query.first()` fallback — that served an arbitrary other
+    # tenant's name, logo and colours to a customer whose branch has no gym.
     response_data['gym'] = gym.to_dict() if gym else None
     response_data['account_deletion'] = deletion_status
 
@@ -498,10 +498,12 @@ def refresh_client_qr():
     Refresh QR code (alias for GET /qr)
     Returns the same as GET /qr since QR codes don't expire in this implementation
     """
-    # Get current client
-    customer_id = request.customer_id
-    customer = db.session.get(Customer, customer_id)
-    
+    # `request.customer_id` was never a thing — nothing in the request
+    # pipeline sets it, so reading it raised an AttributeError and this
+    # endpoint answered 500 to every call. The member app's "refresh QR"
+    # button has therefore never worked.
+    customer = get_current_client()
+
     if not customer or not customer.is_active:
         return error_response('Customer not found or inactive', 404)
     

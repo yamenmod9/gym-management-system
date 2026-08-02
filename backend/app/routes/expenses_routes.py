@@ -130,15 +130,23 @@ def review_expense(expense_id):
     
     if expense.status != ExpenseStatus.PENDING:
         return error_response("Expense is not pending review", 400)
-    
+
+    # Separation of duties: branch managers and accountants can both file and
+    # review expenses, so without this the same person could raise a payment
+    # to themselves and sign it off in the next request. The owner and super
+    # admin are the escalation path and stay exempt.
+    if (expense.created_by_id == reviewer.id
+            and reviewer.role not in (UserRole.SUPER_ADMIN, UserRole.OWNER)):
+        return error_response("You cannot review an expense you created", 403)
+
     try:
         schema = ExpenseReviewSchema()
         data = schema.load(request.json)
     except ValidationError as e:
         return error_response("Validation error", 400, e.messages)
-    
-    user = get_current_user()
-    
+
+    user = reviewer
+
     if data['action'] == 'approve':
         expense.approve(user.id, data.get('notes'))
     else:

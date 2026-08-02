@@ -104,29 +104,61 @@ class OperationsScreen extends StatelessWidget {
   }
 
   Future<void> _performDailyClosing(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
+    // A closing is a reconciliation: the drawer gets counted and that figure
+    // is compared against what the system expects. Without capturing the
+    // counted cash there is nothing to reconcile against.
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final actualCash = await showDialog<double>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(S.dailyClosing),
-        content: Text(
-          S.dailyClosingConfirm,
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(S.dailyClosingConfirm),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: controller,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: S.countedCash,
+                  prefixIcon: const Icon(Icons.payments),
+                ),
+                validator: (v) {
+                  final parsed = double.tryParse((v ?? '').trim());
+                  if (parsed == null) return S.required;
+                  if (parsed < 0) return S.required;
+                  return null;
+                },
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
             child: Text(S.cancel),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.pop(context, double.parse(controller.text.trim()));
+              }
+            },
             child: Text(S.confirm),
           ),
         ],
       ),
     );
 
-    if (confirmed == true && context.mounted) {
+    if (actualCash != null && context.mounted) {
       final provider = context.read<ReceptionProvider>();
-      final result = await provider.dailyClosing();
+      final result = await provider.dailyClosing(actualCash: actualCash);
 
       if (context.mounted) {
         if (result['success'] == true) {

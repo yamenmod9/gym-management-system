@@ -1,6 +1,8 @@
 """
 Customer management routes
 """
+import secrets
+
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from marshmallow import ValidationError
@@ -142,7 +144,13 @@ def create_customer():
     
     db.session.commit()
     
-    return success_response(customer.to_dict(), "Customer created successfully", 201)
+    # Staff route: reception needs the generated first-login password to hand
+    # to the new member.
+    return success_response(
+        customer.to_dict(include_temp_password=True),
+        "Customer created successfully",
+        201,
+    )
 
 
 @customers_bp.route('/register', methods=['POST'])
@@ -312,6 +320,45 @@ def update_customer(customer_id):
     db.session.commit()
     
     return success_response(customer.to_dict(include_temp_password=True), "Customer updated successfully")
+
+
+@customers_bp.route('/<int:customer_id>/regenerate-qr', methods=['POST'])
+@jwt_required()
+@role_required(
+    UserRole.SUPER_ADMIN, UserRole.OWNER,
+    UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK,
+)
+def regenerate_customer_qr(customer_id):
+    """Issue the customer a fresh QR code, invalidating the previous one.
+
+    The code assigned at registration is just ``GYM-<id>``, so re-deriving it
+    would be a no-op. The point of regenerating is to retire a code that has
+    been copied or shared, which means the new value has to be unguessable —
+    hence the random suffix.
+    """
+    customer = db.session.get(Customer, customer_id)
+
+    if not customer:
+        return error_response("Customer not found", 404)
+
+    user = get_current_user()
+    _accessible = get_accessible_branch_ids(user)
+    if _accessible is not None and customer.branch_id not in _accessible:
+        return error_response("Access denied", 403)
+
+    # qr_code is unique; retry rather than 500 on the (vanishingly unlikely)
+    # collision.
+    for _ in range(5):
+        candidate = f"GYM-{customer.id}-{secrets.token_hex(4).upper()}"
+        if not Customer.query.filter_by(qr_code=candidate).first():
+            customer.qr_code = candidate
+            db.session.commit()
+            return success_response(
+                {'qr_code': customer.qr_code},
+                "QR code regenerated successfully",
+            )
+
+    return error_response("Could not generate a unique QR code", 500)
 
 
 @customers_bp.route('/search', methods=['GET'])

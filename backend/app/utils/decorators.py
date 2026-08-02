@@ -31,8 +31,10 @@ def role_required(*allowed_roles):
             if not user:
                 return jsonify({'success': False, 'error': 'Session expired. Please log in again.'}), 401
 
+            # 401, not 403 — a deactivated account is a dead session, and the
+            # clients treat 401 as "log out" but 403 as "wrong permissions".
             if not user.is_active:
-                return jsonify({'success': False, 'error': 'User account is inactive'}), 403
+                return jsonify({'success': False, 'error': 'User account is inactive'}), 401
 
             allowed = user.role in allowed_roles
             # Regional roles inherit their tier's branch-level permissions:
@@ -101,22 +103,57 @@ def get_current_user():
 def get_accessible_branch_ids(user=None):
     """Branch scope for the current user.
 
-    Returns None when the user is unrestricted (super admin, owner, central
-    accountant — gym scoping still applies elsewhere), otherwise the list of
-    branch IDs the user may see: the managed group for a regional manager, or
-    the single home branch for branch-level roles.
+    Returns None only for the super admin, who is genuinely unrestricted.
+    Everyone else gets an explicit list of branch IDs: every branch in their
+    gym for an owner or central accountant, the managed group for a regional
+    role, or the single home branch for branch-level roles.
+
+    The owner/central-accountant case used to return None as well, on the
+    assumption that "gym scoping still applies elsewhere". It did not: seven
+    route modules (customers, complaints, expenses, finance, payments,
+    daily closings, and their callers) scope purely by branch and never look
+    at gym_id, so None meant no WHERE clause at all and the owner of one gym
+    could read every other gym's members, complaints and expenses. Resolving
+    the gym to its branch list here fixes all of those call sites at once.
     """
     if user is None:
         user = get_current_user()
-    # Unrestricted, gym-wide: super admin, owner, and the central accountant
-    # whose whole job is company-wide books. Every other accountant tier is
-    # scoped — a plain (branch) accountant to exactly one branch, a regional
-    # accountant to their group. Only the CENTRAL tier crosses branches.
-    if user.role in (UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT):
+    if user.role == UserRole.SUPER_ADMIN:
         return None
     if user.role in BRANCH_GROUP_ROLES:
         return user.managed_branch_ids
+    # Gym-wide, but still only their own gym.
+    if user.role in (UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT):
+        return _gym_branch_ids(user)
     return [user.branch_id] if user.branch_id else []
+
+
+def _gym_branch_ids(user):
+    """Every branch id belonging to this user's gym.
+
+    Cached per request: gym-wide roles hit this on most queries, and several
+    endpoints call it more than once while assembling a response.
+
+    Fails closed — a user whose gym cannot be resolved gets an empty list and
+    therefore sees nothing, rather than falling back to "everything".
+    """
+    from flask import g
+
+    gym_id = get_current_gym_id(user)
+    if gym_id is None:
+        return []
+
+    cache = getattr(g, '_gym_branch_ids_cache', None)
+    if cache is None:
+        cache = {}
+        g._gym_branch_ids_cache = cache
+    if gym_id not in cache:
+        from app.models.branch import Branch
+        cache[gym_id] = [
+            row[0] for row in
+            db.session.query(Branch.id).filter(Branch.gym_id == gym_id).all()
+        ]
+    return cache[gym_id]
 
 
 def user_can_access_branch(branch, user=None):

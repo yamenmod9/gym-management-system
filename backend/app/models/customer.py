@@ -167,12 +167,18 @@ class Customer(db.Model):
         self.password_changed = False
         return temp_pass
 
-    def to_dict(self, include_temp_password=True, has_active_subscription=None):
+    def to_dict(self, include_temp_password=False, has_active_subscription=None):
         """Convert to dictionary
 
         Args:
-            include_temp_password: If True, includes temp_password for staff viewing
-                                  Set to False for client-facing endpoints
+            include_temp_password: If True, includes the plaintext first-login
+                                  password. Defaults to False so that a caller
+                                  who has not thought about it cannot leak a
+                                  live credential — this used to default to
+                                  True, which is how the unauthenticated
+                                  fingerprint kiosk endpoint ended up handing
+                                  out members' temporary passwords. Pass True
+                                  only on staff-authenticated routes.
             has_active_subscription: Pass a precomputed bool to skip the
                                   per-row EXISTS query when the caller already
                                   batched this check for a page of customers

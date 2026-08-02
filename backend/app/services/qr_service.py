@@ -98,6 +98,11 @@ class QRService:
         # If no subscription_id provided, find active subscription
         if subscription_id:
             subscription = db.session.get(Subscription, subscription_id)
+            # Belongs-to check: without it, a request naming someone else's
+            # subscription id would admit this customer and spend the other
+            # member's visits.
+            if subscription and subscription.customer_id != customer_id:
+                return False, "Subscription does not belong to this customer", None, 0
         else:
             subscription = Subscription.query.filter_by(
                 customer_id=customer_id,

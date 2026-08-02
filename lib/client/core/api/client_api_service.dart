@@ -83,15 +83,34 @@ class ClientApiService {
       final refreshToken = await getRefreshToken();
       if (refreshToken == null) return false;
 
-      final response = await _dio.post(
-        '/client/refresh',
+      // Deliberately a bare Dio, not `_dio`: refreshing through the same
+      // instance means a 401 on the refresh call re-enters the onError
+      // handler, which calls this method again — an unbounded loop.
+      final refreshDio = Dio(BaseOptions(
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: const {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ));
+
+      final response = await refreshDio.post(
+        // The route is /api/client/auth/refresh; '/client/refresh' does not
+        // exist and simply 404'd.
+        '/client/auth/refresh',
         data: {'refresh_token': refreshToken},
       );
 
-      if (response.statusCode == 200 && response.data['status'] == 'success') {
-        final newToken = response.data['data']['access_token'];
-        await saveToken(newToken);
-        return true;
+      // The backend envelope is {'success': true, 'data': {...}} — there has
+      // never been a 'status' key, so this check could not succeed.
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final newToken = response.data['data']?['access_token'];
+        if (newToken != null) {
+          await saveToken(newToken);
+          return true;
+        }
       }
       return false;
     } catch (e) {

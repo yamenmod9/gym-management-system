@@ -15,6 +15,7 @@ from app.models.complaint import ComplaintStatus
 from app.models.expense import ExpenseStatus
 from app.models.subscription import SubscriptionStatus
 from app.extensions import db
+from app.models.transaction import net_amount
 
 dashboards_bp = Blueprint('dashboards', __name__, url_prefix='/api/dashboards')
 
@@ -47,7 +48,7 @@ def get_dashboard_overview():
             Subscription.branch_id.in_(branch_ids),
             Subscription.status == SubscriptionStatus.ACTIVE,
         ).count()
-        revenue_query = db.session.query(func.sum(Transaction.amount)).filter(
+        revenue_query = db.session.query(func.sum(net_amount())).filter(
             Transaction.branch_id.in_(branch_ids)
         ).scalar()
         expenses_query = db.session.query(func.sum(Expense.amount)).filter(
@@ -67,7 +68,7 @@ def get_dashboard_overview():
     # Revenue by branch — one grouped query per metric across all branches
     # instead of 3 queries per branch.
     revenue_by_branch_map = dict(
-        db.session.query(Transaction.branch_id, func.sum(Transaction.amount))
+        db.session.query(Transaction.branch_id, func.sum(net_amount()))
         .filter(Transaction.branch_id.in_(branch_ids))
         .group_by(Transaction.branch_id).all()
     ) if branch_ids else {}
@@ -174,7 +175,7 @@ def get_branch_dashboard(branch_id):
         status=SubscriptionStatus.ACTIVE
     ).count()
     
-    branch_revenue = db.session.query(func.sum(Transaction.amount)).filter(
+    branch_revenue = db.session.query(func.sum(net_amount())).filter(
         Transaction.branch_id == branch_id
     ).scalar()
     total_revenue = float(branch_revenue) if branch_revenue else 0.0
@@ -325,7 +326,7 @@ def get_staff_performance():
         User.full_name,
         User.role,
         func.count(Transaction.id).label('transaction_count'),
-        func.sum(Transaction.amount).label('total_revenue')
+        func.sum(net_amount()).label('total_revenue')
     ).join(Transaction, Transaction.created_by == User.id).filter(
         Transaction.transaction_date >= start_date_obj,
         Transaction.transaction_date <= end_date_obj
@@ -337,7 +338,7 @@ def get_staff_performance():
         query = query.filter(User.branch_id.in_(accessible))
     
     staff_data = query.group_by(User.id, User.full_name, User.role).order_by(
-        func.sum(Transaction.amount).desc()
+        func.sum(net_amount()).desc()
     ).all()
     
     # Customer retention (subscriptions created)

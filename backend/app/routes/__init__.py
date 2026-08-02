@@ -29,14 +29,21 @@ from .finance_routes import finance_bp
 from .entry_logs_routes import entry_logs_bp
 from .attendance_routes import attendance_bp
 from .gyms_routes import gyms_bp
-from .seed_trigger import seed_trigger_bp
 from .notifications_routes import notifications_bp
 from .privacy_routes import privacy_bp
 from .pricing_routes import pricing_bp
 
 
-def register_blueprints(app):
-    """Register all application blueprints"""
+def register_blueprints(app, include_dev_tools=True):
+    """Register all application blueprints.
+
+    Args:
+        app: the Flask application.
+        include_dev_tools: when False, the diagnostic blueprints (the public
+            ``/test`` API console and ``/api/debug/*``) are left unregistered.
+            Neither is used by any client; both exist purely for local
+            debugging and only widen the production attack surface.
+    """
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(branches_bp)
@@ -50,9 +57,12 @@ def register_blueprints(app):
     app.register_blueprint(fingerprints_bp)
     app.register_blueprint(dashboards_bp)
     app.register_blueprint(daily_closing_bp)
-    app.register_blueprint(test_bp)
-    app.register_blueprint(debug_bp)
-    
+
+    if include_dev_tools:
+        app.register_blueprint(test_bp)
+        app.register_blueprint(debug_bp)
+
+
     # Client-facing routes
     app.register_blueprint(client_auth_bp)
     app.register_blueprint(client_compat_bp)
@@ -68,7 +78,6 @@ def register_blueprints(app):
     app.register_blueprint(entry_logs_bp)
     app.register_blueprint(attendance_bp)
     app.register_blueprint(gyms_bp)
-    app.register_blueprint(seed_trigger_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(privacy_bp)
     app.register_blueprint(pricing_bp)

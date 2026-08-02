@@ -12,7 +12,8 @@ from app.models.subscription import Subscription, SubscriptionStatus
 from app.services import SubscriptionService
 from app.utils import (
     success_response, error_response, role_required,
-    paginate, format_pagination_response, get_current_user
+    paginate, format_pagination_response, get_current_user,
+    get_accessible_branch_ids
 )
 from app.models.user import UserRole
 from app.extensions import db
@@ -20,6 +21,26 @@ from app.extensions import db
 logger = logging.getLogger(__name__)
 
 subscriptions_bp = Blueprint('subscriptions', __name__, url_prefix='/api/subscriptions')
+
+
+def _load_scoped_subscription(subscription_id):
+    """Fetch a subscription the caller is actually allowed to act on.
+
+    Returns (subscription, None) or (None, error_response). Every mutating
+    endpoint below routed straight into SubscriptionService with nothing but
+    an id, so a front-desk staffer could renew, freeze, unfreeze or stop any
+    subscription in any gym by guessing one.
+    """
+    subscription = db.session.get(Subscription, subscription_id)
+    if not subscription:
+        return None, error_response("Subscription not found", 404)
+
+    accessible = get_accessible_branch_ids(get_current_user())
+    if accessible is not None and subscription.branch_id not in accessible:
+        # 404 rather than 403 so the response does not confirm the id exists.
+        return None, error_response("Subscription not found", 404)
+
+    return subscription, None
 
 
 @subscriptions_bp.route('', methods=['GET'])
@@ -133,17 +154,27 @@ def activate_subscription():
             if field not in data:
                 return error_response(f"Missing required field: {field}", 400)
         
-        # Validate branch access
+        # Validate branch access.
+        #
+        # This used to compare against user.branch_id directly, which let two
+        # cases through: an owner (exempted outright) could target another
+        # gym's branch, and a regional manager — who has no branch_id of their
+        # own — skipped the check entirely.
         user = get_current_user()
-        if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-            if user.branch_id and data['branch_id'] != user.branch_id:
-                return error_response("Cannot create subscription for another branch", 403)
+        accessible = get_accessible_branch_ids(user)
+        if accessible is not None and data['branch_id'] not in accessible:
+            return error_response("Cannot create subscription for another branch", 403)
         
         # Prepare data for service — forward ALL subscription-type fields
         subscription_data = {
             'customer_id': data['customer_id'],
             'service_id': data['service_id'],
             'branch_id': data['branch_id'],
+            # The amount reception actually collected. Without this the
+            # transaction was booked at the service's list price, so the
+            # ledger disagreed with the cash drawer on every subscription
+            # sold at a negotiated or multi-month price.
+            'amount': data.get('amount'),
             'payment_method': data.get('payment_method', 'cash'),
             'reference_number': data.get('reference_number'),
             'start_date': data.get('start_date'),
@@ -204,9 +235,13 @@ def activate_subscription():
 def renew_subscription(subscription_id):
     """Renew subscription"""
     data = request.json or {}
-    
+
+    _, denied = _load_scoped_subscription(subscription_id)
+    if denied:
+        return denied
+
     user = get_current_user()
-    
+
     subscription, error = SubscriptionService.renew_subscription(
         subscription_id, data, user.id
     )
@@ -239,9 +274,13 @@ def freeze_subscription(subscription_id):
         data = schema.load(request.json)
     except ValidationError as e:
         return error_response("Validation error", 400, e.messages)
-    
+
+    _, denied = _load_scoped_subscription(subscription_id)
+    if denied:
+        return denied
+
     user = get_current_user()
-    
+
     subscription, error = SubscriptionService.freeze_subscription(
         subscription_id,
         data['days'],
@@ -272,6 +311,10 @@ def freeze_subscription(subscription_id):
 @role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def unfreeze_subscription(subscription_id):
     """Unfreeze subscription"""
+    _, denied = _load_scoped_subscription(subscription_id)
+    if denied:
+        return denied
+
     subscription, error = SubscriptionService.unfreeze_subscription(subscription_id)
     
     if error:
@@ -302,7 +345,11 @@ def stop_subscription(subscription_id):
         data = schema.load(request.json)
     except ValidationError as e:
         return error_response("Validation error", 400, e.messages)
-    
+
+    _, denied = _load_scoped_subscription(subscription_id)
+    if denied:
+        return denied
+
     subscription, error = SubscriptionService.stop_subscription(
         subscription_id,
         data['reason']
@@ -337,14 +384,21 @@ def renew_subscription_body():
     if not data or 'subscription_id' not in data:
         return error_response('subscription_id is required', 400)
     
-    subscription_id = data['subscription_id']
-    
-    # Use the existing renewal logic
-    subscription, error = SubscriptionService.renew_subscription(subscription_id)
-    
+    _, denied = _load_scoped_subscription(data['subscription_id'])
+    if denied:
+        return denied
+
+    user = get_current_user()
+    # renew_subscription takes (subscription_id, data, created_by_user_id).
+    # This used to pass only the id, so every renewal raised a TypeError and
+    # came back as a 500 — the reception app's Renew button never worked.
+    subscription, error = SubscriptionService.renew_subscription(
+        data['subscription_id'], data, user.id
+    )
+
     if error:
         return error_response(error, 400)
-    
+
     return success_response(subscription.to_dict(), "Subscription renewed successfully")
 
 
@@ -364,17 +418,24 @@ def freeze_subscription_body():
     
     if not freeze_days:
         return error_response('freeze_days is required', 400)
-    
-    # Use existing freeze logic
+
+    _, denied = _load_scoped_subscription(subscription_id)
+    if denied:
+        return denied
+
+    user = get_current_user()
+    # created_by_user_id is required — omitting it raised a TypeError, so
+    # every freeze came back as a 500.
     subscription, error = SubscriptionService.freeze_subscription(
         subscription_id,
         freeze_days,
-        reason
+        reason,
+        user.id,
     )
-    
+
     if error:
         return error_response(error, 400)
-    
+
     return success_response(subscription.to_dict(), "Subscription frozen successfully")
 
 
@@ -390,8 +451,11 @@ def stop_subscription_body():
     
     subscription_id = data['subscription_id']
     reason = data.get('reason', 'Customer request')
-    
-    # Use existing stop logic
+
+    _, denied = _load_scoped_subscription(subscription_id)
+    if denied:
+        return denied
+
     subscription, error = SubscriptionService.stop_subscription(
         subscription_id,
         reason

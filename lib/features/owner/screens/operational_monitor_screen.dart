@@ -127,38 +127,96 @@ class _OperationalMonitorScreenState extends State<OperationalMonitorScreen> {
                         _buildLiveStatusBanner(),
                         const SizedBox(height: 24),
 
-                        // Gym Capacity Section
-                        _buildCapacitySection(S.gymFloor, Icons.fitness_center, Colors.blue),
-                        const SizedBox(height: 16),
-
-                        // Pool Capacity Section
-                        _buildCapacitySection(S.swimmingPool, Icons.pool, Colors.cyan),
-                        const SizedBox(height: 16),
-
-                        // Karate Area Section
-                        _buildCapacitySection(S.karateArea, Icons.sports_kabaddi, Colors.orange),
+                        // Today's real figures, from /api/reports/daily.
+                        _buildTodaySummary(),
                         const SizedBox(height: 24),
 
-                        // Today's Classes Schedule
+                        // Live occupancy, class schedules and staff clock-ins
+                        // have no backing data on the server yet. These used
+                        // to render invented numbers and invented people —
+                        // a fixed 45/100 occupancy and a staff list of names
+                        // that do not work here — which an owner had no way
+                        // to tell apart from real reporting.
                         Text(
                           S.todaysClasses,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 12),
-                        _buildClassSchedule(),
+                        _buildUnavailableCard(Icons.event_busy),
                         const SizedBox(height: 24),
 
-                        // Staff Attendance
                         Text(
                           S.staffAttendance,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 12),
-                        _buildStaffAttendance(),
+                        _buildUnavailableCard(Icons.badge_outlined),
                       ],
                     ),
                   ),
                 ),
+    );
+  }
+
+  /// Today's figures as reported by the server, or nothing if the payload
+  /// did not arrive in the shape we expect.
+  Widget _buildTodaySummary() {
+    final data = _operationalData?['data'] ?? _operationalData;
+    if (data is! Map) return const SizedBox.shrink();
+
+    String fmt(Object? value) => value == null ? '—' : '$value';
+
+    final rows = <(String, String)>[
+      (S.revenue, fmt(data['total_revenue'])),
+      (S.transactions, fmt(data['total_transactions'])),
+      (S.newSubscriptions, fmt(data['new_subscriptions'])),
+    ];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(S.todaySummary,
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            for (final (label, value) in rows)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(label),
+                    Text(value,
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Placeholder for a section with no data source on the server yet.
+  Widget _buildUnavailableCard(IconData icon) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Row(
+          children: [
+            Icon(icon, color: Theme.of(context).disabledColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                S.notAvailableYet,
+                style: TextStyle(color: Theme.of(context).disabledColor),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -206,251 +264,4 @@ class _OperationalMonitorScreenState extends State<OperationalMonitorScreen> {
     );
   }
 
-  Widget _buildCapacitySection(String title, IconData icon, Color color) {
-    // Mock data - in production this would come from _operationalData
-    final currentOccupancy = 45;
-    final maxCapacity = 100;
-    final percentFull = (currentOccupancy / maxCapacity * 100).round();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: color),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ),
-                Chip(
-                  label: Text('$percentFull%'),
-                  backgroundColor: _getCapacityColor(percentFull).withValues(alpha: 0.2),
-                  labelStyle: TextStyle(
-                    color: _getCapacityColor(percentFull),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '$currentOccupancy / $maxCapacity',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                Text(
-                  S.spotsLeft(maxCapacity - currentOccupancy),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Color(0xFF6B7590),
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: currentOccupancy / maxCapacity,
-                minHeight: 12,
-                backgroundColor: Color(0xFF1B2748),
-                valueColor: AlwaysStoppedAnimation(_getCapacityColor(percentFull)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _getCapacityColor(int percent) {
-    if (percent >= 90) return Colors.red;
-    if (percent >= 70) return Colors.orange;
-    return Colors.green;
-  }
-
-  Widget _buildClassSchedule() {
-    // Mock data - in production this would come from _operationalData
-    final classes = [
-      {
-        'name': S.yogaClass,
-        'time': '09:00 AM',
-        'instructor': 'Sarah Johnson',
-        'capacity': '15/20',
-        'status': 'ongoing',
-      },
-      {
-        'name': S.karateBasics,
-        'time': '11:00 AM',
-        'instructor': 'Ahmed Ali',
-        'capacity': '12/15',
-        'status': 'upcoming',
-      },
-      {
-        'name': S.swimmingLessons,
-        'time': '02:00 PM',
-        'instructor': 'Mike Chen',
-        'capacity': '8/10',
-        'status': 'upcoming',
-      },
-      {
-        'name': S.advancedKarate,
-        'time': '05:00 PM',
-        'instructor': 'Ahmed Ali',
-        'capacity': '0/12',
-        'status': 'upcoming',
-      },
-    ];
-
-    return Column(
-      children: classes.map((classInfo) {
-        final isOngoing = classInfo['status'] == 'ongoing';
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isOngoing
-                    ? Colors.green.withValues(alpha: 0.1)
-                    : Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.event,
-                color: isOngoing ? Colors.green : Colors.blue,
-              ),
-            ),
-            title: Text(
-              classInfo['name'] as String,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.access_time, size: 14, color: Color(0xFF6B7590)),
-                    const SizedBox(width: 4),
-                    Text(classInfo['time'] as String),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Icon(Icons.person, size: 14, color: Color(0xFF6B7590)),
-                    const SizedBox(width: 4),
-                    Text(classInfo['instructor'] as String),
-                  ],
-                ),
-              ],
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (isOngoing)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      S.live,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 4),
-                Text(
-                  classInfo['capacity'] as String,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildStaffAttendance() {
-    // Mock data - in production this would come from _operationalData
-    final staff = [
-      {'name': 'Ahmed Ali', 'role': 'Manager', 'status': 'present', 'time': '08:00 AM'},
-      {'name': 'Sarah Johnson', 'role': 'Trainer', 'status': 'present', 'time': '08:30 AM'},
-      {'name': 'Mike Chen', 'role': 'Trainer', 'status': 'present', 'time': '09:00 AM'},
-      {'name': 'Fatima Hassan', 'role': 'Receptionist', 'status': 'present', 'time': '08:15 AM'},
-      {'name': 'Omar Khalil', 'role': 'Trainer', 'status': 'absent', 'time': null},
-    ];
-
-    return Column(
-      children: staff.map((member) {
-        final isPresent = member['status'] == 'present';
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: isPresent
-                  ? Colors.green.withValues(alpha: 0.2)
-                  : Colors.red.withValues(alpha: 0.2),
-              child: Icon(
-                isPresent ? Icons.check : Icons.close,
-                color: isPresent ? Colors.green : Colors.red,
-              ),
-            ),
-            title: Text(member['name'] as String),
-            subtitle: Text(member['role'] as String),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Chip(
-                  label: Text(
-                    isPresent ? S.present : S.absent,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  backgroundColor: isPresent
-                      ? Colors.green.withValues(alpha: 0.2)
-                      : Colors.red.withValues(alpha: 0.2),
-                  labelStyle: TextStyle(
-                    color: isPresent ? Colors.green : Colors.red,
-                  ),
-                ),
-                if (member['time'] != null)
-                  Text(
-                    member['time'] as String,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
 }

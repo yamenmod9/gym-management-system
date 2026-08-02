@@ -415,6 +415,11 @@ class S {
   static String get dailyClosingConfirm => _t('هل أنت متأكد من إجراء الإغلاق اليومي؟ سيتم إنهاء جميع عمليات اليوم.', 'Are you sure you want to run the daily closing? This will finalize all of today\'s transactions.');
   static String get dailyClosingCompleted => _t('تم الإغلاق اليومي بنجاح', 'Daily closing completed successfully');
   static String get dailyClosingFailed => _t('فشل الإغلاق اليومي', 'Daily closing failed');
+  static String get countedCash => _t('النقد المعدود في الدرج', 'Cash counted in drawer');
+  static String get todaySummary => _t('ملخص اليوم', 'Today at a glance');
+  static String get newSubscriptions => _t('اشتراكات جديدة', 'New subscriptions');
+  static String get notAvailableYet =>
+      _t('هذه البيانات غير متاحة بعد', 'This data is not available yet');
 
   // ─── SUBSCRIPTION OPS ──────────────────────────────────────
   static String get subscriptionOperations => _t('عمليات الاشتراك', 'Subscription operations');
@@ -605,6 +610,14 @@ class S {
   static String get customerIdOptional => _t('معرف العميل (اختياري)', 'Member ID (optional)');
   static String get titleRequired => _t('العنوان *', 'Title *');
   static String get descriptionRequired => _t('الوصف *', 'Description *');
+  static String get complaintType => _t('نوع الشكوى', 'Complaint type');
+  static String get complaintTypeDevice => _t('جهاز', 'Equipment');
+  static String get complaintTypePool => _t('المسبح', 'Pool');
+  static String get complaintTypeCleanliness => _t('النظافة', 'Cleanliness');
+  static String get complaintTypeService => _t('الخدمة', 'Service');
+  static String get complaintTypeOther => _t('أخرى', 'Other');
+  static String minCharacters(int n) =>
+      _t('على الأقل $n أحرف', 'At least $n characters');
 
   // ─── CUSTOMER QR CODE WIDGET ───────────────────────────────
   static String get customerQRCodeTitle => _t('رمز QR العميل', 'Member QR code');

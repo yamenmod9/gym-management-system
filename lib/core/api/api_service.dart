@@ -16,10 +16,15 @@ class ApiService {
   /// Guard to prevent multiple simultaneous forced-logouts.
   bool _isLoggingOut = false;
   
-  ApiService() {
+  /// [baseUrl] defaults to the compile-time API base URL. Tests pass one
+  /// explicitly: `flutter test` supplies no --dart-define, so reading
+  /// [ApiEndpoints.baseUrl] there throws before any test body runs. Keeping
+  /// the throw as the default preserves the guard that a real build cannot
+  /// ship without an API URL configured.
+  ApiService({String? baseUrl}) {
     _dio = Dio(
       BaseOptions(
-        baseUrl: ApiEndpoints.baseUrl,
+        baseUrl: baseUrl ?? ApiEndpoints.baseUrl,
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
         headers: {
