@@ -1,6 +1,7 @@
 """
 Flask application factory
 """
+import os
 from flask import Flask, jsonify
 from app.config import config
 from app.extensions import init_extensions
@@ -9,16 +10,36 @@ from flask_jwt_extended.exceptions import JWTExtendedException
 from werkzeug.exceptions import HTTPException
 
 
+def _init_sentry(environment):
+    """Report unhandled exceptions to Sentry, if configured.
+
+    A no-op without SENTRY_DSN set, so dev/test never touch a Sentry
+    project and nothing changes here until the env var is added.
+    """
+    dsn = os.environ.get('SENTRY_DSN')
+    if not dsn:
+        return
+    import sentry_sdk
+    from sentry_sdk.integrations.flask import FlaskIntegration
+    sentry_sdk.init(
+        dsn=dsn,
+        integrations=[FlaskIntegration()],
+        environment=environment,
+        traces_sample_rate=0.1,
+    )
+
+
 def create_app(config_name='default'):
     """
     Application factory pattern
-    
+
     Args:
         config_name: Configuration name (development, production, testing)
-    
+
     Returns:
         Flask application instance
     """
+    _init_sentry(config_name)
     app = Flask(__name__)
 
     # Load configuration

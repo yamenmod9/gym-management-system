@@ -3,11 +3,15 @@ FCM Push Notification Service — sends push notifications via Firebase Admin SD
 
 SETUP:
   1. pip install firebase-admin
-  2. Place your Firebase service account JSON at the path configured in
-     FIREBASE_SERVICE_ACCOUNT_PATH (default: 'service_account.json' in
-     the backend directory, or set the env var).
+  2. Either set FIREBASE_SERVICE_ACCOUNT_JSON to the full service account key
+     (as a JSON string) — the only option that works on Railway, since its
+     filesystem is rebuilt from the git repo on every deploy and the key is
+     a secret that must never be committed — or, for local dev, place the
+     key file at FIREBASE_SERVICE_ACCOUNT_PATH (default: 'service_account.json'
+     in the backend directory).
 """
 import os
+import json
 import logging
 from typing import Optional, List, Dict
 
@@ -36,19 +40,21 @@ def _init_firebase():
         logger.warning('firebase-admin package not installed — push disabled')
         return False
 
-    # Resolve path to service account key
-    sa_path = os.environ.get(
-        'FIREBASE_SERVICE_ACCOUNT_PATH',
-        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                     'service_account.json'),
-    )
-
-    if not os.path.isfile(sa_path):
-        logger.warning(f'Firebase service account not found at {sa_path} — push disabled')
-        return False
-
+    sa_json = os.environ.get('FIREBASE_SERVICE_ACCOUNT_JSON')
     try:
-        cred = credentials.Certificate(sa_path)
+        if sa_json:
+            cred = credentials.Certificate(json.loads(sa_json))
+        else:
+            sa_path = os.environ.get(
+                'FIREBASE_SERVICE_ACCOUNT_PATH',
+                os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                             'service_account.json'),
+            )
+            if not os.path.isfile(sa_path):
+                logger.warning(f'Firebase service account not found at {sa_path} — push disabled')
+                return False
+            cred = credentials.Certificate(sa_path)
+
         _firebase_app = firebase_admin.initialize_app(cred)
         logger.info('Firebase Admin SDK initialised')
         return True
