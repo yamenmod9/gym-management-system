@@ -1,13 +1,13 @@
 """
 Flask extensions initialization
 """
+from flask import request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_marshmallow import Marshmallow
 from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -15,12 +15,25 @@ migrate = Migrate()
 jwt = JWTManager()
 cors = CORS()
 ma = Marshmallow()
+
+
+def _rate_limit_key():
+    # Railway terminates TLS at its edge and proxies every request to this
+    # container, so request.remote_addr is the proxy's address, not the
+    # caller's — every client collapses onto the same key (or worse, a
+    # rotating pool of edge IPs), and the limit below never actually
+    # engages. Reusing geoip_service's X-Forwarded-For parsing (same
+    # single-trusted-hop assumption it already documents) fixes that.
+    from app.services.geoip_service import get_client_ip
+    return get_client_ip(request)
+
+
 # In-memory storage: counts reset per worker process rather than being
 # shared across them, so the effective limit on a 2-worker deploy is closer
 # to 2x what's configured below. Still closes off unlimited brute-forcing,
 # which is what mattered — a shared store (Redis) is the upgrade if this
 # service ever runs enough workers/instances for that gap to matter.
-limiter = Limiter(key_func=get_remote_address, default_limits=[])
+limiter = Limiter(key_func=_rate_limit_key, default_limits=[])
 
 
 def init_extensions(app):
