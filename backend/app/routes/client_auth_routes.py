@@ -52,7 +52,9 @@ def _build_delete_status(customer: Customer):
 
 
 @client_auth_bp.route('/login', methods=['POST'])
-@limiter.limit('10 per minute;30 per hour')
+# Members log in from their own phones on mobile data, but a gym's wifi puts
+# many of them behind one address — same shared-budget problem as staff login.
+@limiter.limit('30 per minute;200 per hour')
 def client_login():
     """
     Client login with phone and password

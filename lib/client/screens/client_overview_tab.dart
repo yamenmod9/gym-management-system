@@ -25,10 +25,33 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
   bool _isLoading = true;
   String? _error;
 
+  /// Crowding at the member's branch. Null until loaded, and stays null if the
+  /// call fails — the card is then simply not drawn. This is a nice-to-have
+  /// next to the subscription, so it must never turn the whole tab into an
+  /// error state or block the parts the member actually came for.
+  Map<String, dynamic>? _activity;
+
   @override
   void initState() {
     super.initState();
     _loadSubscription();
+    _loadActivity();
+  }
+
+  Future<void> _refresh() async {
+    await Future.wait([_loadSubscription(), _loadActivity()]);
+  }
+
+  Future<void> _loadActivity() async {
+    try {
+      final response = await context.read<ClientApiService>().getBranchActivity();
+      if (!mounted) return;
+      if (response['success'] == true && response['data'] != null) {
+        setState(() => _activity = Map<String, dynamic>.from(response['data']));
+      }
+    } catch (_) {
+      if (mounted) setState(() => _activity = null);
+    }
   }
 
   Future<void> _loadSubscription() async {
@@ -85,7 +108,7 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
         bottom: false,
         child: RefreshIndicator(
           color: ClientTheme.primaryRed,
-          onRefresh: _loadSubscription,
+          onRefresh: _refresh,
           child: _isLoading
               ? const Center(
                   child: CircularProgressIndicator(color: ClientTheme.primaryRed))
@@ -103,6 +126,10 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
                         ],
                         _buildCheckInButton(),
                         const SizedBox(height: 16),
+                        if (_activity != null) ...[
+                          _buildBusyCard(_activity!),
+                          const SizedBox(height: 16),
+                        ],
                         if (_subscription != null) ...[
                           ..._buildAlerts(_subscription!),
                           _buildDetailsCard(_subscription!),
@@ -330,6 +357,81 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildBusyCard(Map<String, dynamic> activity) {
+    final level = (activity['level'] ?? 'quiet').toString();
+    final count = (activity['entries_last_hour'] as num?)?.toInt() ?? 0;
+
+    // Green/amber/red reads as "go / caution / stop" to most people, so the
+    // three levels also carry an icon and a word — colour alone would leave
+    // colour-blind members with nothing to read.
+    late final Color color;
+    late final IconData icon;
+    late final String label;
+    switch (level) {
+      case 'busy':
+        color = const Color(0xFFEF4444);
+        icon = Icons.groups_rounded;
+        label = S.busyBusy;
+        break;
+      case 'moderate':
+        color = const Color(0xFFF59E0B);
+        icon = Icons.group_rounded;
+        label = S.busyModerate;
+        break;
+      default:
+        color = const Color(0xFF22C55E);
+        icon = Icons.person_rounded;
+        label = S.busyQuiet;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ClientTheme.cardGrey,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  S.gymActivity,
+                  style: const TextStyle(
+                      color: ClientTheme.subtleGrey, fontSize: 12),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                      color: color, fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  S.checkInsLastHour(count),
+                  style: const TextStyle(
+                      color: ClientTheme.textGrey, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

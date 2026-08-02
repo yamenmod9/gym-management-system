@@ -110,6 +110,8 @@ def _ensure_db_schema(app):
             from app import models  # noqa: F401 registers every model with db.metadata
             db.create_all()
 
+            _sync_enum_values(app)
+
             inspector = sa_inspect(db.engine)
             existing_tables = inspector.get_table_names()
 
@@ -323,6 +325,63 @@ def _ensure_db_schema(app):
                     app.logger.info('Auto-migration: added index on daily_closings.closed_by')
         except Exception as e:
             app.logger.warning(f'Schema migration check: {e}')
+
+
+def _sync_enum_values(app):
+    """Add enum values the models declare but the database's enum types lack.
+
+    Postgres builds each enum type once, when create_all() first creates the
+    table using it, and never revisits it. Adding a member to a Python enum
+    (a new UserRole, say) therefore leaves the database type behind, and every
+    insert or read of the new value dies with InvalidTextRepresentation —
+    at runtime, on a deploy that looked completely clean.
+
+    Only Postgres needs this. SQLite stores these columns as VARCHAR, so a new
+    member needs no DDL there.
+    """
+    from sqlalchemy import Enum as SAEnum, text
+    from app.extensions import db
+
+    if db.engine.dialect.name != 'postgresql':
+        return
+
+    # What the models say each named enum type should contain. SQLAlchemy
+    # persists PEP-435 enums by member *name*, so .enums is the name list.
+    declared = {}
+    for table in db.metadata.tables.values():
+        for column in table.columns:
+            if isinstance(column.type, SAEnum) and column.type.name:
+                declared.setdefault(column.type.name, set()).update(column.type.enums)
+    if not declared:
+        return
+
+    existing = {}
+    for typname, label in db.session.execute(text(
+        'SELECT t.typname, e.enumlabel FROM pg_type t '
+        'JOIN pg_enum e ON e.enumtypid = t.oid'
+    )).fetchall():
+        existing.setdefault(typname, set()).add(label)
+
+    for type_name, labels in declared.items():
+        # A type absent here doesn't exist yet; create_all() builds those with
+        # the full member set already, so there is nothing to patch.
+        if type_name not in existing:
+            continue
+        missing = sorted(labels - existing[type_name])
+        if not missing:
+            continue
+        # ALTER TYPE ... ADD VALUE takes a literal, not a bind parameter, and
+        # the value cannot be used by the same transaction that adds it —
+        # hence a dedicated AUTOCOMMIT connection. Every label interpolated
+        # here comes from our own model definitions, never from a request.
+        with db.engine.connect().execution_options(isolation_level='AUTOCOMMIT') as conn:
+            for label in missing:
+                conn.execute(text(
+                    f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{label}'"
+                ))
+        app.logger.info(
+            f'Auto-migration: added {missing} to enum type {type_name}'
+        )
 
 
 def register_active_account_guard(app):

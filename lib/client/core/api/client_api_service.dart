@@ -234,6 +234,17 @@ class ClientApiService {
     }
   }
 
+  /// How busy the member's own branch is right now: check-ins in the last
+  /// hour plus a 'quiet' | 'moderate' | 'busy' level.
+  Future<Map<String, dynamic>> getBranchActivity() async {
+    try {
+      final response = await _dio.get('/client/branch-activity');
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Future<Map<String, dynamic>> refreshQrCode() async {
     try {
       final response = await _dio.post('/client/qr/refresh');

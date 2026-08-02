@@ -421,6 +421,26 @@ class S {
   static String get notAvailableYet =>
       _t('هذه البيانات غير متاحة بعد', 'This data is not available yet');
 
+  // ─── GYM CROWDING (client app) ─────────────────────────────
+  static String get gymActivity => _t('الزحام الآن', 'How busy is it');
+  static String get busyQuiet => _t('هادئ', 'Quiet');
+  static String get busyModerate => _t('متوسط', 'Moderate');
+  static String get busyBusy => _t('مزدحم', 'Busy');
+  static String checkInsLastHour(int n) => _t(
+        'دخل $n في آخر ساعة',
+        n == 1 ? '$n check-in in the last hour' : '$n check-ins in the last hour',
+      );
+
+  // ─── TRAINER ───────────────────────────────────────────────
+  static String get trainer => _t('مدرب', 'Trainer');
+  static String get trainerDashboard => _t('لوحة المدرب', 'Trainer dashboard');
+  static String get membersAtBranch => _t('أعضاء الفرع', 'Members at this branch');
+  static String get recentCheckIns => _t('آخر الدخول', 'Recent check-ins');
+  static String get noMembersYet => _t('لا يوجد أعضاء بعد', 'No members yet');
+  static String get noCheckInsYet => _t('لا يوجد دخول بعد', 'No check-ins yet');
+  static String get readOnlyAccess =>
+      _t('صلاحية اطلاع فقط', 'View-only access');
+
   // ─── SUBSCRIPTION OPS ──────────────────────────────────────
   static String get subscriptionOperations => _t('عمليات الاشتراك', 'Subscription operations');
   static String get activateSubscription => _t('تفعيل اشتراك', 'Activate subscription');

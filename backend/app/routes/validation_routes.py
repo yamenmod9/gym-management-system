@@ -4,9 +4,12 @@ Validation routes - For gate scanners and reception to validate entries
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from datetime import datetime
-from app.models import EntryLog, EntryType, EntryStatus, Subscription, Customer
+from app.models import EntryLog, EntryType, EntryStatus, Subscription, SubscriptionStatus, Customer
 from app.services.qr_service import QRService
-from app.utils import success_response, error_response, get_current_user, role_required
+from app.utils import (
+    success_response, error_response, get_current_user, role_required,
+    scope_query_to_branches,
+)
 from app.models.user import UserRole
 from app.extensions import db
 
@@ -143,7 +146,7 @@ def validate_barcode():
     # Find active subscription
     subscription = Subscription.query.filter_by(
         customer_id=customer.id,
-        status='active'
+        status=SubscriptionStatus.ACTIVE
     ).first()
     
     if not subscription:
@@ -258,7 +261,7 @@ def manual_entry():
     # Find active subscription
     subscription = Subscription.query.filter_by(
         customer_id=customer_id,
-        status='active'
+        status=SubscriptionStatus.ACTIVE
     ).first()
     
     if not subscription:
@@ -319,7 +322,8 @@ def manual_entry():
 
 @validation_bp.route('/entry-logs', methods=['GET'])
 @jwt_required()
-@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK, UserRole.BRANCH_ACCOUNTANT, UserRole.CENTRAL_ACCOUNTANT)
+@role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK,
+               UserRole.BRANCH_ACCOUNTANT, UserRole.CENTRAL_ACCOUNTANT, UserRole.TRAINER)
 def get_entry_logs():
     """
     Get entry logs (for staff to review)
@@ -349,22 +353,31 @@ def get_entry_logs():
     to_date = request.args.get('to_date')
     
     query = EntryLog.query
-    
-    # Branch filtering based on role
-    if staff_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        if staff_user.branch_id:
-            query = query.filter_by(branch_id=staff_user.branch_id)
-    elif branch_id:
-        query = query.filter_by(branch_id=branch_id)
-    
+
+    # Branch filtering based on role. Uses the shared helper rather than a
+    # local rule: the previous hand-rolled version only filtered when the
+    # caller had a branch_id of their own, so a regional manager (whose scope
+    # lives in managed_branches, leaving branch_id NULL) and an owner who
+    # passed no branch_id both fell through with no WHERE clause at all and
+    # read every gym's entry logs.
+    query = scope_query_to_branches(query, EntryLog.branch_id, staff_user, branch_id)
+
     # Customer filter
     if customer_id:
         query = query.filter_by(customer_id=customer_id)
-    
-    # Status filter
+
+    # Status filter. Resolved through the enum by value ('approved') and by
+    # name ('APPROVED'); passing the raw string straight to the query makes
+    # Postgres reject it outright as an invalid enum literal (a 500).
     if status:
-        query = query.filter_by(entry_status=status)
-    
+        try:
+            query = query.filter_by(entry_status=EntryStatus(status.lower()))
+        except ValueError:
+            return error_response(
+                f"Invalid status. Use one of: {', '.join(s.value for s in EntryStatus)}",
+                400,
+            )
+
     # Date filters
     if from_date:
         try:

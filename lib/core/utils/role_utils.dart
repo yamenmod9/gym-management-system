@@ -2,7 +2,7 @@
 ///
 /// Staff hierarchy (highest to lowest):
 ///   super_admin > owner > regional_manager > branch_manager >
-///   central_accountant > branch_accountant > front_desk
+///   central_accountant > branch_accountant > trainer > front_desk
 class RoleUtils {
   /// Rank of each role — higher outranks lower. Mirrors the backend's
   /// ROLE_RANK so create/edit rules stay consistent across the stack.
@@ -15,6 +15,7 @@ class RoleUtils {
     'regional_accountant': 55,
     'branch_accountant': 50,
     'accountant': 50, // Legacy
+    'trainer': 15,
     'front_desk': 10,
     'reception': 10, // Legacy
   };
@@ -39,6 +40,8 @@ class RoleUtils {
       case 'front_desk':
       case 'reception': // Legacy
         return '/reception';
+      case 'trainer':
+        return '/trainer';
       case 'central_accountant':
       case 'regional_accountant':
       case 'branch_accountant':
@@ -67,6 +70,13 @@ class RoleUtils {
            role == 'reception';  // Legacy support
   }
 
+  /// Check if the role is a trainer (view-only over their own branch)
+  static bool isTrainer(String? role) => role == 'trainer';
+
+  /// True if the role may only read. Screens use this to hide write actions;
+  /// the backend enforces it independently.
+  static bool isReadOnly(String? role) => isTrainer(role);
+
   /// Check if the role is a manager of one or more branches
   static bool isManager(String? role) {
     return role == 'branch_manager' || role == 'regional_manager';
@@ -77,6 +87,7 @@ class RoleUtils {
     return role == 'branch_manager' ||
            role == 'front_desk' ||
            role == 'branch_accountant' ||
+           role == 'trainer' ||
            role == 'reception';  // Legacy support
   }
 
@@ -106,6 +117,8 @@ class RoleUtils {
       case 'front_desk':
       case 'reception':
         return 'Front Desk';
+      case 'trainer':
+        return 'Trainer';
       case 'central_accountant':
         return 'Central Accountant';
       case 'regional_accountant':

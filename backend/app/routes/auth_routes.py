@@ -16,7 +16,12 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 
 @auth_bp.route('/login', methods=['POST'])
-@limiter.limit('10 per minute;30 per hour')
+# Keyed on IP, and a gym's staff all share one public address behind the
+# branch router — so this budget is spent by the whole shift, not one person.
+# Set high enough that a shift change with mistyped passwords doesn't lock the
+# branch out, and still low enough that guessing a password is hopeless
+# (30/min caps an attacker at ~43k tries a day against a random 8-char code).
+@limiter.limit('30 per minute;200 per hour')
 def login():
     """User login"""
     try:

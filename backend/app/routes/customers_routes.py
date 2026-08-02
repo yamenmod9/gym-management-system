@@ -22,6 +22,24 @@ from app.extensions import db
 
 customers_bp = Blueprint('customers', __name__, url_prefix='/api/customers')
 
+# Roles that onboard members and therefore need to read back the plaintext
+# first-login password to hand it over. Everyone else gets the record without
+# it: `temp_password` is a live credential for that member's client account
+# until they change it, so a role with no reason to issue credentials (a
+# trainer, an accountant) must not be able to read one and sign in as them.
+# Allowlisted rather than denylisted so a role added later starts closed.
+_TEMP_PASSWORD_ROLES = (
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.REGIONAL_MANAGER,
+    UserRole.BRANCH_MANAGER,
+    UserRole.FRONT_DESK,
+)
+
+
+def _may_see_temp_password(user):
+    return bool(user) and user.role in _TEMP_PASSWORD_ROLES
+
 
 @customers_bp.route('', methods=['GET'])
 @jwt_required()
@@ -56,8 +74,9 @@ def get_customers():
     # Batch has_active_subscription for the whole page in one query instead
     # of letting each to_dict() run its own EXISTS query.
     active_sub_ids = Customer.batch_has_active_subscription([c.id for c in pagination.items])
+    show_temp = _may_see_temp_password(user)
     customers_data = [
-        customer.to_dict(include_temp_password=True, has_active_subscription=customer.id in active_sub_ids)
+        customer.to_dict(include_temp_password=show_temp, has_active_subscription=customer.id in active_sub_ids)
         for customer in pagination.items
     ]
     
@@ -87,8 +106,10 @@ def get_customer(customer_id):
     _accessible = get_accessible_branch_ids(user)
     if _accessible is not None and customer.branch_id not in _accessible:
         return error_response("Access denied", 403)
-    
-    return success_response(customer.to_dict(include_temp_password=True))
+
+    return success_response(
+        customer.to_dict(include_temp_password=_may_see_temp_password(user))
+    )
 
 
 @customers_bp.route('/phone/<string:phone>', methods=['GET'])
@@ -105,8 +126,10 @@ def get_customer_by_phone(phone):
     _accessible = get_accessible_branch_ids(user)
     if _accessible is not None and customer.branch_id not in _accessible:
         return error_response("Access denied", 403)
-    
-    return success_response(customer.to_dict(include_temp_password=True))
+
+    return success_response(
+        customer.to_dict(include_temp_password=_may_see_temp_password(user))
+    )
 
 
 @customers_bp.route('', methods=['POST'])
@@ -401,10 +424,11 @@ def search_customers():
     customers = query.options(joinedload(Customer.branch)).limit(limit).all()
 
     active_sub_ids = Customer.batch_has_active_subscription([c.id for c in customers])
+    show_temp = _may_see_temp_password(current_user)
 
     return success_response({
         'items': [
-            c.to_dict(include_temp_password=True, has_active_subscription=c.id in active_sub_ids)
+            c.to_dict(include_temp_password=show_temp, has_active_subscription=c.id in active_sub_ids)
             for c in customers
         ],
         'total': len(customers),

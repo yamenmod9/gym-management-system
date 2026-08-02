@@ -162,6 +162,17 @@ GYM_SPECS = [
             # and this is the only row that proves it.
             ('reception9', 'Karim Adel (Former)', '0202220009', 'DRG001', False),
         ],
+        # Trainers are read-only: they see their own branch's members and
+        # check-in activity and nothing else. Spread across branches so the
+        # branch scoping is actually exercised by the seed data.
+        'trainers': [
+            ('trainer1', 'Omar Zaki', '0202230001', 'DRG001', True),
+            ('trainer2', 'Hossam Farid', '0202230002', 'DRG001', True),
+            ('trainer3', 'Nour El-Din', '0202230003', 'PHX001', True),
+            ('trainer4', 'Amira Fouad', '0202230004', 'FLC001', True),
+            ('trainer5', 'Tarek Sobhy', '0202230005', 'TGR001', True),
+            ('trainer6', 'Laila Mansour (Former)', '0202230006', 'DRG001', False),
+        ],
     },
     {
         'key': 'irontemple',
@@ -206,6 +217,9 @@ GYM_SPECS = [
             ('it_reception1', 'Salma Wagdy', '0202221001', 'ITD001', True),
             ('it_reception2', 'Menna Tarek', '0202221002', 'ITM001', True),
         ],
+        'trainers': [
+            ('it_trainer1', 'Mostafa Gamal', '0202231001', 'ITD001', True),
+        ],
     },
     {
         'key': 'aqualife',
@@ -239,6 +253,9 @@ GYM_SPECS = [
         'branch_accountants': [],
         'reception': [
             ('aq_reception1', 'Farida Emad', '0202222001', 'AQZ001', True),
+        ],
+        'trainers': [
+            ('aq_trainer1', 'Ziad Kamal', '0202232001', 'AQZ001', True),
         ],
     },
 ]
@@ -589,6 +606,12 @@ def create_staff(gym, branches, spec):
         add(username, name, phone, UserRole.FRONT_DESK, 'reception123', branches[code], active)
         for username, name, phone, code, active in spec['reception']
     ]
+    # .get(): the gym specs predate this role, so a spec without a 'trainers'
+    # key should seed no trainers rather than blow up the whole seed run.
+    trainers = [
+        add(username, name, phone, UserRole.TRAINER, 'trainer123', branches[code], active)
+        for username, name, phone, code, active in spec.get('trainers', [])
+    ]
 
     db.session.flush()
 
@@ -607,7 +630,7 @@ def create_staff(gym, branches, spec):
 
     print(f'  ✓ Staff: 1 owner, {len(regionals)} regional, {len(managers)} branch managers, '
           f'{len(central_accountants) + len(regional_accountants) + len(branch_accountants)} accountants, '
-          f'{len(reception)} front desk')
+          f'{len(reception)} front desk, {len(trainers)} trainers')
     for region, user in zip(spec['regions'], regionals):
         names = ', '.join(branches[c].name for c in region['branch_codes'])
         print(f"      - {region['username']} → {region['label']}: {names}")
@@ -620,6 +643,7 @@ def create_staff(gym, branches, spec):
         'regional_accountants': regional_accountants,
         'branch_accountants': branch_accountants,
         'reception': reception,
+        'trainers': trainers,
         'desk_by_branch': desk_by_branch,
     }
 
@@ -1653,6 +1677,11 @@ def print_summary(worlds):
             branch = next(b['name'] for b in spec['branches'] if b['code'] == code)
             flag = '' if active else '  (INACTIVE - login must fail)'
             print(f'  [DESK]     {username} / reception123  — {branch}{flag}')
+
+        for username, name, _phone, code, active in spec.get('trainers', []):
+            branch = next(b['name'] for b in spec['branches'] if b['code'] == code)
+            flag = '' if active else '  (INACTIVE - login must fail)'
+            print(f'  [TRAINER]  {username} / trainer123  — {branch} (read-only){flag}')
 
     print('\n' + '=' * 70)
     print('[*] CLIENT APP ACCOUNTS')

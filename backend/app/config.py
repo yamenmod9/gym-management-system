@@ -124,6 +124,10 @@ class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///test_gym.db'
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
+    # The suite logs in far more often than a human would, from a single
+    # client address; leaving the limiter on just throttles the tests and
+    # turns unrelated assertions into 429s.
+    RATELIMIT_ENABLED = False
 
 
 config = {

@@ -11,6 +11,7 @@ import '../features/owner/screens/owner_dashboard.dart';
 import '../features/regional_manager/screens/regional_manager_dashboard.dart';
 import '../features/branch_manager/screens/branch_manager_dashboard.dart';
 import '../features/reception/screens/reception_main_screen.dart';
+import '../features/trainer/screens/trainer_dashboard.dart';
 import '../features/accountant/screens/accountant_dashboard.dart';
 
 class AppRouter {
@@ -83,6 +84,10 @@ class AppRouter {
           !RoleUtils.isAccountant(userRole)) {
         return _getDefaultRoute(userRole);
       }
+      if (state.matchedLocation.startsWith('/trainer') &&
+          !RoleUtils.isTrainer(userRole)) {
+        return _getDefaultRoute(userRole);
+      }
 
       return null;
     },
@@ -118,6 +123,10 @@ class AppRouter {
       GoRoute(
         path: '/accountant',
         builder: (context, state) => const AccountantDashboard(),
+      ),
+      GoRoute(
+        path: '/trainer',
+        builder: (context, state) => const TrainerDashboard(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

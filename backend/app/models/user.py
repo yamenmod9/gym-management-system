@@ -14,6 +14,7 @@ class UserRole(enum.Enum):
     REGIONAL_MANAGER = 'regional_manager'
     BRANCH_MANAGER = 'branch_manager'
     FRONT_DESK = 'front_desk'
+    TRAINER = 'trainer'
     ACCOUNTANT = 'accountant'
     BRANCH_ACCOUNTANT = 'branch_accountant'
     CENTRAL_ACCOUNTANT = 'central_accountant'
@@ -22,6 +23,10 @@ class UserRole(enum.Enum):
 
 # Rank of each role in the staff hierarchy. Higher outranks lower; a user may
 # only create/manage accounts of strictly lower rank than their own.
+#
+# A trainer sits above no one: the rank only governs who may create/manage
+# whom, and a trainer manages nobody. It is deliberately above FRONT_DESK so
+# reception cannot create or edit trainer accounts.
 ROLE_RANK = {
     UserRole.SUPER_ADMIN: 100,
     UserRole.OWNER: 90,
@@ -31,8 +36,13 @@ ROLE_RANK = {
     UserRole.REGIONAL_ACCOUNTANT: 55,
     UserRole.BRANCH_ACCOUNTANT: 50,
     UserRole.ACCOUNTANT: 50,
+    UserRole.TRAINER: 15,
     UserRole.FRONT_DESK: 10,
 }
+
+# Roles that may only read. Enforced at the route layer via
+# @role_required — listed here so the set has one obvious home.
+READ_ONLY_ROLES = (UserRole.TRAINER,)
 
 # Roles whose scope is a *group* of branches (managed_branches) rather than
 # the single branch_id every other branch-level role carries.

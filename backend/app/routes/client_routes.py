@@ -3,7 +3,9 @@ Client routes - Mobile app endpoints for clients
 """
 from flask import Blueprint, request
 from datetime import datetime, timedelta
-from app.models import Customer, Subscription, SubscriptionStatus, EntryLog, EntryType, Transaction
+from app.models import (
+    Customer, Subscription, SubscriptionStatus, EntryLog, EntryType, EntryStatus, Transaction,
+)
 from app.services.qr_service import QRService
 from app.utils import success_response, error_response, paginate, format_pagination_response
 from app.utils.client_auth import client_token_required, get_current_client
@@ -618,14 +620,14 @@ def get_client_stats():
     # Total visits
     total_visits = EntryLog.query.filter_by(
         customer_id=customer.id,
-        entry_status='approved'
+        entry_status=EntryStatus.APPROVED
     ).count()
     
     # Visits this month
     first_day_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     visits_this_month = EntryLog.query.filter_by(
         customer_id=customer.id,
-        entry_status='approved'
+        entry_status=EntryStatus.APPROVED
     ).filter(EntryLog.entry_time >= first_day_of_month).count()
     
     # Current streak (simplified - consecutive days)
@@ -645,6 +647,52 @@ def get_client_stats():
     })
 
 
+# How many check-ins in the trailing hour separate one crowding level from the
+# next. Tuned for a branch where ~20 entries/hour is a peak; raise these for
+# higher-traffic sites.
+_BUSY_MODERATE_FROM = 5
+_BUSY_BUSY_FROM = 15
+
+
+def _busy_level(count):
+    if count >= _BUSY_BUSY_FROM:
+        return 'busy'
+    if count >= _BUSY_MODERATE_FROM:
+        return 'moderate'
+    return 'quiet'
+
+
+@client_bp.route('/branch-activity', methods=['GET'])
+@client_token_required
+def get_branch_activity():
+    """How busy the member's own branch is right now.
+
+    Counts approved check-ins in the trailing hour at the branch this customer
+    belongs to — never a branch they aren't a member of, and never a
+    gym-wide total, so this can't be used to infer another site's traffic.
+    Denied scans are excluded: someone turned away at the door never entered.
+    """
+    customer = get_current_client()
+
+    if not customer:
+        return error_response('Customer not found', 404)
+
+    since = datetime.utcnow() - timedelta(hours=1)
+    count = EntryLog.query.filter(
+        EntryLog.branch_id == customer.branch_id,
+        EntryLog.entry_status == EntryStatus.APPROVED,
+        EntryLog.entry_time >= since,
+    ).count()
+
+    return success_response({
+        'branch_id': customer.branch_id,
+        'branch_name': customer.branch.name if customer.branch else None,
+        'entries_last_hour': count,
+        'level': _busy_level(count),
+        'as_of': datetime.utcnow().isoformat(),
+    })
+
+
 def _calculate_streak(customer_id: int) -> int:
     """Calculate consecutive days streak"""
     # Get unique entry dates in last 30 days
@@ -654,7 +702,7 @@ def _calculate_streak(customer_id: int) -> int:
         db.func.date(EntryLog.entry_time).label('entry_date')
     ).filter(
         EntryLog.customer_id == customer_id,
-        EntryLog.entry_status == 'approved',
+        EntryLog.entry_status == EntryStatus.APPROVED,
         EntryLog.entry_time >= thirty_days_ago
     ).distinct().order_by(db.desc('entry_date')).all()
     
