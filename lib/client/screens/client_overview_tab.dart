@@ -6,6 +6,7 @@ import '../core/auth/client_auth_provider.dart';
 import '../core/api/client_api_service.dart';
 import '../core/theme/client_theme.dart';
 import '../models/subscription_model.dart';
+import '../widgets/pending_actions_card.dart';
 
 /// Home tab of the member app, styled to the PowerFit Member App design:
 /// greeting header, a crimson subscription card with the remaining balance
@@ -120,6 +121,9 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
                       children: [
                         _buildHeader(client?.fullName),
                         const SizedBox(height: 20),
+                        // Renders nothing unless something actually needs
+                        // answering, so it costs no space on a quiet day.
+                        const PendingActionsCard(),
                         if (_subscription != null) ...[
                           _buildSubscriptionCard(_subscription!),
                           const SizedBox(height: 16),

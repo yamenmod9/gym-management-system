@@ -7,13 +7,18 @@ import '../../../core/utils/role_utils.dart';
 import '../../../shared/widgets/dashboard_shell.dart';
 import '../../../shared/widgets/error_display.dart';
 import '../../../shared/widgets/skeleton_loader.dart';
+import '../widgets/class_session_sheet.dart';
+import '../widgets/log_private_session_dialog.dart';
 
-/// Read-only console for trainers: the members of their own branch and the
-/// recent check-ins there. Both endpoints scope to the caller's branch on the
-/// server, so this screen never asks for a branch id — a trainer cannot widen
-/// their view by tampering with the request.
+/// Console for trainers: the members of their own branch, recent check-ins,
+/// the members who train privately with them, and the classes they run.
 ///
-/// Deliberately has no create/edit affordances anywhere: the backend rejects
+/// Every endpoint behind this screen scopes to the caller's branch (and, for
+/// private training and classes, to the caller themselves) on the server, so
+/// nothing here asks for a branch or trainer id — a trainer cannot widen their
+/// own view by tampering with a request.
+///
+/// The member and check-in tabs are strictly read-only: the backend rejects
 /// writes from this role, and offering a button that always fails is worse
 /// than not offering one.
 class TrainerDashboard extends StatefulWidget {
@@ -30,6 +35,8 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
   String? _error;
   List<Map<String, dynamic>> _members = const [];
   List<Map<String, dynamic>> _entries = const [];
+  List<Map<String, dynamic>> _privateClients = const [];
+  List<Map<String, dynamic>> _classes = const [];
 
   @override
   void initState() {
@@ -48,6 +55,8 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
       final results = await Future.wait([
         api.get('/api/customers', queryParameters: {'per_page': 100}),
         api.get('/api/validation/entry-logs', queryParameters: {'per_page': 50}),
+        api.get('/api/private-training/clients'),
+        api.get('/api/classes/mine'),
       ]);
 
       final memberData = results[0].data?['data'];
@@ -57,6 +66,8 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
       setState(() {
         _members = _asMapList(memberData is Map ? memberData['items'] : null);
         _entries = _asMapList(entryData is Map ? entryData['entries'] : null);
+        _privateClients = _asMapList(results[2].data?['data']);
+        _classes = _asMapList(results[3].data?['data']);
       });
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -70,11 +81,23 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
     return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
-  static List<String> get _titles => [S.membersAtBranch, S.recentCheckIns];
+  static List<String> get _titles => [
+        S.membersAtBranch,
+        S.recentCheckIns,
+        S.privateClients,
+        S.myClasses,
+      ];
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+
+    final tabs = <Widget Function()>[
+      _buildMembers,
+      _buildEntries,
+      _buildPrivateClients,
+      _buildClasses,
+    ];
 
     final body = _isLoading
         ? const DashboardSkeleton()
@@ -82,7 +105,7 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
             ? ErrorDisplay(message: _error!, onRetry: _load)
             : RefreshIndicator(
                 onRefresh: _load,
-                child: _selectedIndex == 0 ? _buildMembers() : _buildEntries(),
+                child: tabs[_selectedIndex](),
               );
 
     return DashboardShell(
@@ -94,24 +117,27 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
       navItems: [
         DashNavItem(Icons.people_outline, S.membersAtBranch),
         DashNavItem(Icons.login_rounded, S.recentCheckIns),
+        DashNavItem(Icons.fitness_center, S.privateClients),
+        DashNavItem(Icons.event_available, S.myClasses),
       ],
       selectedIndex: _selectedIndex,
       onSelect: (i) => setState(() => _selectedIndex = i),
       pageTitle: _titles[_selectedIndex],
-      pageSub: S.readOnlyAccess,
+      // Only the first two tabs are read-only; the trainer genuinely acts in
+      // the other two, so claiming otherwise there would be misleading.
+      pageSub: _selectedIndex < 2 ? S.readOnlyAccess : null,
       onLogout: () => auth.logout(),
       body: body,
     );
   }
 
+  // ─────────────────────────── read-only tabs ───────────────────────────
+
   Widget _buildMembers() {
     if (_members.isEmpty) return _empty(S.noMembersYet);
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      itemCount: _members.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
+    return _list(
+      _members.length,
+      (i) {
         final m = _members[i];
         final active = m['has_active_subscription'] == true;
         return _card(
@@ -124,21 +150,9 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
           ),
           title: (m['full_name'] ?? '').toString(),
           subtitle: (m['phone'] ?? '').toString(),
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: (active ? DashColors.emerald : DashColors.subtle)
-                  .withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              active ? S.active : S.inactive,
-              style: TextStyle(
-                color: active ? DashColors.emerald : DashColors.subtle,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          trailing: _pill(
+            active ? S.active : S.inactive,
+            active ? DashColors.emerald : DashColors.subtle,
           ),
         );
       },
@@ -147,12 +161,9 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
 
   Widget _buildEntries() {
     if (_entries.isEmpty) return _empty(S.noCheckInsYet);
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      itemCount: _entries.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
+    return _list(
+      _entries.length,
+      (i) {
         final e = _entries[i];
         final approved = e['entry_status'] == 'approved';
         return _card(
@@ -166,6 +177,131 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
       },
     );
   }
+
+  // ────────────────────────── private training ──────────────────────────
+
+  Widget _buildPrivateClients() {
+    if (_privateClients.isEmpty) return _empty(S.noPrivateClients);
+    return _list(
+      _privateClients.length,
+      (i) {
+        final c = _privateClients[i];
+        final remaining = c['remaining_sessions'];
+        final total = c['total_sessions'];
+        final pending = (c['awaiting_confirmation'] as num?)?.toInt() ?? 0;
+        final exhausted = remaining is num && remaining <= 0;
+
+        return _card(
+          leading: CircleAvatar(
+            backgroundColor: DashColors.inner,
+            child: Text(
+              _initial(c['customer_name']),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+          title: (c['customer_name'] ?? '').toString(),
+          subtitle: [
+            if (remaining != null) '$remaining/${total ?? '—'} ${S.sessionsRemaining}',
+            if (pending > 0) '$pending ${S.awaitingConfirmation}',
+          ].join('  •  '),
+          trailing: TextButton.icon(
+            onPressed: exhausted
+                ? null
+                : () => _logSession(c['subscription_id'], c['customer_name']),
+            icon: const Icon(Icons.add_task, size: 18),
+            label: Text(S.logSession),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _logSession(dynamic subscriptionId, dynamic name) async {
+    final logged = await showDialog<bool>(
+      context: context,
+      builder: (_) => LogPrivateSessionDialog(
+        subscriptionId: subscriptionId is int ? subscriptionId : 0,
+        customerName: (name ?? '').toString(),
+      ),
+    );
+    if (logged == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.sessionLogged), backgroundColor: Colors.green),
+      );
+      await _load();
+    }
+  }
+
+  // ──────────────────────────────  classes  ──────────────────────────────
+
+  Widget _buildClasses() {
+    if (_classes.isEmpty) return _empty(S.noClasses);
+    return _list(
+      _classes.length,
+      (i) {
+        final c = _classes[i];
+        final runsToday = c['runs_today'] == true;
+        final openSession = c['open_session'];
+        final days = (c['days_of_week'] as List?)?.cast<int>() ?? const [];
+
+        return _card(
+          leading: Icon(
+            Icons.event_available,
+            color: runsToday ? DashColors.emerald : DashColors.subtle,
+          ),
+          title: (c['name'] ?? '').toString(),
+          subtitle: [
+            _weekdayLabels(days),
+            if (c['start_time'] != null) c['start_time'].toString(),
+          ].where((s) => s.isNotEmpty).join('  •  '),
+          trailing: runsToday
+              ? ElevatedButton(
+                  onPressed: () => _openSession(c, openSession),
+                  child: Text(openSession == null ? S.startClass : S.attendees),
+                )
+              : _pill(_weekdayLabels(days), DashColors.subtle),
+        );
+      },
+    );
+  }
+
+  Future<void> _openSession(Map<String, dynamic> gymClass, dynamic openSession) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ClassSessionSheet(
+        classId: gymClass['id'] as int,
+        className: (gymClass['name'] ?? '').toString(),
+        existingSession: openSession is Map
+            ? Map<String, dynamic>.from(openSession)
+            : null,
+      ),
+    );
+    if (changed == true) await _load();
+  }
+
+  // ─────────────────────────────── chrome ───────────────────────────────
+
+  Widget _list(int count, Widget Function(int) builder) => ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: count,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (_, i) => builder(i),
+      );
+
+  Widget _pill(String text, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+      );
 
   Widget _card({
     required Widget leading,
@@ -218,6 +354,13 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
           ),
         ],
       );
+
+  static const _weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  static String _weekdayLabels(List<int> days) => days
+      .where((d) => d >= 0 && d < _weekdayNames.length)
+      .map((d) => _weekdayNames[d])
+      .join(', ');
 
   static String _initial(dynamic name) {
     final s = (name ?? '').toString().trim();

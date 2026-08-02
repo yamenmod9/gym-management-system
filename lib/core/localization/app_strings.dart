@@ -438,6 +438,61 @@ class S {
   static String get recentCheckIns => _t('آخر الدخول', 'Recent check-ins');
   static String get noMembersYet => _t('لا يوجد أعضاء بعد', 'No members yet');
   static String get noCheckInsYet => _t('لا يوجد دخول بعد', 'No check-ins yet');
+
+  // ─── PRIVATE TRAINING ──────────────────────────────────────
+  static String get privateTraining => _t('التدريب الخاص', 'Private training');
+  static String get privateClients => _t('متدربوني', 'My private clients');
+  static String get noPrivateClients =>
+      _t('لا يوجد متدربون خاصون بعد', 'No private clients yet');
+  static String get logSession => _t('تسجيل حصة', 'Log a session');
+  static String get sessionLogged => _t('تم تسجيل الحصة', 'Session logged');
+  static String get sessionsRemaining => _t('حصص متبقية', 'sessions left');
+  static String get awaitingConfirmation =>
+      _t('في انتظار تأكيد العضو', 'Awaiting member confirmation');
+  static String get sessionNotes => _t('ملاحظات الحصة', 'Session notes');
+  static String get confirmSession => _t('تأكيد الحصة', 'Confirm session');
+  static String get disputeSession => _t('اعتراض', 'Dispute');
+  static String get disputeReason => _t('سبب الاعتراض', 'What went wrong?');
+  static String get sessionConfirmed => _t('تم تأكيد الحصة', 'Session confirmed');
+  static String get sessionDisputed =>
+      _t('تم إرسال اعتراضك للمدير', 'Your dispute was sent to the manager');
+  static String get confirmYourSessions =>
+      _t('حصص بانتظار تأكيدك', 'Sessions awaiting your confirmation');
+  static String get disputes => _t('الاعتراضات', 'Disputes');
+  static String get noDisputes => _t('لا توجد اعتراضات', 'No disputes');
+  static String get upholdSession => _t('تأكيد الحصة', 'Uphold');
+  static String get refundSession => _t('إرجاع الحصة', 'Refund');
+  static String get disputeResolved => _t('تم حسم الاعتراض', 'Dispute resolved');
+
+  // ─── CLASSES ───────────────────────────────────────────────
+  static String get classes => _t('الحصص', 'Classes');
+  static String get myClasses => _t('حصصي', 'My classes');
+  static String get noClasses => _t('لا توجد حصص', 'No classes');
+  static String get startClass => _t('بدء الحصة', 'Start class');
+  static String get endClass => _t('إنهاء الحصة', 'End class');
+  static String get classStarted => _t('بدأت الحصة', 'Class started');
+  static String get classClosed =>
+      _t('انتهت الحصة وتم طلب التقييم', 'Class ended — feedback requested');
+  static String get runsToday => _t('اليوم', 'Runs today');
+  static String get addAttendee => _t('إضافة حاضر', 'Add attendee');
+  static String get attendees => _t('الحاضرون', 'Attendees');
+  static String get noAttendeesYet => _t('لا يوجد حاضرون بعد', 'Nobody added yet');
+  static String get classFeedback => _t('تقييم الحصة', 'Class feedback');
+  static String get noFeedbackYet => _t('لا توجد تقييمات بعد', 'No feedback yet');
+  static String get averageRating => _t('متوسط التقييم', 'Average rating');
+  static String get rateThisClass => _t('قيّم هذه الحصة', 'Rate this class');
+  static String get feedbackThanks => _t('شكراً لتقييمك', 'Thanks for your feedback');
+  static String get optionalComment => _t('تعليق (اختياري)', 'Comment (optional)');
+  static String get assignTrainer => _t('تعيين مدرب', 'Assign trainer');
+  static String get scheduleDays => _t('أيام الحصة', 'Scheduled days');
+
+  // ─── GYM RULES (owner settings) ────────────────────────────
+  static String get gymRules => _t('قواعد الجيم', 'Gym rules');
+  static String get gymRulesHint => _t(
+        'قواعد تسري على جميع فروع الجيم',
+        'These apply across every branch of your gym',
+      );
+  static String get rulesSaved => _t('تم حفظ القواعد', 'Rules saved');
   static String get readOnlyAccess =>
       _t('صلاحية اطلاع فقط', 'View-only access');
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/api/api_service.dart';
 import '../../../shared/models/customer_model.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../providers/reception_provider.dart';
@@ -24,6 +25,8 @@ class _ActivateSubscriptionDialogState extends State<ActivateSubscriptionDialog>
   String? _packageDuration; // For time-based packages
   String? _coinsAmount; // For coins packages
   String? _sessionsAmount; // For personal training packages
+  int? _trainerId; // The captain on a personal-training package
+  List<Map<String, dynamic>> _trainers = const [];
   bool _isLoading = false;
 
   // Subscription type options
@@ -74,6 +77,36 @@ class _ActivateSubscriptionDialogState extends State<ActivateSubscriptionDialog>
     {'value': '20', 'label': S.sessions(20)},
     {'value': '30', 'label': S.sessions(30)},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadTrainers());
+  }
+
+  /// Captains available to be named on a private-training package. The API
+  /// scopes this to the caller's own branches, so reception can only assign
+  /// someone who actually works where they do.
+  Future<void> _loadTrainers() async {
+    try {
+      final response = await context.read<ApiService>().get(
+        '/api/users',
+        queryParameters: {'role': 'trainer'},
+      );
+      final data = response.data?['data'];
+      final items = data is Map ? data['items'] : data;
+      if (!mounted || items is! List) return;
+      setState(() {
+        _trainers = items
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .where((u) => u['role'] == 'trainer' && u['is_active'] != false)
+            .toList();
+      });
+    } catch (_) {
+      if (mounted) setState(() => _trainers = const []);
+    }
+  }
 
   @override
   void dispose() {
@@ -141,6 +174,7 @@ class _ActivateSubscriptionDialogState extends State<ActivateSubscriptionDialog>
     } else if (_subscriptionType == 'personal_training') {
       subscriptionDetails['sessions'] = int.parse(_sessionsAmount!);
       subscriptionDetails['session_count'] = int.parse(_sessionsAmount!);
+      subscriptionDetails['trainer_id'] = _trainerId;
     }
 
     final result = await provider.activateSubscription(
@@ -512,6 +546,25 @@ class _ActivateSubscriptionDialogState extends State<ActivateSubscriptionDialog>
                             });
                           },
                           validator: (v) => v == null ? S.pleaseSelectSessions : null,
+                        ),
+                        const SizedBox(height: 12),
+                        // Which captain the member trains with. Required: the
+                        // package is sold as time with a specific person, and
+                        // the trainer's own client list is built from this.
+                        DropdownButtonFormField<int>(
+                          initialValue: _trainerId,
+                          decoration: InputDecoration(
+                            labelText: S.assignTrainer,
+                            prefixIcon: const Icon(Icons.person_pin),
+                          ),
+                          items: _trainers.map((t) {
+                            return DropdownMenuItem<int>(
+                              value: t['id'] as int,
+                              child: Text((t['full_name'] ?? '').toString()),
+                            );
+                          }).toList(),
+                          onChanged: (v) => setState(() => _trainerId = v),
+                          validator: (v) => v == null ? S.required : null,
                         ),
                         const SizedBox(height: 12),
                       ],

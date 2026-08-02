@@ -15,6 +15,29 @@ class SubscriptionService:
     """Subscription management service"""
     
     @staticmethod
+    def _resolve_trainer(trainer_id, branch_id):
+        """Validate a requested captain, or None.
+
+        Silently drops an id that is not an active trainer in the same gym as
+        the branch, rather than raising: the field only applies to private
+        training, and a bad value should not sink an otherwise valid sale.
+        """
+        if not trainer_id:
+            return None
+
+        from app.models.branch import Branch
+        from app.models.user import User, UserRole
+
+        trainer = db.session.get(User, trainer_id)
+        if not trainer or trainer.role != UserRole.TRAINER or not trainer.is_active:
+            return None
+
+        branch = db.session.get(Branch, branch_id)
+        if branch is None or trainer.gym_id != branch.gym_id:
+            return None
+        return trainer.id
+
+    @staticmethod
     def _derive_subscription_type(service):
         """
         Derive subscription_type from a Service object.
@@ -120,6 +143,14 @@ class SubscriptionService:
             # Keep legacy visit tracking for gym door access
             remaining_visits = None  # unlimited for time-based
 
+        # The captain a private-training package is sold against. Validated
+        # rather than trusted: it comes from the request, and pointing it at
+        # someone who is not a trainer (or belongs to another gym) would put a
+        # member on a stranger's client list.
+        trainer_id = SubscriptionService._resolve_trainer(
+            data.get('trainer_id'), data['branch_id']
+        )
+
         # Create subscription
         subscription = Subscription(
             customer_id=customer.id,
@@ -136,6 +167,7 @@ class SubscriptionService:
             remaining_visits=remaining_visits,
             remaining_classes=remaining_classes,
             created_by=created_by_user_id,
+            trainer_id=trainer_id,
         )
 
         db.session.add(subscription)

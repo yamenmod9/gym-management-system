@@ -245,6 +245,70 @@ class ClientApiService {
     }
   }
 
+  /// Private-training sessions a captain logged that this member has not yet
+  /// confirmed or disputed.
+  Future<Map<String, dynamic>> getPendingPrivateSessions() async {
+    try {
+      final response = await _dio.get('/private-training/client/pending');
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> confirmPrivateSession(int sessionId) async {
+    try {
+      final response = await _dio.post(
+        '/private-training/client/sessions/$sessionId/confirm',
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> disputePrivateSession(
+    int sessionId,
+    String reason,
+  ) async {
+    try {
+      final response = await _dio.post(
+        '/private-training/client/sessions/$sessionId/dispute',
+        data: {'reason': reason},
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Classes this member attended but hasn't rated yet.
+  Future<Map<String, dynamic>> getPendingClassFeedback() async {
+    try {
+      final response = await _dio.get('/client/class-feedback/pending');
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> submitClassFeedback({
+    required int sessionId,
+    required int rating,
+    String? comment,
+  }) async {
+    try {
+      final response = await _dio.post('/client/class-feedback', data: {
+        'session_id': sessionId,
+        'rating': rating,
+        if (comment != null && comment.isNotEmpty) 'comment': comment,
+      });
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Future<Map<String, dynamic>> refreshQrCode() async {
     try {
       final response = await _dio.post('/client/qr/refresh');

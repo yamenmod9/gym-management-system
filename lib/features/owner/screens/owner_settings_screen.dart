@@ -5,6 +5,7 @@ import '../../../shared/widgets/biometric_settings_section.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../shared/widgets/language_settings_tile.dart';
 import '../../../shared/widgets/notification_settings_section.dart';
+import 'gym_rules_screen.dart';
 
 class OwnerSettingsScreen extends StatelessWidget {
   const OwnerSettingsScreen({super.key});
@@ -99,6 +100,19 @@ class OwnerSettingsScreen extends StatelessWidget {
           Card(
             child: Column(
               children: [
+                ListTile(
+                  leading: const Icon(Icons.rule),
+                  title: Text(S.gymRules),
+                  subtitle: Text(
+                    S.gymRulesHint,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const GymRulesScreen()),
+                  ),
+                ),
+                const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.lock),
                   title: Text(S.changePassword),
