@@ -75,6 +75,12 @@ class Config:
     # Allow all origins for development. Restrict in production.
     CORS_ORIGINS = _parse_origins(os.getenv('CORS_ORIGINS'), default='*')
 
+    # Supabase Storage (gym logo uploads). Not in REQUIRED_IN_PRODUCTION:
+    # unlike SECRET_KEY/JWT_SECRET_KEY, missing these only fails logo
+    # uploads specifically (a clear 502), not the whole app's security model.
+    SUPABASE_URL = os.getenv('SUPABASE_URL')
+    SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""

@@ -38,6 +38,9 @@ def create_app(config_name='default'):
 
     # Register error handlers
     register_error_handlers(app)
+
+    # Attach baseline security headers to every response
+    register_security_headers(app)
     
     # Register CLI commands
     register_cli_commands(app)
@@ -375,6 +378,26 @@ def register_active_account_guard(app):
                 'error': 'User account is inactive',
             }), 401
         return None
+
+
+def register_security_headers(app):
+    """Attach baseline security headers to every response.
+
+    Railway terminates TLS in front of this app, so HSTS is always safe to
+    send here — there's no self-redirect-loop risk from checking
+    request.is_secure the way there would be running behind a proxy that
+    doesn't forward HTTPS. The API returns JSON (plus a handful of static
+    logo images); it never renders third-party-embeddable HTML, so a strict
+    CSP has no legitimate response to relax it for.
+    """
+    @app.after_request
+    def _add_security_headers(response):
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        response.headers['Content-Security-Policy'] = "default-src 'none'; frame-ancestors 'none'"
+        return response
 
 
 def register_error_handlers(app):

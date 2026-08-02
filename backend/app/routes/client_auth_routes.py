@@ -7,7 +7,7 @@ from app.models import Customer, ActivationCode, ActivationCodeType
 from app.services.notification_service import get_notification_service
 from app.utils import success_response, error_response
 from app.utils.client_auth import create_client_token
-from app.extensions import db
+from app.extensions import db, limiter
 
 client_auth_bp = Blueprint('client_auth', __name__, url_prefix='/api/client/auth')
 
@@ -52,6 +52,7 @@ def _build_delete_status(customer: Customer):
 
 
 @client_auth_bp.route('/login', methods=['POST'])
+@limiter.limit('10 per minute;30 per hour')
 def client_login():
     """
     Client login with phone and password

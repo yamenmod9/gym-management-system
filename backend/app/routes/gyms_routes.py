@@ -1,9 +1,9 @@
 """
 Gym routes - Setup and management of gym branding/settings
 """
-import os
 import uuid
-from flask import Blueprint, request, send_from_directory, current_app
+import requests
+from flask import Blueprint, request, current_app
 from flask_jwt_extended import jwt_required
 from werkzeug.utils import secure_filename
 from app.extensions import db
@@ -14,17 +14,52 @@ from app.utils import success_response, error_response, get_current_user, role_r
 gyms_bp = Blueprint('gyms', __name__, url_prefix='/api/gyms')
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+_CONTENT_TYPES = {
+    'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+    'gif': 'image/gif', 'webp': 'image/webp',
+}
+# Logos used to be saved to local disk (static/uploads/), which Railway wipes
+# on every redeploy — every uploaded logo vanished the next time the service
+# rebuilt. Supabase Storage is the actual persistent home for them now.
+_STORAGE_BUCKET = 'gym-logos'
 
 
 def _allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def _upload_dir():
-    """Return (and create) the upload directory path."""
-    base = os.path.join(current_app.root_path, 'static', 'uploads')
-    os.makedirs(base, exist_ok=True)
-    return base
+def _storage_object_url(path):
+    return f"{current_app.config['SUPABASE_URL']}/storage/v1/object/{_STORAGE_BUCKET}/{path}"
+
+
+def _storage_public_url(path):
+    return f"{current_app.config['SUPABASE_URL']}/storage/v1/object/public/{_STORAGE_BUCKET}/{path}"
+
+
+def _storage_auth_headers():
+    # Supabase's newer sb_secret_... key format needs both headers: `apikey`
+    # identifies the project/key pair, `Authorization` is what Storage
+    # actually authorizes against. Sending only one gets a 400
+    # "Invalid Compact JWS" — Storage tries to parse a bare Bearer token as
+    # a legacy JWT service-role key and fails on the new format.
+    key = current_app.config['SUPABASE_SERVICE_ROLE_KEY']
+    return {'Authorization': f'Bearer {key}', 'apikey': key}
+
+
+def _storage_upload(path, data, content_type):
+    """Upload bytes to the public gym-logos bucket. Raises on failure."""
+    headers = {**_storage_auth_headers(), 'Content-Type': content_type}
+    resp = requests.post(_storage_object_url(path), headers=headers, data=data, timeout=15)
+    resp.raise_for_status()
+
+
+def _storage_delete(path):
+    """Best-effort delete — a missing old file isn't worth failing the request over."""
+    url = f"{current_app.config['SUPABASE_URL']}/storage/v1/object/{_STORAGE_BUCKET}"
+    try:
+        requests.delete(url, headers=_storage_auth_headers(), json={'prefixes': [path]}, timeout=10)
+    except requests.RequestException:
+        pass
 
 
 @gyms_bp.route('/my-gym', methods=['GET'])
@@ -119,24 +154,23 @@ def upload_logo():
 
     # Generate a unique filename to avoid collisions
     ext = file.filename.rsplit('.', 1)[1].lower()
-    unique_name = f"gym_{user.id}_{uuid.uuid4().hex[:8]}.{ext}"
-    safe_name = secure_filename(unique_name)
+    safe_name = secure_filename(f"gym_{user.id}_{uuid.uuid4().hex[:8]}.{ext}")
 
-    upload_path = os.path.join(_upload_dir(), safe_name)
-    file.save(upload_path)
+    try:
+        _storage_upload(safe_name, file.read(), _CONTENT_TYPES[ext])
+    except requests.RequestException as e:
+        current_app.logger.error(f'Logo upload to Supabase Storage failed: {e}')
+        return error_response("Logo upload failed. Please try again.", 502)
 
-    # Build public URL — works for both local dev and PythonAnywhere
-    logo_url = f"/api/gyms/logos/{safe_name}"
+    logo_url = _storage_public_url(safe_name)
 
     # Also update the gym record
     gym = Gym.query.filter_by(owner_id=user.id).first()
     if gym:
-        # Delete old logo file if it exists
-        if gym.logo_url and gym.logo_url.startswith('/api/gyms/logos/'):
-            old_name = gym.logo_url.split('/')[-1]
-            old_path = os.path.join(_upload_dir(), old_name)
-            if os.path.exists(old_path):
-                os.remove(old_path)
+        # Delete the old logo object if it exists
+        prefix = _storage_public_url('')
+        if gym.logo_url and gym.logo_url.startswith(prefix):
+            _storage_delete(gym.logo_url[len(prefix):])
 
         gym.logo_url = logo_url
         db.session.commit()
@@ -145,13 +179,6 @@ def upload_logo():
         'logo_url': logo_url,
         'filename': safe_name,
     }, "Logo uploaded successfully")
-
-
-@gyms_bp.route('/logos/<filename>', methods=['GET'])
-def serve_logo(filename):
-    """Serve uploaded logo images (no auth required so images load everywhere)."""
-    safe = secure_filename(filename)
-    return send_from_directory(_upload_dir(), safe)
 
 
 @gyms_bp.route('', methods=['GET'])

@@ -6,6 +6,8 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_marshmallow import Marshmallow
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -13,6 +15,12 @@ migrate = Migrate()
 jwt = JWTManager()
 cors = CORS()
 ma = Marshmallow()
+# In-memory storage: counts reset per worker process rather than being
+# shared across them, so the effective limit on a 2-worker deploy is closer
+# to 2x what's configured below. Still closes off unlimited brute-forcing,
+# which is what mattered — a shared store (Redis) is the upgrade if this
+# service ever runs enough workers/instances for that gap to matter.
+limiter = Limiter(key_func=get_remote_address, default_limits=[])
 
 
 def init_extensions(app):
@@ -38,3 +46,4 @@ def init_extensions(app):
         }
     })
     ma.init_app(app)
+    limiter.init_app(app)

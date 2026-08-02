@@ -8,7 +8,7 @@ from app.schemas import UserSchema, LoginSchema
 from app.services import AuthService
 from app.utils import success_response, error_response, get_current_user, role_required
 from app.models.user import UserRole
-from app.extensions import db
+from app.extensions import db, limiter
 
 _SUPPORTED_LANGUAGES = {'ar', 'en'}
 
@@ -16,6 +16,7 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit('10 per minute;30 per hour')
 def login():
     """User login"""
     try:
