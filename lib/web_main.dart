@@ -32,6 +32,7 @@ import 'features/regional_manager/screens/regional_manager_dashboard.dart';
 import 'features/branch_manager/screens/branch_manager_dashboard.dart';
 import 'features/reception/screens/reception_main_screen.dart';
 import 'features/accountant/screens/accountant_dashboard.dart';
+import 'features/trainer/screens/trainer_dashboard.dart';
 import 'features/super_admin/screens/super_admin_dashboard.dart';
 
 import 'client/core/api/client_api_service.dart';
@@ -199,6 +200,9 @@ class _WebAppState extends State<WebApp> {
         if (loc.startsWith('/accountant') && !RoleUtils.isAccountant(userRole)) {
           return _staffDefaultRoute(userRole);
         }
+        if (loc.startsWith('/trainer') && !RoleUtils.isTrainer(userRole)) {
+          return _staffDefaultRoute(userRole);
+        }
         if (loc.startsWith('/super-admin') && userRole != AppConstants.roleSuperAdmin) {
           return _staffDefaultRoute(userRole);
         }
@@ -248,6 +252,10 @@ class _WebAppState extends State<WebApp> {
         GoRoute(
           path: '/accountant',
           builder: (context, state) => const AccountantDashboard(),
+        ),
+        GoRoute(
+          path: '/trainer',
+          builder: (context, state) => const TrainerDashboard(),
         ),
         GoRoute(
           path: '/super-admin',
