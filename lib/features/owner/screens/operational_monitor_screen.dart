@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../shared/widgets/skeleton_loader.dart';
@@ -19,6 +21,8 @@ class _OperationalMonitorScreenState extends State<OperationalMonitorScreen> {
   Map<String, dynamic>? _operationalData;
   ApiService? _apiService;
 
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
@@ -26,10 +30,19 @@ class _OperationalMonitorScreenState extends State<OperationalMonitorScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadOperationalData();
     });
-    // Auto-refresh every 30 seconds
-    Future.delayed(const Duration(seconds: 30), () {
-      if (mounted) _loadOperationalData();
-    });
+    // Auto-refresh every 30 seconds. A one-shot Future.delayed fired once and
+    // then stopped, so what called itself a live monitor quietly went stale
+    // after half a minute — and kept running after the screen was popped.
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _loadOperationalData(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   @override

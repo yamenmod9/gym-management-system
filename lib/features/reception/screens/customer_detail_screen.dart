@@ -72,17 +72,10 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(S.customerProfile),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              // TODO: Navigate to edit screen
-            },
-          ),
-        ],
-      ),
+      // No edit action: this screen is reached from the members list, which is
+      // where editing already lives. A button that silently does nothing is
+      // worse than not offering one.
+      appBar: AppBar(title: Text(S.customerProfile)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

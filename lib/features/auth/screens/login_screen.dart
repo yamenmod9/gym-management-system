@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
@@ -8,6 +9,7 @@ import '../../../core/providers/locale_provider.dart';
 import '../../../shared/models/gym_model.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../widgets/login_shell.dart';
+import 'api_debug_screen.dart';
 
 /// Staff/admin login for the native single-audience app (main.dart and
 /// super_admin_main.dart). Backend resolves the role after submit. Keeps
@@ -203,8 +205,32 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             _biometricButton(context),
+            _apiDebugButton(context),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Entry point for the connectivity tester, debug builds only.
+  ///
+  /// It takes a username and password and prints the raw response, which is
+  /// exactly what you want when a deploy cannot reach its backend and exactly
+  /// what should never ship to a gym. `kDebugMode` is a compile-time constant,
+  /// so this and the screen behind it are tree-shaken out of a release build —
+  /// the same posture the backend takes with its own dev-only blueprints.
+  Widget _apiDebugButton(BuildContext context) {
+    if (!kDebugMode) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: TextButton.icon(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ApiDebugScreen()),
+        ),
+        icon: const Icon(Icons.bug_report_outlined, size: 18),
+        label: const Text('API diagnostics (debug build)'),
+        style: TextButton.styleFrom(foregroundColor: kLoginMuted),
       ),
     );
   }

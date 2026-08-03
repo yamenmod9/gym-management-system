@@ -9,19 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// was no way to reach the screen that resolves one. Nothing failed — no
 /// analyzer error, no failing test — because unreferenced code is still valid
 /// code. This test is the thing that would have caught it.
-/// Screens that are already unreachable and are *not* being fixed here.
-///
-/// Recorded rather than ignored: the sweep found them, they are real, and
-/// listing them keeps the guard useful for new orphans instead of being
-/// switched off. Each still needs a decision — wire it up or delete it.
-const _knownUnrouted = {
-  // Developer tool; plausibly meant to stay out of the shipped navigation.
-  'ApiDebugScreen',
-  // Owner feature with no entry point.
-  'OperationalMonitorScreen',
-  // Reception cannot open a member's detail page from anywhere.
-  'CustomerDetailScreen',
-};
+/// Screens deliberately left unreachable. Empty, and worth keeping that way:
+/// anything added here needs a reason that outlives whoever added it.
+const _knownUnrouted = <String>{};
 
 void main() {
   group('screen wiring', () {
@@ -85,6 +75,26 @@ void main() {
           reason: 'managers cannot create a class without this');
       expect(dashboards, contains('TrainingDisputesScreen'),
           reason: 'disputed training sessions would have no resolution path');
+    });
+
+    test('the API diagnostics screen is only reachable in a debug build', () {
+      // It accepts a username and password and prints the raw response. Being
+      // reachable is fine; being reachable from a gym's install is not, and
+      // "someone will remember" is not a control.
+      final callers = {
+        for (final file in dartFiles)
+          if (!file.path.endsWith('api_debug_screen.dart'))
+            file.path: file.readAsStringSync(),
+      }..removeWhere((_, source) => !source.contains('ApiDebugScreen'));
+
+      expect(callers, isNotEmpty,
+          reason: 'nothing opens ApiDebugScreen — either wire it up or delete it');
+
+      callers.forEach((path, source) {
+        expect(source, contains('kDebugMode'),
+            reason: '$path reaches ApiDebugScreen without a kDebugMode guard, '
+                'so it would ship in a release build');
+      });
     });
   });
 }

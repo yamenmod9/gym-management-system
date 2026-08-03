@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../../shared/models/customer_model.dart';
 import '../../../shared/widgets/skeleton_loader.dart';
 import '../providers/reception_provider.dart';
 import '../../../core/localization/app_strings.dart';
+import 'customer_detail_screen.dart';
 
 class CustomersListScreen extends StatefulWidget {
   /// View a specific branch's members. Null means "the signed-in user's own
@@ -339,10 +341,33 @@ class _CustomersListScreenState extends State<CustomersListScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 12),
+                // The card shows the QR *code*, but a member at the desk needs
+                // the scannable image — and a way to reissue it when the old
+                // one has been shared around. That lives on the detail screen.
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton.icon(
+                    onPressed: () => _openCustomerDetail(customer),
+                    icon: const Icon(Icons.qr_code_2, size: 18),
+                    label: Text(S.customerProfile),
+                  ),
+                ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openCustomerDetail(Map<String, dynamic> customer) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CustomerDetailScreen(
+          customer: CustomerModel.fromJson(customer),
+        ),
       ),
     );
   }

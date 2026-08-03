@@ -19,6 +19,7 @@ import 'staff_leaderboard_screen.dart';
 import 'branch_detail_screen.dart';
 import 'create_branch_screen.dart';
 import 'owner_settings_screen.dart';
+import 'operational_monitor_screen.dart';
 import '../../manager/screens/classes_screen.dart';
 import '../../manager/screens/training_disputes_screen.dart';
 import '../../../core/localization/app_strings.dart';
@@ -105,6 +106,16 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
             icon: Icons.refresh,
             tooltip: S.refresh,
             onTap: () => dashboardProvider.refresh()),
+        // A live view rather than another nav tab: it is something an owner
+        // pops open to see how today is going, not a section they work in.
+        DashIconAction(
+          icon: Icons.monitor_heart_outlined,
+          tooltip: S.operationalMonitor,
+          onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const OperationalMonitorScreen())),
+        ),
         DashIconAction(
           icon: Icons.settings_outlined,
           tooltip: S.settings,
