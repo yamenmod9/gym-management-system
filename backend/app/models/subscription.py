@@ -88,6 +88,27 @@ class Subscription(db.Model):
     # sessions. The two helpers below are those two questions, named.
 
     @staticmethod
+    def entry_query(customer_id, allow_non_entry=False, statuses=None):
+        """Base query for the subscriptions that open the door for this member.
+
+        The single definition of "grants entry". Every door path narrows this
+        rather than rebuilding the join, so the rule cannot drift between the
+        turnstile, the QR scan and the fingerprint reader.
+        """
+        from app.models.service import Service
+
+        if statuses is None:
+            statuses = [SubscriptionStatus.ACTIVE, SubscriptionStatus.FROZEN]
+
+        query = Subscription.query.join(Service, Subscription.service_id == Service.id).filter(
+            Subscription.customer_id == customer_id,
+            Subscription.status.in_(statuses),
+        )
+        if not allow_non_entry:
+            query = query.filter(Service.grants_gym_entry.is_(True))
+        return query
+
+    @staticmethod
     def entry_subscription_for(customer_id, allow_non_entry=False):
         """The subscription that should open the door for this member, if any.
 
@@ -100,16 +121,7 @@ class Subscription(db.Model):
         "no subscription" from "frozen" and report the freeze reason; returning
         a frozen one first would make that branch unreachable.
         """
-        from app.models.service import Service
-
-        query = Subscription.query.join(Service, Subscription.service_id == Service.id).filter(
-            Subscription.customer_id == customer_id,
-            Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.FROZEN]),
-        )
-        if not allow_non_entry:
-            query = query.filter(Service.grants_gym_entry.is_(True))
-
-        return query.order_by(
+        return Subscription.entry_query(customer_id, allow_non_entry).order_by(
             (Subscription.status == SubscriptionStatus.ACTIVE).desc(),
             Subscription.end_date.desc(),
         ).first()

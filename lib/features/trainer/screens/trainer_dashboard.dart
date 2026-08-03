@@ -38,42 +38,75 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
   List<Map<String, dynamic>> _privateClients = const [];
   List<Map<String, dynamic>> _classes = const [];
 
+  /// Whatever went wrong on the last load, one entry per failed endpoint.
+  List<Object> _failures = const [];
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  /// Loads the four tabs independently.
+  ///
+  /// They are four unrelated endpoints, so one of them failing is not a reason
+  /// to blank the other three — a `Future.wait` here meant a hiccup fetching
+  /// classes took the member list down with it. A tab whose fetch failed shows
+  /// empty; the whole screen only errors when nothing at all could be loaded.
   Future<void> _load() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
-    try {
-      final api = context.read<ApiService>();
-      final results = await Future.wait([
-        api.get('/api/customers', queryParameters: {'per_page': 100}),
-        api.get('/api/validation/entry-logs', queryParameters: {'per_page': 50}),
-        api.get('/api/private-training/clients'),
-        api.get('/api/classes/mine'),
-      ]);
+    final api = context.read<ApiService>();
 
-      final memberData = results[0].data?['data'];
-      final entryData = results[1].data?['data'];
-
-      if (!mounted) return;
-      setState(() {
-        _members = _asMapList(memberData is Map ? memberData['items'] : null);
-        _entries = _asMapList(entryData is Map ? entryData['entries'] : null);
-        _privateClients = _asMapList(results[2].data?['data']);
-        _classes = _asMapList(results[3].data?['data']);
-      });
-    } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    Future<T> attempt<T>(Future<T> Function() fetch, T fallback) async {
+      try {
+        return await fetch();
+      } catch (e) {
+        _failures.add(e);
+        return fallback;
+      }
     }
+
+    _failures = [];
+    const empty = <Map<String, dynamic>>[];
+
+    final results = await Future.wait([
+      attempt(() async {
+        final res = await api.get('/api/customers', queryParameters: {'per_page': 100});
+        final data = res.data?['data'];
+        return _asMapList(data is Map ? data['items'] : null);
+      }, empty),
+      attempt(() async {
+        final res = await api.get('/api/validation/entry-logs',
+            queryParameters: {'per_page': 50});
+        final data = res.data?['data'];
+        return _asMapList(data is Map ? data['entries'] : null);
+      }, empty),
+      attempt(() async {
+        final res = await api.get('/api/private-training/clients');
+        return _asMapList(res.data?['data']);
+      }, empty),
+      attempt(() async {
+        final res = await api.get('/api/classes/mine');
+        return _asMapList(res.data?['data']);
+      }, empty),
+    ]);
+
+    if (!mounted) return;
+    setState(() {
+      _members = results[0];
+      _entries = results[1];
+      _privateClients = results[2];
+      _classes = results[3];
+      // Only a total failure is worth replacing the screen with an error.
+      _error = _failures.length == results.length
+          ? _failures.first.toString()
+          : null;
+      _isLoading = false;
+    });
   }
 
   static List<Map<String, dynamic>> _asMapList(dynamic raw) {

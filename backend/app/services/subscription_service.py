@@ -95,7 +95,24 @@ class SubscriptionService:
         service = db.session.get(Service, data['service_id'])
         if not service or not service.is_active:
             return None, "Service not found or inactive"
-        
+
+        # House rule. Multiple active subscriptions are the default — that is
+        # what lets a member hold gym entry *and* private training — but a gym
+        # that sells one at a time can switch it off. Enforced here rather than
+        # at the route so every path that creates a subscription obeys it.
+        from app.models.branch import Branch
+        from app.services.gym_rules import gym_rule
+
+        branch = db.session.get(Branch, data['branch_id'])
+        if not gym_rule(branch.gym_id if branch else None,
+                        'allow_multiple_active_subscriptions'):
+            if Subscription.active_for(customer.id):
+                return None, (
+                    "This member already has an active subscription, and this "
+                    "gym allows only one at a time"
+                )
+
+
         # Calculate dates
         start_date = data.get('start_date')
         if not start_date:

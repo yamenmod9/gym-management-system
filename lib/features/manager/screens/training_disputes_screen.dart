@@ -11,7 +11,10 @@ import '../../../shared/widgets/error_display.dart';
 /// logged it), so upholding changes nothing and refunding gives the session
 /// back. Both sides are told the outcome.
 class TrainingDisputesScreen extends StatefulWidget {
-  const TrainingDisputesScreen({super.key});
+  /// Rendered inside a dashboard tab rather than pushed as its own route.
+  final bool embedded;
+
+  const TrainingDisputesScreen({super.key, this.embedded = false});
 
   @override
   State<TrainingDisputesScreen> createState() => _TrainingDisputesScreenState();
@@ -76,34 +79,38 @@ class _TrainingDisputesScreenState extends State<TrainingDisputesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final body = _isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : _error != null
+            ? ErrorDisplay(message: _error!, onRetry: _load)
+            : RefreshIndicator(
+                onRefresh: _load,
+                child: _disputes.isEmpty
+                    ? ListView(
+                        children: [
+                          const SizedBox(height: 140),
+                          Center(
+                            child: Text(
+                              S.noDisputes,
+                              style: const TextStyle(color: DashColors.muted),
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _disputes.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, i) => _buildCard(_disputes[i]),
+                      ),
+              );
+
+    if (widget.embedded) return body;
+
     return Scaffold(
       backgroundColor: DashColors.bg,
       appBar: AppBar(title: Text(S.disputes)),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? ErrorDisplay(message: _error!, onRetry: _load)
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: _disputes.isEmpty
-                      ? ListView(
-                          children: [
-                            const SizedBox(height: 140),
-                            Center(
-                              child: Text(
-                                S.noDisputes,
-                                style: const TextStyle(color: DashColors.muted),
-                              ),
-                            ),
-                          ],
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _disputes.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 10),
-                          itemBuilder: (context, i) => _buildCard(_disputes[i]),
-                        ),
-                ),
+      body: body,
     );
   }
 

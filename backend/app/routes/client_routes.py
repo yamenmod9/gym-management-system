@@ -18,6 +18,23 @@ _DELETE_REQUEST_PREFIX = '[DELETE_REQUEST]'
 _DELETE_GRACE_DAYS = 90
 
 
+def _entry_subscription(customer):
+    """The member's subscription that grants gym entry, honouring gym rules.
+
+    Same question the door asks, so it has to be asked the same way — including
+    the owner override. Without it a private-training-only member at a gym that
+    admits them would be shown "no subscription" by the app while the turnstile
+    let them in.
+    """
+    return Subscription.entry_subscription_for(
+        customer.id,
+        allow_non_entry=gym_rule(
+            customer.branch.gym_id if customer.branch else None,
+            'pt_only_members_may_enter',
+        ),
+    )
+
+
 def _extract_delete_request_date(customer: Customer):
     notes = customer.health_notes or ''
     for line in notes.splitlines():
@@ -295,7 +312,7 @@ def get_client_subscription():
         return error_response('No active subscription found', 404)
 
     # Headline = whatever opens the door, falling back to the newest.
-    entry = Subscription.entry_subscription_for(customer.id)
+    entry = _entry_subscription(customer)
     subscription = next(
         (s for s in active if entry is not None and s.id == entry.id),
         active[0],
@@ -466,13 +483,7 @@ def get_client_qr():
     # This QR opens the door, so it has to be backed by the subscription that
     # grants entry — issuing one against a private-training package would let
     # the scan meter the wrong thing.
-    subscription = Subscription.entry_subscription_for(
-        customer.id,
-        allow_non_entry=gym_rule(
-            customer.branch.gym_id if customer.branch else None,
-            'pt_only_members_may_enter',
-        ),
-    )
+    subscription = _entry_subscription(customer)
 
     if not subscription or subscription.status != SubscriptionStatus.ACTIVE:
         return error_response('No active subscription. Please purchase a subscription.', 403)
@@ -653,7 +664,7 @@ def get_client_stats():
     # Headline subscription stays a single object for existing clients;
     # `active_subscriptions` carries the rest for members holding several.
     active = Subscription.active_for(customer.id)
-    entry = Subscription.entry_subscription_for(customer.id)
+    entry = _entry_subscription(customer)
     headline = next(
         (s for s in active if entry is not None and s.id == entry.id),
         active[0] if active else None,

@@ -122,7 +122,11 @@ class ProductionConfig(Config):
 class TestingConfig(Config):
     """Testing configuration"""
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///test_gym.db'
+    # Honour DATABASE_URL so a test module can point at its own throwaway file.
+    # The fixed fallback is a real file on disk and therefore survives between
+    # runs — a fixture that seeds into it hits unique-constraint errors on the
+    # second run rather than starting clean.
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///test_gym.db')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
     # The suite logs in far more often than a human would, from a single
     # client address; leaving the limiter on just throttles the tests and

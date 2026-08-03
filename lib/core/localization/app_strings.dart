@@ -485,6 +485,33 @@ class S {
   static String get optionalComment => _t('تعليق (اختياري)', 'Comment (optional)');
   static String get assignTrainer => _t('تعيين مدرب', 'Assign trainer');
   static String get scheduleDays => _t('أيام الحصة', 'Scheduled days');
+  static String get manageClasses => _t('إدارة الحصص', 'Manage classes');
+  static String get newClass => _t('حصة جديدة', 'New class');
+  static String get editClass => _t('تعديل الحصة', 'Edit class');
+  static String get className => _t('اسم الحصة', 'Class name');
+  static String get classCreated => _t('تم إنشاء الحصة', 'Class created');
+  static String get classUpdated => _t('تم تحديث الحصة', 'Class updated');
+  static String get classDeactivated => _t('تم إيقاف الحصة', 'Class deactivated');
+  static String get deactivateClass => _t('إيقاف الحصة', 'Deactivate class');
+  static String get deactivateClassConfirm => _t(
+        'سيتم إخفاء الحصة من جدول المدرب. الحصص السابقة وتقييماتها تبقى محفوظة.',
+        'The class disappears from the trainer\'s schedule. Past sessions and '
+            'their feedback are kept.',
+      );
+  static String get durationMinutes => _t('المدة (دقائق)', 'Duration (minutes)');
+  static String get startTime => _t('وقت البدء', 'Start time');
+  static String get noTrainerAssigned => _t('بدون مدرب', 'No trainer assigned');
+  static String get unassignedClassHint => _t(
+        'لا يمكن بدء حصة بدون مدرب',
+        'A class with no trainer cannot be started',
+      );
+  static String get pickAtLeastOneDay =>
+      _t('اختر يوماً واحداً على الأقل', 'Pick at least one day');
+
+  /// Weekday initials, Monday first — matches the backend's 0=Monday.
+  static List<String> get weekdayLabels => _ar
+      ? const ['ن', 'ث', 'ر', 'خ', 'ج', 'س', 'ح']
+      : const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   // ─── GYM RULES (owner settings) ────────────────────────────
   static String get gymRules => _t('قواعد الجيم', 'Gym rules');

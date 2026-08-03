@@ -95,6 +95,12 @@ class QRService:
         if not customer.is_active:
             return False, "Customer account is inactive", None, 0
         
+        from app.services.gym_rules import gym_rule
+        allow_non_entry = gym_rule(
+            customer.branch.gym_id if customer.branch else None,
+            'pt_only_members_may_enter',
+        )
+
         # If no subscription_id provided, find active subscription
         if subscription_id:
             subscription = db.session.get(Subscription, subscription_id)
@@ -103,19 +109,27 @@ class QRService:
             # member's visits.
             if subscription and subscription.customer_id != customer_id:
                 return False, "Subscription does not belong to this customer", None, 0
+            # Grants-entry check: the caller supplied this id (a QR token carries
+            # it), so the entry rule has to be re-applied here rather than
+            # trusted from whoever minted it. Without this, a token naming the
+            # member's own private-training package would open the door and
+            # meter sessions their captain never delivered.
+            if (
+                subscription is not None
+                and not allow_non_entry
+                and subscription.service is not None
+                and not subscription.service.grants_gym_entry
+            ):
+                return False, "This subscription does not grant gym entry", subscription, 0
         else:
             # The one that grants entry: a member holding gym *and* private
             # training has more than one, and only the gym package should be
             # metered by a scan at the door.
-            from app.services.gym_rules import gym_rule
             subscription = Subscription.entry_subscription_for(
                 customer_id,
-                allow_non_entry=gym_rule(
-                    customer.branch.gym_id if customer.branch else None,
-                    'pt_only_members_may_enter',
-                ),
+                allow_non_entry=allow_non_entry,
             )
-        
+
         if not subscription:
             return False, "No active subscription found", None, 0
         
@@ -131,19 +145,25 @@ class QRService:
         if branch_id and subscription.branch_id != branch_id:
             return False, "Subscription not valid for this branch", subscription, 0
         
-        # Check remaining visits/coins
+        # Check remaining visits/coins.
+        #
+        # A NULL counter means the subscription does not meter that thing —
+        # a time-based membership has unlimited visits, and a coin package is
+        # metered through remaining_coins instead. Comparing NULL with <= 0
+        # raises TypeError, which surfaced as a 500 at the front desk rather
+        # than a denial, so the None case has to be handled before the compare.
         coins_to_deduct = 0
-        if subscription.service.has_visits:
+        if subscription.service.has_visits and subscription.remaining_visits is not None:
             if subscription.remaining_visits <= 0:
                 return False, "No remaining visits on subscription", subscription, 0
             coins_to_deduct = 1
-        
+
         # Check class-based limits
-        if subscription.service.has_classes:
+        if subscription.service.has_classes and subscription.remaining_classes is not None:
             if subscription.remaining_classes <= 0:
                 return False, "No remaining classes on subscription", subscription, 0
             coins_to_deduct = 1
-        
+
         # All checks passed
         return True, "Entry approved", subscription, coins_to_deduct
     
@@ -156,16 +176,19 @@ class QRService:
             subscription: Subscription object
             coins: Number of visits/classes to deduct
         """
-        if subscription.service.has_visits:
+        # NULL counters are untracked, not zero — see validate_entry. Decrementing
+        # one would raise, and setting it to a number would silently start
+        # metering a membership that was sold as unlimited.
+        if subscription.service.has_visits and subscription.remaining_visits is not None:
             subscription.remaining_visits = max(0, subscription.remaining_visits - coins)
-            
+
             # Auto-expire if no visits left
             if subscription.remaining_visits == 0:
                 subscription.status = SubscriptionStatus.EXPIRED
-        
-        if subscription.service.has_classes:
+
+        if subscription.service.has_classes and subscription.remaining_classes is not None:
             subscription.remaining_classes = max(0, subscription.remaining_classes - coins)
-            
+
             # Auto-expire if no classes left
             if subscription.remaining_classes == 0:
                 subscription.status = SubscriptionStatus.EXPIRED

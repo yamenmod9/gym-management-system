@@ -308,6 +308,10 @@ def add_attendance(session_id):
         get_current_gym_id(user), 'class_attendance_deducts_coin'
     )
 
+    # Running set of who is on the register, seeded from what is already
+    # stored and extended as we go. It has to grow inside the loop: a payload
+    # naming the same member twice would otherwise build two rows and break the
+    # (session, customer) unique constraint, turning a double-tap into a 500.
     already = {a.customer_id for a in session.attendance.all()}
     added, skipped = [], []
 
@@ -330,7 +334,7 @@ def add_attendance(session_id):
             continue
 
         if session.gym_class and session.gym_class.capacity is not None:
-            if len(already) + len(added) >= session.gym_class.capacity:
+            if len(already) >= session.gym_class.capacity:
                 skipped.append({'customer_id': customer_id, 'reason': 'class is full'})
                 continue
 
@@ -350,6 +354,7 @@ def add_attendance(session_id):
             coin_deducted=coin_taken,
         ))
         added.append(customer_id)
+        already.add(customer_id)
 
     db.session.commit()
 

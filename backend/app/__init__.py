@@ -48,6 +48,15 @@ def create_app(config_name='default'):
         config_class.validate()
     app.config.from_object(config_class)
 
+    # Config classes read DATABASE_URL when the module is first imported, which
+    # is whenever something first touches `app.config` — often before a caller
+    # has had a chance to set it. Re-reading it here binds the value that is
+    # actually in the environment at boot, so import order cannot silently
+    # point the app at the wrong database.
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+
     # Initialize extensions
     init_extensions(app)
 
@@ -62,6 +71,9 @@ def create_app(config_name='default'):
 
     # Attach baseline security headers to every response
     register_security_headers(app)
+
+    # Per-request caches must not outlive the request
+    register_request_cache_reset(app)
     
     # Register CLI commands
     register_cli_commands(app)
@@ -85,6 +97,30 @@ def create_app(config_name='default'):
         return jsonify({'status': 'healthy'})
     
     return app
+
+
+#: Caches that hold for exactly one request. Each lives on ``flask.g`` and is
+#: keyed by gym id, so a stale entry is a stale *value*, not another tenant's
+#: data — an owner flipping a gym rule would otherwise keep seeing the old one.
+_PER_REQUEST_CACHES = ('_gym_rules_cache', '_gym_branch_ids_cache')
+
+
+def register_request_cache_reset(app):
+    """Clear the per-request caches at the start of every request.
+
+    ``flask.g`` is normally per request already, so this is belt-and-braces —
+    but only *normally*: an app context that is pushed and left on the stack
+    gets reused by subsequent requests, and then `g` (and everything cached on
+    it) silently outlives the request it was built for. Clearing here makes the
+    lifetime true by construction instead of by assumption.
+    """
+    @app.before_request
+    def _reset_per_request_caches():
+        from flask import g
+
+        for attr in _PER_REQUEST_CACHES:
+            if hasattr(g, attr):
+                delattr(g, attr)
 
 
 def _ensure_db_schema(app):

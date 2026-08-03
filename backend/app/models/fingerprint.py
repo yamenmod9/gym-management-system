@@ -63,7 +63,6 @@ class Fingerprint(db.Model):
         # only active package is private training has bought a captain's time,
         # not floor access, so their finger must not open the door.
         from app.models.subscription import Subscription, SubscriptionStatus
-        from app.models.service import Service
         from app.services.gym_rules import gym_rule
 
         customer = self.customer
@@ -72,16 +71,15 @@ class Fingerprint(db.Model):
             'pt_only_members_may_enter',
         )
 
-        query = Subscription.query.join(
-            Service, Subscription.service_id == Service.id
-        ).filter(
-            Subscription.customer_id == self.customer_id,
-            Subscription.status == SubscriptionStatus.ACTIVE,
-        )
-        if not allow_non_entry:
-            query = query.filter(Service.grants_gym_entry.is_(True))
-
-        active_subscriptions = query.all()
+        # Shares Subscription.entry_query with the turnstile and QR paths so
+        # "grants entry" is defined once. Narrowed to ACTIVE because a frozen
+        # membership should not open a door, and unlike the scan paths there is
+        # no freeze reason to report back at a fingerprint reader.
+        active_subscriptions = Subscription.entry_query(
+            self.customer_id,
+            allow_non_entry=allow_non_entry,
+            statuses=[SubscriptionStatus.ACTIVE],
+        ).all()
 
         if not active_subscriptions:
             return False, "No active subscriptions"

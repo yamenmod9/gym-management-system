@@ -19,6 +19,8 @@ import 'staff_leaderboard_screen.dart';
 import 'branch_detail_screen.dart';
 import 'create_branch_screen.dart';
 import 'owner_settings_screen.dart';
+import '../../manager/screens/classes_screen.dart';
+import '../../manager/screens/training_disputes_screen.dart';
 import '../../../core/localization/app_strings.dart';
 
 class OwnerDashboard extends StatefulWidget {
@@ -46,6 +48,8 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     S.finance,
     S.complaints,
     S.issues,
+    S.classes,
+    S.disputes,
   ];
 
   @override
@@ -83,6 +87,8 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         DashNavItem(Icons.assessment_outlined, S.finance),
         DashNavItem(Icons.report_problem_outlined, S.complaints),
         DashNavItem(Icons.flag_outlined, S.issues),
+        DashNavItem(Icons.event_note_outlined, S.classes),
+        DashNavItem(Icons.gavel_outlined, S.disputes),
       ],
       actions: [
         DashIconAction(
@@ -155,6 +161,10 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         return _buildComplaintsTab(context, provider);
       case 5:
         return const IssuesScreen(embedded: true);
+      case 6:
+        return const ClassesScreen(embedded: true);
+      case 7:
+        return const TrainingDisputesScreen(embedded: true);
       default:
         return const SizedBox();
     }

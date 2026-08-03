@@ -325,6 +325,41 @@ def at_business_hour(day):
 # SEED ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 
+def enable_row_level_security():
+    """Turn RLS on for every table, on Postgres only.
+
+    Defence in depth rather than the primary control: the backend reaches the
+    database over a direct Postgres connection as the owner role, so RLS is not
+    what keeps tenants apart — ``scope_query_to_branches`` is. What RLS buys is
+    that a leaked anon/publishable key cannot be pointed at PostgREST and used
+    to read the tables wholesale.
+
+    No-op on SQLite, which has no such concept, so local runs are unaffected.
+    """
+    from sqlalchemy import text
+
+    if not db.engine.url.get_backend_name().startswith('postgres'):
+        return
+
+    print('  > Enabling row-level security...')
+    enabled = 0
+    with db.engine.connect() as connection:
+        tables = connection.execute(text(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+        )).scalars().all()
+
+        for table in tables:
+            # Table names come from pg_tables, not user input, but they are
+            # still interpolated — quote them so an odd name cannot break out.
+            connection.execute(
+                text(f'ALTER TABLE "{table}" ENABLE ROW LEVEL SECURITY')
+            )
+            enabled += 1
+        connection.commit()
+
+    print(f'    {enabled} table(s) secured')
+
+
 def seed_database():
     """Seed the database with production-quality test data."""
     env = 'production' if any('pythonanywhere' in path.lower() for path in sys.path) \
@@ -341,6 +376,12 @@ def seed_database():
         print('  > Clearing existing data...')
         db.drop_all()
         db.create_all()
+
+        # drop_all/create_all rebuilds every table from scratch, and a recreated
+        # table comes back with row-level security *off* — so seeding silently
+        # undid it across the whole database. Re-applying it here keeps the two
+        # in step instead of relying on someone remembering afterwards.
+        enable_row_level_security()
 
         print('  > Creating platform super admin...')
         create_super_admin()

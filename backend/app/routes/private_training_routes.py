@@ -11,6 +11,7 @@ from app.models import (
     Customer, PrivateSession, PrivateSessionStatus, Subscription,
     SubscriptionStatus, Service,
 )
+from app.models.private_session import AUTO_CONFIRM_AFTER
 from app.models.user import UserRole
 from app.utils import (
     success_response, error_response, role_required, get_current_user,
@@ -47,10 +48,17 @@ def my_private_clients():
     user = get_current_user()
     subs = _trainer_subscriptions(user.id)
 
+    # Only sessions still inside the confirmation window count as awaiting an
+    # answer. Past it they are treated as agreed everywhere else (see
+    # PrivateSession.effective_status), and counting them here would leave the
+    # captain staring at a badge that only ever climbs.
+    still_open_after = datetime.utcnow() - AUTO_CONFIRM_AFTER
+
     pending_by_sub = {}
     for s in PrivateSession.query.filter(
         PrivateSession.trainer_id == user.id,
         PrivateSession.status == PrivateSessionStatus.PENDING,
+        PrivateSession.logged_at > still_open_after,
     ).all():
         pending_by_sub.setdefault(s.subscription_id, 0)
         pending_by_sub[s.subscription_id] += 1
