@@ -9,7 +9,8 @@ from app.models.fingerprint import Fingerprint
 from app.models.customer import Customer
 from app.utils import (
     success_response, error_response, role_required,
-    paginate, format_pagination_response, get_current_user
+    paginate, format_pagination_response, get_current_user,
+    get_accessible_branch_ids, scope_query_to_branches
 )
 from app.models.user import UserRole
 from app.extensions import db
@@ -17,20 +18,50 @@ from app.extensions import db
 fingerprints_bp = Blueprint('fingerprints', __name__, url_prefix='/api/fingerprints')
 
 
+#: Who handles biometrics: the desk that enrols members and the managers above
+#: it. Not a bare @jwt_required(), which any staff login satisfies.
+FINGERPRINT_ROLES = (
+    UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.REGIONAL_MANAGER,
+    UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK,
+)
+
+
+def _scoped_fingerprint(fingerprint_id):
+    """A fingerprint whose owner is a member of the caller's branches."""
+    fingerprint = db.session.get(Fingerprint, fingerprint_id)
+    if not fingerprint:
+        return None, error_response("Fingerprint not found", 404)
+
+    accessible = get_accessible_branch_ids(get_current_user())
+    customer = fingerprint.customer
+    if accessible is not None and (
+            customer is None or customer.branch_id not in accessible):
+        return None, error_response("Fingerprint not found", 404)
+    return fingerprint, None
+
+
 @fingerprints_bp.route('', methods=['GET'])
 @jwt_required()
+@role_required(*FINGERPRINT_ROLES)
 def get_fingerprints():
     """Get all fingerprints (paginated)"""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     customer_id = request.args.get('customer_id', type=int)
     is_active = request.args.get('is_active', type=bool)
-    
-    query = Fingerprint.query
-    
+
+    # Scoped through the member, since a fingerprint has no branch of its own.
+    # Unscoped, this listed every enrolled fingerprint on the platform to any
+    # staff login from any gym.
+    query = Fingerprint.query.join(
+        Customer, Fingerprint.customer_id == Customer.id
+    )
+    query = scope_query_to_branches(query, Customer.branch_id, get_current_user())
+
     if customer_id:
-        query = query.filter_by(customer_id=customer_id)
-    
+        query = query.filter(Fingerprint.customer_id == customer_id)
+
+
     if is_active is not None:
         query = query.filter_by(is_active=is_active)
     
@@ -55,9 +86,15 @@ def register_fingerprint():
     except ValidationError as e:
         return error_response("Validation error", 400, e.messages)
     
-    # Validate customer
+    # Validate customer, and that they are one of ours. customer_id comes
+    # from the request body, so without this a desk could enrol a biometric
+    # against a member of another gym.
     customer = db.session.get(Customer, data['customer_id'])
     if not customer:
+        return error_response("Customer not found", 404)
+
+    accessible = get_accessible_branch_ids(get_current_user())
+    if accessible is not None and customer.branch_id not in accessible:
         return error_response("Customer not found", 404)
     
     # Check if customer already has an active fingerprint
@@ -107,30 +144,50 @@ def register_fingerprint():
 
 
 @fingerprints_bp.route('/validate', methods=['POST'])
+@jwt_required()
+@role_required(*FINGERPRINT_ROLES)
 def validate_fingerprint():
-    """Validate fingerprint for access (public endpoint for kiosk)"""
+    """Validate a fingerprint for access.
+
+    This was an unauthenticated endpoint, described as public "for kiosk". It
+    takes a hash and, on a match, opens the door and returns the member's full
+    profile — so anyone who could reach the API could replay a hash or probe
+    for one, and the listing endpoint above was handing those hashes out. No
+    client in this repository ever called it, so requiring a door role costs
+    nothing; a real kiosk authenticates with its own staff account.
+    """
     try:
         schema = FingerprintValidateSchema()
         data = schema.load(request.json)
     except ValidationError as e:
         return error_response("Validation error", 400, e.messages)
-    
-    # Find fingerprint
+
     fingerprint = Fingerprint.query.filter_by(
         fingerprint_hash=data['fingerprint_hash']
     ).first()
-    
+
     if not fingerprint:
         return error_response("Fingerprint not recognized", 404)
-    
-    # Validate access
+
+    # A reader belonging to one gym must not admit another gym's member.
+    accessible = get_accessible_branch_ids(get_current_user())
+    customer = fingerprint.customer
+    if accessible is not None and (
+            customer is None or customer.branch_id not in accessible):
+        return error_response("Fingerprint not recognized", 404)
+
     success, message = fingerprint.validate_access()
-    
+
     if not success:
         return error_response(message, 403)
-    
+
+    # What a door needs to show, not the member's whole record.
     return success_response({
-        'customer': fingerprint.customer.to_dict(),
+        'customer': {
+            'id': customer.id,
+            'full_name': customer.full_name,
+            'branch_id': customer.branch_id,
+        },
         'access_granted': True,
         'message': message
     })
@@ -141,10 +198,9 @@ def validate_fingerprint():
 @role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def deactivate_fingerprint(fingerprint_id):
     """Deactivate fingerprint"""
-    fingerprint = db.session.get(Fingerprint, fingerprint_id)
-    
-    if not fingerprint:
-        return error_response("Fingerprint not found", 404)
+    fingerprint, denied = _scoped_fingerprint(fingerprint_id)
+    if denied:
+        return denied
     
     data = request.json or {}
     reason = data.get('reason', 'Manual deactivation')
@@ -160,10 +216,9 @@ def deactivate_fingerprint(fingerprint_id):
 @role_required(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER, UserRole.FRONT_DESK)
 def reactivate_fingerprint(fingerprint_id):
     """Reactivate fingerprint"""
-    fingerprint = db.session.get(Fingerprint, fingerprint_id)
-    
-    if not fingerprint:
-        return error_response("Fingerprint not found", 404)
+    fingerprint, denied = _scoped_fingerprint(fingerprint_id)
+    if denied:
+        return denied
     
     fingerprint.is_active = True
     fingerprint.deactivation_reason = None

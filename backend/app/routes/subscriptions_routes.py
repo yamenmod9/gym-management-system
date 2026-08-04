@@ -118,10 +118,13 @@ def create_subscription():
     
     # Validate branch access
     user = get_current_user()
-    if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        if user.branch_id and data['branch_id'] != user.branch_id:
-            return error_response("Cannot create subscription for another branch", 403)
-    
+    # Same scope as /activate. The check this replaces exempted owners, so one
+    # could sell a subscription into another gym's branch, and skipped any role
+    # whose branch_id is NULL.
+    accessible = get_accessible_branch_ids(user)
+    if accessible is not None and data['branch_id'] not in accessible:
+        return error_response("Cannot create subscription for another branch", 403)
+
     subscription, error = SubscriptionService.create_subscription(data, user.id)
     
     if error:

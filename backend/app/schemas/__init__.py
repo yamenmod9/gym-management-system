@@ -257,7 +257,9 @@ class FingerprintSchema(Schema):
     id = fields.Int(dump_only=True)
     customer_id = fields.Int(required=True)
     customer_name = fields.Str(dump_only=True)
-    fingerprint_hash = fields.Str(dump_only=True)
+    # fingerprint_hash is deliberately not dumped. It is the credential the
+    # /fingerprints/validate endpoint accepts to open a door, so listing it
+    # turned a read of this endpoint into a working key for every member on it.
     is_active = fields.Bool(dump_only=True)
     created_at = fields.DateTime(dump_only=True)
     last_used = fields.DateTime(dump_only=True)
