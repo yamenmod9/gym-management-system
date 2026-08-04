@@ -11,7 +11,7 @@ from app.utils import (
     paginate, format_pagination_response,
     get_current_user, get_current_gym_id, get_accessible_branch_ids
 )
-from app.models.user import User, UserRole, ROLE_RANK
+from app.models.user import User, UserRole, ROLE_RANK, GYM_WIDE_ROLES
 from app.extensions import db
 
 users_bp = Blueprint('users', __name__, url_prefix='/api/users')
@@ -129,6 +129,13 @@ def _can_administer(actor, target):
     if actor_gym is None or target.gym_id != actor_gym:
         return False
 
+    # Gym-wide actors are already fully scoped by the gym check above. Narrowing
+    # them by branch as well excluded every colleague who has no branch_id —
+    # regional managers, central accountants, other owners — so an owner could
+    # not read, edit or deactivate their own gym-wide staff.
+    if actor.role in GYM_WIDE_ROLES:
+        return True
+
     accessible = get_accessible_branch_ids(actor)
     if accessible is not None and target.branch_id not in accessible:
         return False
@@ -173,13 +180,22 @@ def create_user():
     if not creator.outranks(new_role):
         return error_response("You cannot create an account at or above your own rank", 403)
 
-    # Branch-scoped managers can only create staff inside their own branches
+    # Branch-scoped managers can only create staff inside their own branches.
+    # Gym-wide creators skip this: they are scoped by the gym_id injected below,
+    # and requiring a branch stopped an owner from creating gym-wide staff (a
+    # central accountant carries no branch at all). Their branch grants are
+    # still checked, just against the whole gym.
     accessible = get_accessible_branch_ids(creator)
     if accessible is not None:
         target_branches = set(data.get('managed_branch_ids') or [])
         if data.get('branch_id'):
             target_branches.add(data['branch_id'])
-        if not target_branches or not target_branches.issubset(set(accessible)):
+
+        if creator.role in GYM_WIDE_ROLES:
+            if not target_branches.issubset(set(accessible)):
+                return error_response(
+                    "You can only assign branches belonging to your gym", 403)
+        elif not target_branches or not target_branches.issubset(set(accessible)):
             return error_response("You can only create staff for branches you manage", 403)
 
     # Inject gym_id so the new user belongs to the same gym
@@ -212,16 +228,29 @@ def update_user(user_id):
     # Hierarchy: you can only edit accounts that rank strictly below you
     if editor.id != target.id and not editor.outranks(target.role):
         return error_response("You cannot edit an account at or above your own rank", 403)
-    # Branch scope: a branch/regional manager may only edit staff of a branch
-    # they run. Owner/super admin (unrestricted scope) skip this.
+    # Branch scope. Gym-wide editors are bounded by the gym check in
+    # _can_administer instead — narrowing them by branch excluded every target
+    # with no branch_id, which is exactly the gym-wide staff an owner manages.
     accessible = get_accessible_branch_ids(editor)
+    if editor.id != target.id and not _can_administer(editor, target):
+        return error_response("You can only manage staff of branches you run", 403)
+
     if editor.id != target.id and accessible is not None:
-        if target.branch_id not in accessible:
-            return error_response("You can only manage staff of branches you run", 403)
-        # And they must not move a staff member out of their own scope.
+        # They must not move a staff member out of their own scope.
         new_branch = data.get('branch_id', target.branch_id)
         if new_branch is not None and new_branch not in accessible:
             return error_response("You can only assign staff to branches you run", 403)
+
+    # managed_branch_ids is a scope *grant*: whatever lands here becomes the
+    # target's accessible branch list. The create path validated it; this one
+    # did not check it at all, so an editor could widen a regional manager's
+    # reach into another gym and every read that manager then made returned
+    # someone else's data.
+    if 'managed_branch_ids' in data and accessible is not None:
+        requested = set(data.get('managed_branch_ids') or [])
+        if not requested.issubset(set(accessible)):
+            return error_response(
+                "You can only assign branches within your own scope", 403)
 
     user, error = AuthService.update_user(user_id, data)
     

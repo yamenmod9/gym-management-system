@@ -48,6 +48,18 @@ READ_ONLY_ROLES = (UserRole.TRAINER,)
 # the single branch_id every other branch-level role carries.
 BRANCH_GROUP_ROLES = (UserRole.REGIONAL_MANAGER, UserRole.REGIONAL_ACCOUNTANT)
 
+# Roles whose scope is the whole gym rather than any particular branch. They
+# are still confined to their own gym — that check is separate — but narrowing
+# them to a branch list is wrong: gym-wide staff (a regional manager, a central
+# accountant, the owner) carry no branch_id at all, so a `target.branch_id in
+# accessible_branches` test excluded exactly the people an owner most needs to
+# administer.
+GYM_WIDE_ROLES = (
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.CENTRAL_ACCOUNTANT,
+)
+
 # Roles that may read a branch's books: transactions, payments, expenses, cash
 # reconciliation. Every role except the trainer, whose job is members and
 # sessions — these endpoints carry amounts, discounts, till shortfalls and who

@@ -130,6 +130,12 @@ def client_login():
 
 
 @client_auth_bp.route('/request-code', methods=['POST'])
+# Each code allows 3 guesses, which sounds tight until you notice that minting
+# a fresh one was unlimited: request, guess three times, request again. At a
+# few requests a second that walks a 6-digit space in hours, and every attempt
+# also sends the member a real SMS. Capping the mint rate is what makes the
+# per-code attempt limit mean anything.
+@limiter.limit('5 per minute;20 per hour')
 def request_activation_code():
     """
     Request activation code for client login
@@ -219,27 +225,31 @@ def request_activation_code():
             customer_name=customer.full_name
         )
     except Exception as e:
-        print(f"[ERROR] Failed to send code: {str(e)}", flush=True)
+        # The reason stays server-side: it names the provider and its failure
+        # mode, which is of no use to a member and of some use to an attacker.
+        current_app.logger.exception('Failed to send activation code: %s', e)
         db.session.rollback()
-        return error_response(f'Failed to send activation code: {str(e)}', 500)
+        return error_response('Could not send the activation code. Please try again.', 500)
     
-    # For development/testing, include the code in response
-    # TODO: Remove this in production!
-    response_data = {
+    # The code is never returned over the API, in any environment.
+    #
+    # It used to be included whenever current_app.debug was set, which made a
+    # full account takeover — request a code for any member's phone, read it
+    # out of the response — contingent on a single `ENV FLASK_ENV=production`
+    # line in the Dockerfile staying put. That is too much weight for one line
+    # of deployment config to carry. Local development reads the code from the
+    # stdout block above instead.
+    return success_response({
         'message': f'Activation code sent via {delivery_method}',
         'delivery_target': _mask_identifier(delivery_target, delivery_method),
         'expires_in': 900  # 15 minutes in seconds
-    }
-    
-    # Add code to response in development mode only
-    if current_app.debug:
-        response_data['code'] = plain_code  # DEV ONLY - Remove in production!
-        response_data['note'] = 'Code included in response for testing only'
-    
-    return success_response(response_data)
+    })
 
 
 @client_auth_bp.route('/verify-code', methods=['POST'])
+# Second line of defence behind the per-code attempt counter, since the counter
+# resets with every newly minted code.
+@limiter.limit('15 per minute;100 per hour')
 def verify_activation_code():
     """
     Verify activation code and issue client JWT

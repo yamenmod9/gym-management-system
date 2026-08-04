@@ -8,9 +8,25 @@ from app.models.user import User, UserRole, BRANCH_GROUP_ROLES
 from app.models.gym import Gym
 
 
+#: Shortest password a staff account may have. Matches what the member-facing
+#: change-password already required — the staff path enforced nothing at all,
+#: so an account guarding a gym's takings could be secured with one character.
+MIN_PASSWORD_LENGTH = 8
+
+
+def validate_password(password):
+    """Return an error string, or None if the password is acceptable."""
+    if not password or not str(password).strip():
+        return "Password is required"
+    if len(str(password)) < MIN_PASSWORD_LENGTH:
+        return f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+    return None
+
+
 class AuthService:
     """Authentication and user management service"""
-    
+
+
     @staticmethod
     def login(username, password):
         """Authenticate user and return tokens"""
@@ -69,7 +85,11 @@ class AuthService:
         #     if not User.validate_owner_uniqueness():
         #         return None, "Owner account already exists. Only ONE owner is allowed."
         role = UserRole(data['role'])
-        
+
+        weak = validate_password(data.get('password'))
+        if weak:
+            return None, weak
+
         # Validate branch requirement for branch-specific roles. The plain
         # ACCOUNTANT is included so a "normal" accountant can never end up
         # unscoped and thereby control more than the one branch they're tied to.
@@ -160,7 +180,11 @@ class AuthService:
         
         if not user.check_password(old_password):
             return False, "Current password is incorrect"
-        
+
+        weak = validate_password(new_password)
+        if weak:
+            return False, weak
+
         user.set_password(new_password)
         db.session.commit()
         

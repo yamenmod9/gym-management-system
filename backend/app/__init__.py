@@ -475,6 +475,29 @@ def _sync_enum_values(app):
         )
 
 
+#: Blueprints whose routes authenticate from the request body (phone plus
+#: password, or an activation code) rather than from a token. A member's app
+#: may still send a stale Authorization header to them, and rejecting that
+#: would break logging in or changing a password.
+_CLIENT_CREDENTIAL_BLUEPRINTS = frozenset({'client_auth', 'client_compat'})
+
+
+def _endpoint_allows_client_token(app):
+    """Whether the endpoint being served accepts a member's token.
+
+    True for anything wrapped in ``client_token_required`` (which tags itself)
+    and for the credential-based client auth routes. Everything else is staff
+    surface, where a client token must not be honoured.
+    """
+    from flask import request
+
+    if request.blueprint in _CLIENT_CREDENTIAL_BLUEPRINTS:
+        return True
+
+    view = app.view_functions.get(request.endpoint)
+    return bool(getattr(view, '_allows_client_token', False))
+
+
 def register_active_account_guard(app):
     """Reject any request whose JWT belongs to a deactivated account.
 
@@ -517,6 +540,28 @@ def register_active_account_guard(app):
         # selectin-eager and would otherwise fire an extra query per request.
         if claims.get('scope') == 'client':
             from app.models.customer import Customer
+
+            # A member's token must not be usable as a staff account.
+            #
+            # Both token kinds are signed with the same secret and carry a bare
+            # numeric identity: a staff token's is a users.id, a client token's
+            # is a customers.id. The two id spaces start at 1 and count up
+            # independently, so they collide constantly — and nothing on the
+            # staff side looked at `scope`. get_current_user() called int() on
+            # the identity and loaded that row out of `users`, so a member
+            # holding customer id 7 was served as staff user 7, with whatever
+            # role that user has.
+            #
+            # Enforced here rather than inside get_current_user() because 71 of
+            # its 79 call sites use the result without a None check, and because
+            # running before the view means no route-level `except Exception`
+            # can turn the rejection into a 500 that still executed.
+            if not _endpoint_allows_client_token(app):
+                return jsonify({
+                    'success': False,
+                    'error': 'Client access is not permitted on this endpoint',
+                }), 403
+
             customer_id = claims.get('customer_id')
             if customer_id is None:
                 return None

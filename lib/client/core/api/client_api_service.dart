@@ -311,7 +311,7 @@ class ClientApiService {
 
   Future<Map<String, dynamic>> refreshQrCode() async {
     try {
-      final response = await _dio.post('/client/qr/refresh');
+      final response = await _dio.post('/client/refresh-qr');
       return response.data;
     } on DioException catch (e) {
       throw _handleError(e);

@@ -18,20 +18,26 @@ def client_token_required(fn):
     def wrapper(*args, **kwargs):
         # Verify JWT is present
         verify_jwt_in_request()
-        
+
         # Get JWT claims
         claims = get_jwt()
-        
+
         # Verify this is a client token
         if claims.get('scope') != 'client':
             return error_response('Client access required', 403)
-        
+
         # Verify customer_id is present
         if 'customer_id' not in claims:
             return error_response('Invalid client token', 403)
-        
+
         return fn(*args, **kwargs)
-    
+
+    # Marks this view as one a member's token may reach. The request-level
+    # guard in app/__init__.py rejects client tokens everywhere else, which is
+    # what stops a member's token being resolved as a staff account. Kept as an
+    # attribute rather than a blueprint list because private_training serves
+    # both audiences from one blueprint.
+    wrapper._allows_client_token = True
     return wrapper
 
 

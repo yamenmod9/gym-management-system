@@ -25,6 +25,20 @@ def role_required(*allowed_roles):
         @wraps(fn)
         def wrapper(*args, **kwargs):
             verify_jwt_in_request()
+
+            # A member's token carries a customers.id in the same field a staff
+            # token carries a users.id, so without this check int() would
+            # happily resolve it against the users table. The request-level
+            # guard already rejects client tokens on staff endpoints; this is
+            # the second lock, because the cost of the guard ever being bypassed
+            # is a member acting as an owner.
+            from flask_jwt_extended import get_jwt
+            if get_jwt().get('scope') == 'client':
+                return jsonify({
+                    'success': False,
+                    'error': 'Client access is not permitted on this endpoint',
+                }), 403
+
             user_id = int(get_jwt_identity())
             user = db.session.get(User, user_id)
 
