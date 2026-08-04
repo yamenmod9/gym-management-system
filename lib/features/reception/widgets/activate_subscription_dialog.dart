@@ -27,6 +27,16 @@ class _ActivateSubscriptionDialogState extends State<ActivateSubscriptionDialog>
   String? _sessionsAmount; // For personal training packages
   int? _trainerId; // The captain on a personal-training package
   List<Map<String, dynamic>> _trainers = const [];
+
+  /// Which service is actually being sold.
+  ///
+  /// This used to be hardcoded to service 1 for every sale. The service is not
+  /// cosmetic: it carries `grants_gym_entry`, the freeze allowance and the list
+  /// price, so booking a private-training package against a gym membership
+  /// meant that package opened the door — the one case the gym explicitly does
+  /// not want — and inherited the wrong freeze rules.
+  int? _serviceId;
+  List<Map<String, dynamic>> _services = const [];
   bool _isLoading = false;
 
   // Subscription type options
@@ -78,10 +88,47 @@ class _ActivateSubscriptionDialogState extends State<ActivateSubscriptionDialog>
     {'value': '30', 'label': S.sessions(30)},
   ];
 
+  /// Service types that belong with each subscription type, so the picker
+  /// offers what the desk actually meant to sell.
+  static const Map<String, List<String>> _serviceTypesFor = {
+    'coins': ['gym', 'bundle'],
+    'time_based': ['gym', 'bundle', 'swimming_recreation', 'swimming_education'],
+    'personal_training': ['personal_training'],
+  };
+
+  List<Map<String, dynamic>> get _matchingServices {
+    final allowed = _serviceTypesFor[_subscriptionType];
+    if (allowed == null) return const [];
+    return _services
+        .where((s) => allowed.contains((s['service_type'] ?? '').toString()))
+        .toList();
+  }
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadTrainers());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadTrainers();
+      _loadServices();
+    });
+  }
+
+  Future<void> _loadServices() async {
+    try {
+      final response = await context.read<ApiService>().get('/api/services');
+      final data = response.data?['data'];
+      final items = data is Map ? data['items'] : data;
+      if (!mounted || items is! List) return;
+      setState(() {
+        _services = items
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .where((s) => s['is_active'] != false)
+            .toList();
+      });
+    } catch (_) {
+      if (mounted) setState(() => _services = const []);
+    }
   }
 
   /// Captains available to be named on a private-training package. The API
@@ -154,6 +201,13 @@ class _ActivateSubscriptionDialogState extends State<ActivateSubscriptionDialog>
       return;
     }
 
+    if (_serviceId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.pleaseSelectService)),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     final provider = context.read<ReceptionProvider>();
@@ -179,7 +233,7 @@ class _ActivateSubscriptionDialogState extends State<ActivateSubscriptionDialog>
 
     final result = await provider.activateSubscription(
       customerId: customer!.id!,
-      serviceId: 1, // Default service ID (automatic)
+      serviceId: _serviceId!,
       amount: double.parse(_amountController.text),
       paymentMethod: _paymentMethod,
       subscriptionDetails: subscriptionDetails,
@@ -471,11 +525,48 @@ class _ActivateSubscriptionDialogState extends State<ActivateSubscriptionDialog>
                             _packageDuration = null;
                             _coinsAmount = null;
                             _sessionsAmount = null;
+                            // The service list is filtered by type, so a
+                            // previously chosen service may no longer apply.
+                            _serviceId = null;
                           });
                         },
                         validator: (v) => v == null ? S.pleaseSelectSubType : null,
                       ),
                       const SizedBox(height: 12),
+
+                      if (_subscriptionType != null) ...[
+                        DropdownButtonFormField<int>(
+                          initialValue: _serviceId,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: S.service,
+                            border: const OutlineInputBorder(),
+                          ),
+                          items: _matchingServices.map((s) {
+                            return DropdownMenuItem<int>(
+                              value: s['id'] as int,
+                              child: Text(
+                                '${s['name']}'
+                                '${s['price'] != null ? '  ·  ${s['price']}' : ''}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (v) => setState(() => _serviceId = v),
+                          validator: (v) =>
+                              v == null ? S.pleaseSelectService : null,
+                        ),
+                        if (_matchingServices.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              S.noServiceForThisType,
+                              style: const TextStyle(
+                                  color: Colors.orange, fontSize: 12),
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                      ],
 
                       // Conditional fields based on subscription type
                       if (_subscriptionType == 'coins') ...[

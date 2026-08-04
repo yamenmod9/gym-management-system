@@ -10,10 +10,11 @@ from app.schemas import (
 )
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.services import SubscriptionService
+from sqlalchemy.orm import joinedload
 from app.utils import (
     success_response, error_response, role_required,
     paginate, format_pagination_response, get_current_user,
-    get_accessible_branch_ids
+    get_accessible_branch_ids, scope_query_to_branches
 )
 from app.models.user import UserRole
 from app.extensions import db
@@ -55,15 +56,20 @@ def get_subscriptions():
     
     user = get_current_user()
     
-    query = Subscription.query
-    
-    # Branch filtering based on role
-    if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        if user.branch_id:
-            query = query.filter_by(branch_id=user.branch_id)
-    elif branch_id:
-        query = query.filter_by(branch_id=branch_id)
-    
+    # Eager-load what the schema names, so serialising a page of 20 does not
+    # fire three extra queries per row.
+    query = Subscription.query.options(
+        joinedload(Subscription.customer),
+        joinedload(Subscription.service),
+        joinedload(Subscription.branch),
+    )
+
+    # Branch scope. The hand-rolled filter this replaces applied nothing at all
+    # to an owner unless they passed ?branch_id, so listing subscriptions
+    # returned every gym's members; any role with a NULL branch_id fell through
+    # the same gap.
+    query = scope_query_to_branches(query, Subscription.branch_id, user, branch_id)
+
     # Customer filter
     if customer_id:
         query = query.filter_by(customer_id=customer_id)
@@ -89,17 +95,13 @@ def get_subscriptions():
 @jwt_required()
 def get_subscription(subscription_id):
     """Get subscription by ID"""
-    subscription = db.session.get(Subscription, subscription_id)
-    
-    if not subscription:
-        return error_response("Subscription not found", 404)
-    
-    # Check branch access
-    user = get_current_user()
-    if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        if user.branch_id and subscription.branch_id != user.branch_id:
-            return error_response("Access denied", 403)
-    
+    # Same scope as every mutating endpoint here. The check this replaces
+    # exempted owners entirely, so one could read any subscription in the
+    # database — including another gym's — by guessing an id.
+    subscription, error = _load_scoped_subscription(subscription_id)
+    if error:
+        return error
+
     return success_response(subscription.to_dict())
 
 
@@ -178,6 +180,14 @@ def activate_subscription():
             'payment_method': data.get('payment_method', 'cash'),
             'reference_number': data.get('reference_number'),
             'start_date': data.get('start_date'),
+            # The captain a private-training package is sold against. This dict
+            # is built field by field, and trainer_id was simply not on the
+            # list — so reception could pick a captain, the request carried the
+            # id, and it was dropped here. Every private package sold through
+            # the desk ended up with no trainer, which is what the captain's
+            # client roster is built from, so the member never appeared on it.
+            # SubscriptionService validates the id (active trainer, same gym).
+            'trainer_id': data.get('trainer_id'),
             # ── type overrides from client ────────────────────────────
             'subscription_type': data.get('subscription_type'),       # 'coins', 'time_based', 'sessions', 'training'
             # coins fields
@@ -226,7 +236,9 @@ def activate_subscription():
         )
     
     except Exception as e:
-        return error_response(f"Failed to activate subscription: {str(e)}", 500)
+        # Reason stays server-side; the caller gets a stable message.
+        logger.exception('Failed to activate subscription: %s', e)
+        return error_response("Failed to activate subscription", 500)
 
 
 @subscriptions_bp.route('/<int:subscription_id>/renew', methods=['POST'])

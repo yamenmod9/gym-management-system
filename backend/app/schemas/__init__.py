@@ -11,6 +11,43 @@ from app.models.expense import ExpenseStatus
 from app.models.complaint import ComplaintType, ComplaintStatus
 
 
+class EnumValue(fields.Field):
+    """Serialises a Python enum as its API value, and accepts that value back.
+
+    ``fields.Str`` on an enum attribute calls ``str()`` on it, which yields the
+    repr — ``"SubscriptionStatus.ACTIVE"``, ``"PaymentMethod.CASH"`` — not the
+    ``"active"`` and ``"cash"`` the API is documented to speak and the clients
+    compare against. Every list endpoint that went through a schema returned
+    the repr, so `subscription.isActive` (which tests `status == 'active'`) was
+    false for every active subscription in the system.
+
+    ``to_dict()`` on the models already returned ``.value``, so the same record
+    described itself two different ways depending on which endpoint served it.
+    """
+
+    def __init__(self, enum_cls, **kwargs):
+        self.enum_cls = enum_cls
+        kwargs.setdefault(
+            'validate', validate.OneOf([m.value for m in enum_cls])
+        )
+        super().__init__(**kwargs)
+
+    def _serialize(self, value, attr, obj, **kwargs):
+        if value is None:
+            return None
+        return value.value if isinstance(value, self.enum_cls) else str(value)
+
+    def _deserialize(self, value, attr, data, **kwargs):
+        if isinstance(value, self.enum_cls):
+            return value
+        try:
+            return self.enum_cls(value)
+        except ValueError:
+            raise ValidationError(
+                f'Must be one of: {", ".join(m.value for m in self.enum_cls)}.'
+            )
+
+
 # User Schemas
 class UserSchema(Schema):
     id = fields.Int(dump_only=True)
@@ -107,7 +144,7 @@ class SubscriptionSchema(Schema):
     branch_name = fields.Str(dump_only=True)
     start_date = fields.Date(required=True)
     end_date = fields.Date(required=True)
-    status = fields.Str(validate=validate.OneOf([s.value for s in SubscriptionStatus]))
+    status = EnumValue(SubscriptionStatus)
     freeze_count = fields.Int(dump_only=True)
     total_frozen_days = fields.Int(dump_only=True)
     stop_reason = fields.Str(allow_none=True)
@@ -132,14 +169,15 @@ class TransactionSchema(Schema):
     id = fields.Int(dump_only=True)
     amount = fields.Decimal(required=True, as_string=True, validate=validate.Range(min=0))
     discount = fields.Decimal(as_string=True, load_default=0, dump_default=0)
-    payment_method = fields.Str(required=True, validate=validate.OneOf([p.value for p in PaymentMethod]))
-    transaction_type = fields.Str(required=True, validate=validate.OneOf([t.value for t in TransactionType]))
+    payment_method = EnumValue(PaymentMethod, required=True)
+    transaction_type = EnumValue(TransactionType, required=True)
     branch_id = fields.Int(required=True)
     branch_name = fields.Str(dump_only=True)
     customer_id = fields.Int(allow_none=True)
+    customer_name = fields.Str(dump_only=True, allow_none=True)
     subscription_id = fields.Int(allow_none=True)
     created_by = fields.Int(dump_only=True)
-    created_by_name = fields.Str(dump_only=True)
+    created_by_name = fields.Str(dump_only=True, allow_none=True)
     description = fields.Str(allow_none=True)
     notes = fields.Str(allow_none=True)
     reference_number = fields.Str(allow_none=True)
@@ -210,7 +248,7 @@ class ComplaintSchema(Schema):
 
 
 class ComplaintUpdateSchema(Schema):
-    status = fields.Str(validate=validate.OneOf([s.value for s in ComplaintStatus]))
+    status = EnumValue(ComplaintStatus)
     resolution_notes = fields.Str(allow_none=True)
 
 

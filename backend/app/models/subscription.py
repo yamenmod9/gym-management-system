@@ -78,6 +78,31 @@ class Subscription(db.Model):
     def __repr__(self):
         return f'<Subscription {self.id} - {self.customer.full_name} - {self.service.name}>'
 
+    # Names for schema serialisation. SubscriptionSchema declared all of these
+    # and the model exposed none of them, so the list endpoint returned bare
+    # ids — no member, no service, no branch — while the single-record endpoint
+    # (which goes through to_dict) returned them in full.
+
+    @property
+    def customer_name(self):
+        return self.customer.full_name if self.customer else None
+
+    @property
+    def customer_phone(self):
+        return self.customer.phone if self.customer else None
+
+    @property
+    def service_name(self):
+        return self.service.name if self.service else None
+
+    @property
+    def service_type(self):
+        return self.service.service_type.value if self.service else None
+
+    @property
+    def branch_name(self):
+        return self.branch.name if self.branch else None
+
     # ── Lookups ──────────────────────────────────────────────────────────
     #
     # A member may hold several subscriptions at once (gym entry, private
@@ -121,10 +146,19 @@ class Subscription(db.Model):
         "no subscription" from "frozen" and report the freeze reason; returning
         a frozen one first would make that branch unreachable.
         """
-        return Subscription.entry_query(customer_id, allow_non_entry).order_by(
+        candidates = Subscription.entry_query(customer_id, allow_non_entry).order_by(
             (Subscription.status == SubscriptionStatus.ACTIVE).desc(),
             Subscription.end_date.desc(),
-        ).first()
+        ).all()
+
+        # A freeze that has run its course must not still bar the door. Settled
+        # here, on the read that cares, because nothing else will do it.
+        if any(s.settle_expired_freeze() for s in candidates):
+            candidates.sort(
+                key=lambda s: (s.status != SubscriptionStatus.ACTIVE, -s.end_date.toordinal())
+            )
+
+        return candidates[0] if candidates else None
 
     @staticmethod
     def active_for(customer_id):
@@ -188,6 +222,49 @@ class Subscription(db.Model):
             self.status = SubscriptionStatus.ACTIVE
             return True, "Subscription unfrozen successfully"
         return False, "Subscription is not frozen"
+
+    def settle_expired_freeze(self):
+        """End a freeze whose agreed period has already passed.
+
+        Freezing set the status to FROZEN, extended end_date by the agreed days
+        and recorded a FreezeHistory row with the date the freeze was meant to
+        end — and then nothing ever ended it. Only the manual unfreeze endpoint
+        could, so a member who froze for a week was still refused at the door a
+        month later, having already been charged for the extension.
+
+        Derived on read rather than scheduled, for the same reason the private
+        session auto-confirm is: this deployment has no worker process, so a
+        status that depended on one would sit stale forever.
+
+        Returns True if a freeze was ended.
+        """
+        if self.status != SubscriptionStatus.FROZEN:
+            return False
+
+        from app.models.freeze_history import FreezeHistory
+
+        active_freeze = FreezeHistory.query.filter_by(
+            subscription_id=self.id, is_active=True
+        ).order_by(FreezeHistory.freeze_end.desc()).first()
+
+        # No record of when it should end means it can only be ended by hand.
+        if active_freeze is None or active_freeze.freeze_end is None:
+            return False
+        if active_freeze.freeze_end >= datetime.utcnow().date():
+            return False
+
+        self.status = SubscriptionStatus.ACTIVE
+        active_freeze.is_active = False
+        active_freeze.unfrozen_at = datetime.utcnow()
+
+        # The freeze deactivated their fingerprints; ending it restores them.
+        from app.models.fingerprint import Fingerprint
+        for fp in Fingerprint.query.filter_by(customer_id=self.customer_id).all():
+            fp.is_active = True
+            fp.deactivation_reason = None
+
+        db.session.commit()
+        return True
 
     def stop(self, reason):
         """Stop subscription"""

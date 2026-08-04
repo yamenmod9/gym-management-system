@@ -62,6 +62,25 @@ class Transaction(db.Model):
     def __repr__(self):
         return f'<Transaction {self.id} - {self.amount} - {self.transaction_type.value}>'
 
+    # Names for schema serialisation. TransactionSchema has always declared
+    # these, but the model exposed no such attributes, and marshmallow silently
+    # omits a field it cannot read — so every list endpoint returned rows with
+    # no branch, no customer and no staff name, and the accountant's ledger
+    # labelled every single transaction "Walk-in". Same pattern Expense already
+    # uses for exactly this reason.
+
+    @property
+    def branch_name(self):
+        return self.branch.name if self.branch else None
+
+    @property
+    def customer_name(self):
+        return self.customer.full_name if self.customer else None
+
+    @property
+    def created_by_name(self):
+        return self.created_by_user.full_name if self.created_by_user else None
+
     def to_dict(self):
         """
         Convert to dictionary.

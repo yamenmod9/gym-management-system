@@ -508,6 +508,15 @@ class S {
   static String get pickAtLeastOneDay =>
       _t('اختر يوماً واحداً على الأقل', 'Pick at least one day');
 
+  // ─── SELLING A SUBSCRIPTION ────────────────────────────────
+  static String get service => _t('الباقة', 'Service');
+  static String get pleaseSelectService =>
+      _t('اختر الباقة', 'Please select a service');
+  static String get noServiceForThisType => _t(
+        'لا توجد باقة من هذا النوع. أضف واحدة من إعدادات الباقات.',
+        'No service of this type exists yet. Add one under services.',
+      );
+
   /// Weekday initials, Monday first — matches the backend's 0=Monday.
   static List<String> get weekdayLabels => _ar
       ? const ['ن', 'ث', 'ر', 'خ', 'ج', 'س', 'ح']

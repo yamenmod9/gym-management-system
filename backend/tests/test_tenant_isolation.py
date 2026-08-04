@@ -18,7 +18,7 @@ Run with:  pytest backend/tests/test_tenant_isolation.py
 import os
 import sys
 import tempfile
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -52,6 +52,8 @@ def _make_tenant(name):
     from app.models.daily_closing import DailyClosing
     from app.models.expense import Expense, ExpenseCategory
     from app.models.gym import Gym
+    from app.models.service import Service, ServiceType
+    from app.models.subscription import Subscription, SubscriptionStatus
     from app.models.transaction import (
         Transaction, PaymentMethod, TransactionType,
     )
@@ -73,8 +75,10 @@ def _make_tenant(name):
     db.session.add(branch)
     db.session.flush()
 
-    db.session.add(Customer(full_name=f'Member {name}', phone=f'0{name}0000000',
-                            branch_id=branch.id, is_active=True))
+    member = Customer(full_name=f'Member {name}', phone=f'0{name}0000000',
+                      branch_id=branch.id, is_active=True)
+    db.session.add(member)
+    db.session.flush()
     db.session.add(Complaint(title=f'Complaint {name}',
                              description=f'description for {name}',
                              complaint_type=ComplaintType.SERVICE,
@@ -87,6 +91,16 @@ def _make_tenant(name):
         amount=250, discount=0, payment_method=PaymentMethod.CASH,
         transaction_type=TransactionType.SUBSCRIPTION, branch_id=branch.id,
         created_by=owner.id, description=f'Transaction {name}',
+    ))
+
+    service = Service(name=f'Service {name}', service_type=ServiceType.GYM,
+                      price=500, duration_days=30, allowed_days_per_week=7)
+    db.session.add(service)
+    db.session.flush()
+    db.session.add(Subscription(
+        customer_id=member.id, service_id=service.id, branch_id=branch.id,
+        start_date=date.today(), end_date=date.today() + timedelta(days=30),
+        status=SubscriptionStatus.ACTIVE, subscription_type='time_based',
     ))
     db.session.add(DailyClosing(
         branch_id=branch.id, closing_date=date.today(),
@@ -119,6 +133,7 @@ SCOPED_ENDPOINTS = [
     ('/api/payments', 'Transaction'),
     ('/api/daily-closings', 'Closing'),
     ('/api/finance/cash-differences', 'Closing'),
+    ('/api/subscriptions', 'Member'),
 ]
 
 
@@ -126,6 +141,47 @@ SCOPED_ENDPOINTS = [
 def test_owner_cannot_see_other_gyms_data(app, owner_a_headers, endpoint, label):
     body = str(app.test_client().get(endpoint, headers=owner_a_headers).get_json())
     assert f'{label} B' not in body, f'{endpoint} leaked gym B data'
+
+
+def test_no_endpoint_returns_a_record_from_another_gyms_branch(app, owner_a_headers):
+    """Names are not a reliable tell.
+
+    /api/subscriptions leaked every gym's rows and the name-based check above
+    passed anyway, because its schema serialises ids only. Branch id is on
+    every one of these payloads and cannot be omitted.
+    """
+    from app.extensions import db
+    from app.models.branch import Branch
+    from app.models.gym import Gym
+
+    with app.app_context():
+        gym_a = Gym.query.filter_by(name='Gym A').one()
+        own = {b.id for b in Branch.query.filter_by(gym_id=gym_a.id).all()}
+        foreign = {b.id for b in Branch.query.filter(Branch.gym_id != gym_a.id).all()}
+
+    client = app.test_client()
+    for endpoint, _label in SCOPED_ENDPOINTS:
+        payload = client.get(endpoint, headers=owner_a_headers).get_json()
+        seen = _branch_ids(payload)
+        assert not (seen & foreign), (
+            f'{endpoint} returned rows from branches {sorted(seen & foreign)}, '
+            f'outside this owner\'s gym {sorted(own)}'
+        )
+
+
+def _branch_ids(node):
+    """Every branch_id anywhere in a response payload."""
+    found = set()
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == 'branch_id' and isinstance(value, int):
+                found.add(value)
+            else:
+                found |= _branch_ids(value)
+    elif isinstance(node, list):
+        for item in node:
+            found |= _branch_ids(item)
+    return found
 
 
 @pytest.mark.parametrize('endpoint,label', SCOPED_ENDPOINTS)

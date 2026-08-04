@@ -581,3 +581,115 @@ def test_every_rule_is_actually_consulted_somewhere(app):
 
     unused = [key for key in RULES if key not in blob]
     assert not unused, f'gym rules with no effect anywhere: {unused}'
+
+
+# ─────────────────── selling a private package at the desk ──────────────────
+
+def test_a_package_sold_at_the_desk_keeps_its_captain(app, owner_headers):
+    """The reception dialog sends trainer_id to /subscriptions/activate.
+
+    That endpoint rebuilds the payload field by field and trainer_id was not on
+    the list, so it was dropped: the package saved with no captain, and the
+    member never appeared on anyone's private-client roster.
+    """
+    from app.extensions import db
+    from app.models.subscription import Subscription
+
+    response = app.test_client().post(
+        '/api/subscriptions/activate',
+        json={
+            'customer_id': IDS['bob'],
+            'service_id': IDS['pt_service_id'],
+            'branch_id': IDS['branch_id'],
+            'subscription_type': 'training',
+            'session_count': 8,
+            'amount': 2000,
+            'payment_method': 'cash',
+            'trainer_id': IDS['trainer_id'],
+        },
+        headers=owner_headers)
+    assert response.status_code == 201, response.get_json()
+
+    subscription_id = response.get_json()['data']['id']
+    with app.app_context():
+        saved = db.session.get(Subscription, subscription_id)
+        assert saved.trainer_id == IDS['trainer_id'], (
+            'the captain was dropped between the request and the database'
+        )
+
+    roster = app.test_client().get(
+        '/api/private-training/clients',
+        headers=_headers(app, 'cap_ct')).get_json()['data']
+    assert subscription_id in [row['subscription_id'] for row in roster]
+
+
+def test_a_training_package_sold_at_the_desk_still_does_not_open_the_door(app):
+    """The package above grants no gym entry, so Bob's door subscription must
+    still be his gym membership."""
+    from app.models.subscription import Subscription
+
+    with app.app_context():
+        entry = Subscription.entry_subscription_for(IDS['bob'])
+        assert entry is not None
+        assert entry.service_id == IDS['gym_service_id']
+
+
+# ──────────────────────────── freezes that end ──────────────────────────────
+
+def test_a_freeze_whose_period_has_passed_stops_barring_the_door(app):
+    """Freezing extended end_date and set the status to FROZEN, and nothing
+    ever set it back — only a manual unfreeze could. A member who froze for a
+    week was still refused a month later, having already paid for the days."""
+    from app.extensions import db
+    from app.models.freeze_history import FreezeHistory
+    from app.models.subscription import Subscription, SubscriptionStatus
+
+    with app.app_context():
+        # Freeze every subscription that could open the door, so the assertion
+        # does not depend on how many earlier tests have sold this member.
+        entry_subs = Subscription.entry_query(IDS['bob']).all()
+        assert entry_subs, 'fixture no longer gives this member a way in'
+        for sub in entry_subs:
+            sub.status = SubscriptionStatus.FROZEN
+            db.session.add(FreezeHistory(
+                subscription_id=sub.id,
+                freeze_start=date.today() - timedelta(days=30),
+                freeze_end=date.today() - timedelta(days=23),
+                freeze_days=7, is_active=True,
+            ))
+        db.session.commit()
+        frozen_ids = {s.id for s in entry_subs}
+
+    with app.app_context():
+        found = Subscription.entry_subscription_for(IDS['bob'])
+        assert found is not None
+        assert found.id in frozen_ids
+        assert found.status == SubscriptionStatus.ACTIVE, (
+            'the freeze period ended weeks ago and the member is still frozen'
+        )
+
+
+def test_a_freeze_still_running_is_left_alone(app):
+    """Fails closed the other way: an in-progress freeze must stay frozen."""
+    from app.extensions import db
+    from app.models.freeze_history import FreezeHistory
+    from app.models.subscription import Subscription, SubscriptionStatus
+
+    with app.app_context():
+        entry = Subscription.entry_subscription_for(IDS['alice'])
+        entry.status = SubscriptionStatus.FROZEN
+        db.session.add(FreezeHistory(
+            subscription_id=entry.id,
+            freeze_start=date.today() - timedelta(days=1),
+            freeze_end=date.today() + timedelta(days=6),
+            freeze_days=7, is_active=True,
+        ))
+        db.session.commit()
+
+    with app.app_context():
+        found = Subscription.entry_subscription_for(IDS['alice'])
+        assert found.status == SubscriptionStatus.FROZEN
+        # Restore for the other tests in this module.
+        found.status = SubscriptionStatus.ACTIVE
+        FreezeHistory.query.filter_by(subscription_id=found.id).delete()
+        db.session.commit()
