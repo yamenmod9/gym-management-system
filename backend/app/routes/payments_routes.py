@@ -5,23 +5,25 @@ Maps /api/payments/* to transaction functionality for Flutter app compatibility
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from app.models import Transaction, DailyClosing, Branch
-from app.models.transaction import PaymentMethod, TransactionType
+from app.models.transaction import PaymentMethod, TransactionType, net_amount
 from app.utils import (
     success_response, error_response, get_current_user, role_required,
     paginate, format_pagination_response, get_accessible_branch_ids,
     scope_query_to_branches
 )
-from app.models.user import UserRole
+from app.models.user import UserRole, FINANCE_READ_ROLES
 from app.extensions import db
 from app.schemas import TransactionSchema, DailyClosingSchema
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 payments_bp = Blueprint('payments', __name__, url_prefix='/api/payments')
 
 
 @payments_bp.route('', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_payments():
     """
     Get all payments/transactions with filtering
@@ -57,40 +59,60 @@ def get_payments():
         except ValueError:
             pass
     
-    # Date range filter
+    # Date range filter.
+    #
+    # On transaction_date, the business date, which is what daily closing and
+    # every report already use — filtering on created_at here meant the same
+    # day could total differently depending on which screen you asked.
+    #
+    # date_to is inclusive of the whole day: parsed as midnight and compared
+    # with <=, a from/to of the same date matched nothing, so asking for one
+    # day's takings returned an empty list.
     if date_from:
         try:
             start_date = datetime.strptime(date_from, '%Y-%m-%d')
-            query = query.filter(Transaction.created_at >= start_date)
+            query = query.filter(Transaction.transaction_date >= start_date)
         except ValueError:
             pass
-    
+
     if date_to:
         try:
-            end_date = datetime.strptime(date_to, '%Y-%m-%d')
-            query = query.filter(Transaction.created_at <= end_date)
+            end_date = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Transaction.transaction_date < end_date)
         except ValueError:
             pass
-    
+
     # Order by most recent
-    query = query.order_by(Transaction.created_at.desc())
-    
+    query = query.order_by(Transaction.transaction_date.desc())
+
+    # The total for the whole filtered range, computed in SQL, net of discount.
+    # It used to sum the gross `amount` of the rows on the current page only —
+    # so it read high by exactly the discounts given, and shrank as you paged,
+    # while sitting next to a `total` count covering everything.
+    #
+    # order_by(None) matters: Postgres rejects an aggregate select that still
+    # carries an ORDER BY on a non-grouped column, and SQLite does not — so
+    # leaving it on passes every local test and 500s in production.
+    total_amount = float(
+        query.order_by(None)
+        .with_entities(func.coalesce(func.sum(net_amount()), 0))
+        .scalar() or 0
+    )
+
     # Paginate
     items, total, pages, current_page = paginate(query, page, per_page)
-    
-    # Calculate total amount
-    total_amount = sum(t.amount for t in items)
-    
+
     # Format response
     schema = TransactionSchema()
     response_data = format_pagination_response(items, total, pages, current_page, schema)
     response_data['total_amount'] = total_amount
-    
+
     return success_response(response_data)
 
 
 @payments_bp.route('/<int:payment_id>', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_payment(payment_id):
     """Get payment by ID"""
     transaction = db.session.get(Transaction, payment_id)
@@ -248,16 +270,17 @@ def daily_closing():
     # transactions on record, never taken from the request. Accepting them
     # from the caller — as this endpoint used to — meant whoever closed the
     # till could paper over a shortfall by sending numbers that agreed.
-    from app.routes.daily_closing_routes import _totals_by_payment_method
+    from app.routes.daily_closing_routes import (
+        _totals_by_payment_method, parse_actual_cash,
+    )
 
     expected_cash, network_total, transfer_total, _ = _totals_by_payment_method(
         branch_id, date_obj
     )
 
-    try:
-        actual_cash = float(data['actual_cash'])
-    except (TypeError, ValueError):
-        return error_response('actual_cash must be numeric', 400)
+    actual_cash, cash_error = parse_actual_cash(data['actual_cash'])
+    if cash_error:
+        return cash_error
 
     closing = DailyClosing(
         branch_id=branch_id,
@@ -273,7 +296,13 @@ def daily_closing():
     )
     
     db.session.add(closing)
-    db.session.commit()
-    
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # Two tills closing the same day at once both clear the check above;
+        # the unique constraint is what stops the second one landing.
+        db.session.rollback()
+        return error_response('Daily closing already exists for this date', 409)
+
     schema = DailyClosingSchema()
     return success_response(schema.dump(closing), 'Daily closing recorded successfully', 201)

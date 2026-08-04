@@ -8,9 +8,10 @@ from app.schemas import TransactionSchema
 from app.models.transaction import Transaction
 from app.utils import (
     success_response, error_response, role_required,
-    paginate, format_pagination_response, get_current_user
+    paginate, format_pagination_response, get_current_user,
+    get_accessible_branch_ids, scope_query_to_branches
 )
-from app.models.user import UserRole
+from app.models.user import UserRole, FINANCE_READ_ROLES
 from app.extensions import db
 
 transactions_bp = Blueprint('transactions', __name__, url_prefix='/api/transactions')
@@ -18,6 +19,7 @@ transactions_bp = Blueprint('transactions', __name__, url_prefix='/api/transacti
 
 @transactions_bp.route('', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_transactions():
     """Get all transactions (paginated)"""
     page = request.args.get('page', 1, type=int)
@@ -25,18 +27,19 @@ def get_transactions():
     branch_id = request.args.get('branch_id', type=int)
     start_date = request.args.get('start_date', type=str)
     end_date = request.args.get('end_date', type=str)
-    
+
     user = get_current_user()
-    
+
     query = Transaction.query
-    
-    # Branch filtering based on role
-    if user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        if user.branch_id:
-            query = query.filter_by(branch_id=user.branch_id)
-    elif branch_id:
-        query = query.filter_by(branch_id=branch_id)
-    
+
+    # Branch scope. The hand-rolled version this replaces exempted owners from
+    # any filter unless they passed ?branch_id, so a gym owner listing
+    # transactions saw every other gym's takings — and any role with no
+    # branch_id of its own (regional manager, regional accountant) fell through
+    # the same hole. scope_query_to_branches resolves the gym first and fails
+    # closed.
+    query = scope_query_to_branches(query, Transaction.branch_id, user, branch_id)
+
     # Date filtering
     if start_date:
         query = query.filter(Transaction.transaction_date >= start_date)
@@ -55,19 +58,22 @@ def get_transactions():
 
 @transactions_bp.route('/<int:transaction_id>', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_transaction(transaction_id):
     """Get transaction by ID"""
     transaction = db.session.get(Transaction, transaction_id)
-    
+
     if not transaction:
         return error_response("Transaction not found", 404)
-    
-    # Check branch access
+
+    # Same scope as the list. The previous check exempted owners outright and
+    # skipped anyone whose branch_id was NULL, so either could read any
+    # transaction in the database by guessing its id.
     user = get_current_user()
-    if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        if user.branch_id and transaction.branch_id != user.branch_id:
-            return error_response("Access denied", 403)
-    
+    accessible = get_accessible_branch_ids(user)
+    if accessible is not None and transaction.branch_id not in accessible:
+        return error_response("Access denied", 403)
+
     return success_response(transaction.to_dict())
 
 
@@ -83,12 +89,15 @@ def create_transaction():
         return error_response("Validation error", 400, e.messages)
     
     user = get_current_user()
-    
-    # Validate branch access
-    if user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        if user.branch_id and data['branch_id'] != user.branch_id:
-            return error_response("Cannot create transaction for another branch", 403)
-    
+
+    # Writing money into another gym's books is the worst version of this bug,
+    # so the same scope applies here — an owner is unrestricted within their own
+    # gym and nowhere else.
+    accessible = get_accessible_branch_ids(user)
+    if accessible is not None and data['branch_id'] not in accessible:
+        return error_response("Cannot create transaction for another branch", 403)
+
+
     transaction = Transaction(
         amount=data['amount'],
         payment_method=data['payment_method'],

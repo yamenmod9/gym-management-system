@@ -13,14 +13,7 @@ from app.models.transaction import net_amount
 
 
 def calculate_branch_revenue(branch_id, start_date=None, end_date=None):
-    """Calculate total revenue for a branch in date range"""
-    query = Transaction.query.filter_by(branch_id=branch_id)
-    
-    if start_date:
-        query = query.filter(Transaction.transaction_date >= start_date)
-    if end_date:
-        query = query.filter(Transaction.transaction_date <= end_date)
-    
+    """Calculate total revenue for a branch in date range, net of discount."""
     total = db.session.query(func.sum(net_amount())).filter(
         Transaction.branch_id == branch_id
     )
@@ -59,7 +52,12 @@ def get_expiring_subscriptions(days=7, branch_id=None):
 
 
 def get_daily_transactions_summary(branch_id, transaction_date):
-    """Get summary of transactions for a specific day"""
+    """Get summary of transactions for a specific day, net of discount.
+
+    Amounts are net because that is what revenue means everywhere else here —
+    reports, daily closing, branch performance. This totalled the gross amount,
+    which would have put it at odds with the reconciliation for the same day.
+    """
     start_datetime = datetime.combine(transaction_date, datetime.min.time())
     end_datetime = datetime.combine(transaction_date, datetime.max.time())
     
@@ -78,9 +76,10 @@ def get_daily_transactions_summary(branch_id, transaction_date):
     }
     
     for txn in transactions:
-        amount = float(txn.amount)
+        amount = float(txn.amount) - float(txn.discount or 0)
         summary['total'] += amount
-        
+
+
         if txn.payment_method == PaymentMethod.CASH:
             summary['cash'] += amount
         elif txn.payment_method == PaymentMethod.NETWORK:
@@ -236,7 +235,11 @@ def get_staff_performance(user_id, start_date=None, end_date=None):
     
     transactions = query.all()
     
-    total_revenue = sum(float(t.amount) for t in transactions)
+    # Net of discount — a staff member is credited with the revenue the gym
+    # actually banked, not the list price before they discounted it.
+    total_revenue = sum(
+        float(t.amount) - float(t.discount or 0) for t in transactions
+    )
     subscription_count = sum(1 for t in transactions if t.transaction_type == TransactionType.SUBSCRIPTION)
     
     return {

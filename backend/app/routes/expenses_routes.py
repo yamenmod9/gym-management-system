@@ -11,7 +11,7 @@ from app.utils import (
     paginate, format_pagination_response, get_current_user,
     get_accessible_branch_ids, scope_query_to_branches
 )
-from app.models.user import UserRole
+from app.models.user import UserRole, FINANCE_READ_ROLES
 from app.extensions import db
 
 expenses_bp = Blueprint('expenses', __name__, url_prefix='/api/expenses')
@@ -19,6 +19,7 @@ expenses_bp = Blueprint('expenses', __name__, url_prefix='/api/expenses')
 
 @expenses_bp.route('', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_expenses():
     """Get all expenses (paginated)"""
     page = request.args.get('page', 1, type=int)
@@ -52,6 +53,7 @@ def get_expenses():
 
 @expenses_bp.route('/<int:expense_id>', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_expense(expense_id):
     """Get expense by ID"""
     expense = db.session.get(Expense, expense_id)

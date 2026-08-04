@@ -5,6 +5,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from datetime import datetime, date
 from sqlalchemy import func, and_
+from sqlalchemy.exc import IntegrityError
 from app.models.daily_closing import DailyClosing
 from app.models.transaction import Transaction, PaymentMethod
 from app.utils import (
@@ -12,7 +13,7 @@ from app.utils import (
     paginate, format_pagination_response, get_current_user,
     get_accessible_branch_ids, scope_query_to_branches
 )
-from app.models.user import UserRole
+from app.models.user import UserRole, FINANCE_READ_ROLES
 from app.extensions import db
 
 daily_closing_bp = Blueprint('daily_closing', __name__, url_prefix='/api/daily-closings')
@@ -47,6 +48,25 @@ def _totals_by_payment_method(branch_id, closing_date):
         totals[PaymentMethod.TRANSFER],
         len(transactions),
     )
+
+
+def parse_actual_cash(raw):
+    """The physical cash count, or (None, error).
+
+    Typed by a human at the end of a shift, so it arrives as whatever the form
+    sent. Unchecked, ``float(raw)`` on a non-numeric value raised straight out
+    of the handler as a 500, and a negative count was stored as-is — producing
+    a cash difference that reads like a huge shortfall.
+    """
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None, error_response('actual_cash must be numeric', 400)
+    if value != value or value in (float('inf'), float('-inf')):
+        return None, error_response('actual_cash must be a real number', 400)
+    if value < 0:
+        return None, error_response('actual_cash cannot be negative', 400)
+    return value, None
 
 
 @daily_closing_bp.route('', methods=['GET'])
@@ -90,6 +110,7 @@ def get_daily_closings():
 
 @daily_closing_bp.route('/<int:closing_id>', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_daily_closing(closing_id):
     """Get daily closing by ID"""
     closing = db.session.get(DailyClosing, closing_id)
@@ -162,7 +183,9 @@ def create_daily_closing():
             return error_response(f"{field} is required", 400)
     
     branch_id = data['branch_id']
-    actual_cash = data['actual_cash']
+    actual_cash, cash_error = parse_actual_cash(data['actual_cash'])
+    if cash_error:
+        return cash_error
     closing_date_str = data.get('date', date.today().isoformat())
     notes = data.get('notes', '')
     
@@ -195,8 +218,8 @@ def create_daily_closing():
     )
 
     total_revenue = expected_cash + network_total + transfer_total
-    cash_difference = float(actual_cash) - expected_cash
-    
+    cash_difference = actual_cash - expected_cash
+
     # Create closing
     closing = DailyClosing(
         branch_id=branch_id,
@@ -210,10 +233,17 @@ def create_daily_closing():
         closed_by=user.id,
         notes=notes
     )
-    
+
     db.session.add(closing)
-    db.session.commit()
-    
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # Lost the race against another till closing the same day. The check
+        # above cannot prevent this; the unique constraint can, and this turns
+        # it into the same answer the check would have given.
+        db.session.rollback()
+        return error_response("Daily closing already exists for this date", 409)
+
     return success_response(
         closing.to_dict(),
         "Daily closing created successfully",
@@ -223,6 +253,7 @@ def create_daily_closing():
 
 @daily_closing_bp.route('/today', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_today_status():
     """Check if today's closing has been done for user's branch"""
     user = get_current_user()

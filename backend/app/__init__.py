@@ -383,6 +383,37 @@ def _ensure_db_schema(app):
                     ))
                     db.session.commit()
                     app.logger.info('Auto-migration: added index on daily_closings.closed_by')
+
+                # One closing per branch per day. Both writers check for an
+                # existing row and then insert, which two tills closing at the
+                # same moment can both pass — double-counting that day's revenue
+                # and leaving two contradictory cash differences. A unique index
+                # rather than ALTER TABLE ADD CONSTRAINT so the same statement
+                # works on SQLite as well as Postgres.
+                unique_index_names = {
+                    idx['name'] for idx in inspector.get_indexes('daily_closings')
+                    if idx.get('unique')
+                }
+                existing_constraints = set()
+                try:
+                    existing_constraints = {
+                        c['name'] for c in
+                        inspector.get_unique_constraints('daily_closings')
+                    }
+                except Exception:
+                    pass
+
+                if 'uq_daily_closing_branch_date' not in (
+                        unique_index_names | existing_constraints):
+                    db.session.execute(text(
+                        'CREATE UNIQUE INDEX uq_daily_closing_branch_date '
+                        'ON daily_closings (branch_id, closing_date)'
+                    ))
+                    db.session.commit()
+                    app.logger.info(
+                        'Auto-migration: added unique index on '
+                        'daily_closings(branch_id, closing_date)'
+                    )
         except Exception as e:
             app.logger.warning(f'Schema migration check: {e}')
 

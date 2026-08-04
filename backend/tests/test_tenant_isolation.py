@@ -42,13 +42,19 @@ def app():
 
 
 def _make_tenant(name):
-    """One gym: an owner, a branch, a member, a complaint and an expense."""
+    """One gym: an owner, a branch, a member, and one of every record type
+    that is scoped by branch — including the money ones, which is where a
+    hand-rolled filter is most expensive to get wrong."""
     from app.extensions import db
     from app.models.branch import Branch
     from app.models.complaint import Complaint, ComplaintStatus, ComplaintType
     from app.models.customer import Customer
+    from app.models.daily_closing import DailyClosing
     from app.models.expense import Expense, ExpenseCategory
     from app.models.gym import Gym
+    from app.models.transaction import (
+        Transaction, PaymentMethod, TransactionType,
+    )
     from app.models.user import User, UserRole
 
     owner = User(username=f'owner_{name}', email=f'{name}@example.com',
@@ -77,6 +83,17 @@ def _make_tenant(name):
                            amount=100, category=ExpenseCategory.OTHER,
                            branch_id=branch.id, created_by_id=owner.id,
                            expense_date=date.today()))
+    db.session.add(Transaction(
+        amount=250, discount=0, payment_method=PaymentMethod.CASH,
+        transaction_type=TransactionType.SUBSCRIPTION, branch_id=branch.id,
+        created_by=owner.id, description=f'Transaction {name}',
+    ))
+    db.session.add(DailyClosing(
+        branch_id=branch.id, closing_date=date.today(),
+        expected_cash=250, actual_cash=250, cash_difference=0,
+        network_total=0, transfer_total=0, total_revenue=250,
+        closed_by=owner.id, notes=f'Closing {name}',
+    ))
     db.session.commit()
 
 
@@ -96,6 +113,12 @@ SCOPED_ENDPOINTS = [
     ('/api/expenses', 'Expense'),
     ('/api/finance/expenses', 'Expense'),
     ('/api/branches', 'Branch'),
+    # Money. Every one of these is branch-scoped and none of them was covered,
+    # which is how a hand-rolled filter in transactions_routes survived.
+    ('/api/transactions', 'Transaction'),
+    ('/api/payments', 'Transaction'),
+    ('/api/daily-closings', 'Closing'),
+    ('/api/finance/cash-differences', 'Closing'),
 ]
 
 
@@ -203,7 +226,9 @@ def test_dashboard_and_report_revenue_agree(app):
     assert dashboard_revenue == pytest.approx(report_revenue), (
         f'dashboard says {dashboard_revenue}, report says {report_revenue}'
     )
-    assert dashboard_revenue == pytest.approx(750.0)
+    # 750 net from the discounted subscription above (1000 - 250), plus the
+    # flat 250 cash transaction every tenant gets in _make_tenant.
+    assert dashboard_revenue == pytest.approx(1000.0)
 
 
 def test_role_notifications_do_not_cross_gyms(app):

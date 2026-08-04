@@ -10,7 +10,7 @@ from app.utils import (
     success_response, error_response, get_current_user, role_required,
     paginate, format_pagination_response, scope_query_to_branches
 )
-from app.models.user import UserRole
+from app.models.user import UserRole, FINANCE_READ_ROLES
 from app.extensions import db
 from app.schemas import ExpenseSchema, DailyClosingSchema
 from datetime import datetime
@@ -21,6 +21,7 @@ finance_bp = Blueprint('finance', __name__, url_prefix='/api/finance')
 
 @finance_bp.route('/expenses', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_expenses():
     """
     Get expenses with filtering
@@ -65,30 +66,48 @@ def get_expenses():
         except ValueError as e:
             return error_response(str(e), 400)
 
-    # Date range filter
+    # Date range filter, on expense_date — the date the money was spent, which
+    # is what an accountant means by "expenses in March". Filtering created_at
+    # answered "expenses *entered* in March" instead, so a receipt filed late
+    # landed in the wrong month.
+    #
+    # date_to covers the whole day; as a bare <= against midnight it excluded
+    # the final day of every range.
     if date_from:
         try:
-            start_date = datetime.strptime(date_from, '%Y-%m-%d')
-            query = query.filter(Expense.created_at >= start_date)
+            start_date = datetime.strptime(date_from, '%Y-%m-%d').date()
+            query = query.filter(Expense.expense_date >= start_date)
         except ValueError:
             pass
-    
+
     if date_to:
         try:
-            end_date = datetime.strptime(date_to, '%Y-%m-%d')
-            query = query.filter(Expense.created_at <= end_date)
+            end_date = datetime.strptime(date_to, '%Y-%m-%d').date()
+            query = query.filter(Expense.expense_date <= end_date)
         except ValueError:
             pass
-    
+
     # Order by most recent
     query = query.order_by(Expense.created_at.desc())
-    
+
+    # Totals for the whole filtered set, computed in SQL. Summing `items` added
+    # up only the rows on the current page, so the reported totals shrank as
+    # the user paged through them.
+    # order_by(None): Postgres rejects an aggregate select that still carries
+    # an ORDER BY on a non-grouped column, while SQLite tolerates it.
+    def _total_for(status):
+        return float(
+            query.order_by(None)
+            .with_entities(func.coalesce(func.sum(Expense.amount), 0))
+            .filter(Expense.status == status)
+            .scalar() or 0
+        )
+
+    pending_total = _total_for(ExpenseStatus.PENDING)
+    approved_total = _total_for(ExpenseStatus.APPROVED)
+
     # Paginate
     items, total, pages, current_page = paginate(query, page, per_page)
-    
-    # Calculate totals
-    pending_total = float(sum(float(e.amount) for e in items if e.status == ExpenseStatus.PENDING))
-    approved_total = float(sum(float(e.amount) for e in items if e.status == ExpenseStatus.APPROVED))
 
     # Format response
     schema = ExpenseSchema()
@@ -170,6 +189,7 @@ def get_cash_differences():
 
 @finance_bp.route('/daily-sales', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_daily_sales():
     """
     Get daily sales summary
@@ -191,23 +211,23 @@ def get_daily_sales():
     
     current_user = get_current_user()
     
-    # Build query for transactions on this date
+    # Build query for transactions on this date, on transaction_date so this
+    # agrees with the daily closing for the same day.
     start_datetime = datetime.combine(report_date, datetime.min.time())
     end_datetime = datetime.combine(report_date, datetime.max.time())
-    
+
     query = Transaction.query.filter(
         and_(
-            Transaction.created_at >= start_datetime,
-            Transaction.created_at <= end_datetime
+            Transaction.transaction_date >= start_datetime,
+            Transaction.transaction_date <= end_datetime
         )
     )
-    
-    # Role-based filtering
-    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT, UserRole.ACCOUNTANT]:
-        query = query.filter(Transaction.branch_id == current_user.branch_id)
-    elif branch_id:
-        query = query.filter(Transaction.branch_id == branch_id)
-    
+
+    # Branch scope. The hand-rolled version exempted owners and accountants
+    # from any filter unless they passed ?branch_id, so a gym owner asking for
+    # today's sales was shown every gym on the platform added together.
+    query = scope_query_to_branches(query, Transaction.branch_id, current_user, branch_id)
+
     transactions = query.all()
     
     # Calculate totals by payment method

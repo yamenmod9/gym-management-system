@@ -152,7 +152,11 @@ class DashboardService:
         }
         
         for txn in today_transactions.all():
-            amount = float(txn.amount)
+            # Net of discount, like the monthly figures directly below and like
+            # every other revenue number in the system. Summing gross here put
+            # the accountant's own dashboard at odds with itself: today read
+            # high by the day's discounts while the month beside it did not.
+            amount = float(txn.amount) - float(txn.discount or 0)
             today_summary['total'] += amount
             if txn.payment_method == PaymentMethod.CASH:
                 today_summary['cash'] += amount

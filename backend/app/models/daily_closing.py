@@ -9,14 +9,24 @@ class DailyClosing(db.Model):
     """Daily cash closing/reconciliation"""
     __tablename__ = 'daily_closings'
 
+    # One closing per branch per day. Both endpoints that create one check for
+    # an existing row first and then insert, which two shifts closing the till
+    # at the same moment can both pass — leaving that day's revenue counted
+    # twice everywhere closings are summed, and two contradictory cash
+    # differences on record. The constraint is what actually holds.
+    __table_args__ = (
+        db.UniqueConstraint('branch_id', 'closing_date',
+                            name='uq_daily_closing_branch_date'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
-    
+
     # Branch
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=False, index=True)
     branch = db.relationship('Branch', back_populates='daily_closings')
-    
+
     # Date
-    closing_date = db.Column(db.Date, nullable=False, index=True, unique=False)
+    closing_date = db.Column(db.Date, nullable=False, index=True)
     
     # Cash amounts
     expected_cash = db.Column(db.Numeric(10, 2), nullable=False)  # From system

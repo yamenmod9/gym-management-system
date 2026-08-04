@@ -48,6 +48,23 @@ READ_ONLY_ROLES = (UserRole.TRAINER,)
 # the single branch_id every other branch-level role carries.
 BRANCH_GROUP_ROLES = (UserRole.REGIONAL_MANAGER, UserRole.REGIONAL_ACCOUNTANT)
 
+# Roles that may read a branch's books: transactions, payments, expenses, cash
+# reconciliation. Every role except the trainer, whose job is members and
+# sessions — these endpoints carry amounts, discounts, till shortfalls and who
+# paid what, and most of them were guarded by a bare @jwt_required(), which any
+# staff login satisfies. Branch scope still applies on top of this.
+FINANCE_READ_ROLES = (
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.REGIONAL_MANAGER,
+    UserRole.BRANCH_MANAGER,
+    UserRole.FRONT_DESK,
+    UserRole.ACCOUNTANT,
+    UserRole.BRANCH_ACCOUNTANT,
+    UserRole.CENTRAL_ACCOUNTANT,
+    UserRole.REGIONAL_ACCOUNTANT,
+)
+
 
 # Branches assigned to a branch-group role (regional manager / regional
 # accountant). The member has their tier's full powers over every branch in
