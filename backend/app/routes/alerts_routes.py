@@ -7,8 +7,11 @@ from flask_jwt_extended import jwt_required
 from app.models import Subscription, Customer, Complaint
 from app.models.subscription import SubscriptionStatus
 from app.models.complaint import ComplaintStatus
-from app.utils import success_response, error_response, get_current_user, role_required
-from app.models.user import UserRole
+from app.utils import (
+    success_response, error_response, get_current_user, role_required,
+    scope_query_to_branches,
+)
+from app.models.user import UserRole, FINANCE_READ_ROLES
 from datetime import datetime, timedelta
 from app.extensions import db
 
@@ -17,6 +20,7 @@ alerts_bp = Blueprint('alerts', __name__, url_prefix='/api/alerts')
 
 @alerts_bp.route('', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_alerts():
     """
     Get all alerts for the current user
@@ -31,10 +35,12 @@ def get_alerts():
     
     current_user = get_current_user()
     
-    # Determine branch access
-    if current_user.role not in [UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        branch_id = current_user.branch_id
-    
+    # Branch scope. The check this replaces set branch_id from the caller only
+    # for branch-level roles and left it as whatever the query string said for
+    # everyone else — so an owner or central accountant asking for alerts with
+    # no ?branch_id got no filter at all and was shown every gym's expiring
+    # members, low balances and open complaints. Applied per query below via
+    # scope_query_to_branches, which resolves the gym and fails closed.
     alerts = []
     
     # Expiring subscriptions alert
@@ -49,8 +55,8 @@ def get_alerts():
             Subscription.end_date >= today
         )
         
-        if branch_id:
-            expiring_query = expiring_query.filter_by(branch_id=branch_id)
+        expiring_query = scope_query_to_branches(
+            expiring_query, Subscription.branch_id, current_user, branch_id)
         
         expiring_subs = expiring_query.all()
         
@@ -78,8 +84,8 @@ def get_alerts():
             Subscription.remaining_coins > 0
         )
         
-        if branch_id:
-            low_coins_query = low_coins_query.filter_by(branch_id=branch_id)
+        low_coins_query = scope_query_to_branches(
+            low_coins_query, Subscription.branch_id, current_user, branch_id)
         
         low_coins_subs = low_coins_query.all()
         
@@ -102,8 +108,8 @@ def get_alerts():
     if not alert_type or alert_type == 'complaints':
         complaints_query = Complaint.query.filter_by(status=ComplaintStatus.OPEN)
 
-        if branch_id:
-            complaints_query = complaints_query.filter_by(branch_id=branch_id)
+        complaints_query = scope_query_to_branches(
+            complaints_query, Complaint.branch_id, current_user, branch_id)
         
         open_complaints = complaints_query.all()
         

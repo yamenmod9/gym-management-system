@@ -42,6 +42,12 @@ class Complaint(db.Model):
     
     # Customer (optional - can be anonymous)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True, index=True)
+    # The alerts feed falls back to this relationship when customer_name is
+    # blank, which is the normal case for a complaint filed by a registered
+    # member. It was never declared, so that fallback raised AttributeError and
+    # took the whole alerts endpoint down with a 500 whenever any complaint was
+    # open — which is precisely when the feed has something to say.
+    customer = db.relationship('Customer')
     customer_name = db.Column(db.String(150), nullable=True)  # If not registered
     customer_phone = db.Column(db.String(20), nullable=True)
     

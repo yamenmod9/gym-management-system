@@ -128,6 +128,13 @@ def accountant_x(app):
 # ───────────────────────── who may read the books ───────────────────────────
 
 MONEY_READ_ENDPOINTS = [
+    '/api/reports/daily',
+    '/api/reports/weekly',
+    '/api/reports/monthly',
+    '/api/reports/revenue-trend',
+    '/api/reports/expenses-by-category',
+    '/api/alerts',
+    '/api/dashboards/alerts',
     '/api/transactions',
     '/api/payments',
     '/api/expenses',

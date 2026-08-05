@@ -10,7 +10,7 @@ from app.utils import (
     get_current_gym_id, get_accessible_branch_ids, user_can_access_branch,
     calculate_branch_revenue, get_expiring_subscriptions
 )
-from app.models.user import UserRole
+from app.models.user import UserRole, FINANCE_READ_ROLES
 from app.models.complaint import ComplaintStatus
 from app.models.expense import ExpenseStatus
 from app.models.subscription import SubscriptionStatus
@@ -266,6 +266,7 @@ def get_revenue_report():
 
 @dashboards_bp.route('/alerts/expiring-subscriptions', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_expiring_subscriptions_alert():
     """Get expiring subscriptions alert"""
     days = request.args.get('days', 7, type=int)
@@ -273,11 +274,20 @@ def get_expiring_subscriptions_alert():
     
     user = get_current_user()
     
-    # Branch-specific roles can only see their branch
-    if user.role not in [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.CENTRAL_ACCOUNTANT]:
-        branch_id = user.branch_id
-    
-    subscriptions = get_expiring_subscriptions(days, branch_id)
+    # Branch scope. Setting branch_id only for branch-level roles left it as
+    # None for an owner who passed no ?branch_id, and the helper applies no
+    # filter at all when it is None — so the alert listed every gym's expiring
+    # members. get_expiring_subscriptions accepts a list, so hand it the
+    # caller's whole scope.
+    accessible = get_accessible_branch_ids(user)
+    if accessible is None:
+        scope = branch_id
+    elif branch_id and branch_id in accessible:
+        scope = branch_id
+    else:
+        scope = accessible
+
+    subscriptions = get_expiring_subscriptions(days, scope)
     
     from app.schemas import SubscriptionSchema
     schema = SubscriptionSchema()
@@ -379,6 +389,7 @@ def get_staff_performance():
 
 @dashboards_bp.route('/alerts', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_all_alerts():
     """Get all smart alerts for the user"""
     user = get_current_user()

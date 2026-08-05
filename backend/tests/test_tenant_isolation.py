@@ -136,6 +136,18 @@ SCOPED_ENDPOINTS = [
     ('/api/subscriptions', 'Member'),
 ]
 
+#: Endpoints checked for leaks only. They aggregate or filter on recency, so
+#: this fixture legitimately produces nothing for them to return — which makes
+#: a "still sees own data" assertion meaningless, but says nothing about
+#: whether they would leak. The branch-id sweep below covers them, and it does
+#: not need a positive match to be sound.
+LEAK_ONLY_ENDPOINTS = [
+    '/api/alerts',
+    '/api/dashboards/alerts/expiring-subscriptions',
+    '/api/finance/daily-sales',
+    '/api/reports/revenue',
+]
+
 
 @pytest.mark.parametrize('endpoint,label', SCOPED_ENDPOINTS)
 def test_owner_cannot_see_other_gyms_data(app, owner_a_headers, endpoint, label):
@@ -160,7 +172,8 @@ def test_no_endpoint_returns_a_record_from_another_gyms_branch(app, owner_a_head
         foreign = {b.id for b in Branch.query.filter(Branch.gym_id != gym_a.id).all()}
 
     client = app.test_client()
-    for endpoint, _label in SCOPED_ENDPOINTS:
+    endpoints = [e for e, _ in SCOPED_ENDPOINTS] + LEAK_ONLY_ENDPOINTS
+    for endpoint in endpoints:
         payload = client.get(endpoint, headers=owner_a_headers).get_json()
         seen = _branch_ids(payload)
         assert not (seen & foreign), (
@@ -328,3 +341,17 @@ def test_role_notifications_do_not_cross_gyms(app):
 
     assert 'token-owner_A' in sent_to, 'gym A owner should have been notified'
     assert 'token-owner_B' not in sent_to, "gym B's owner was notified about gym A"
+
+
+def test_the_alerts_feed_survives_an_open_complaint(app, owner_a_headers):
+    """It fell back to `complaint.customer` when customer_name was blank —
+    the normal case for a complaint filed by a registered member — and that
+    relationship was never declared. So the feed 500'd exactly when it had
+    something to report."""
+    response = app.test_client().get('/api/alerts', headers=owner_a_headers)
+    assert response.status_code == 200, response.get_json()
+
+    alerts = response.get_json()['data']['data']
+    assert any(a['alert_type'] == 'open_complaint' for a in alerts), (
+        'the open complaint in this gym produced no alert'
+    )

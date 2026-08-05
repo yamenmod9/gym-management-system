@@ -13,7 +13,7 @@ from app.utils import (
     success_response, error_response, get_current_user, role_required,
     get_current_gym_id, get_accessible_branch_ids, scope_query_to_branches
 )
-from app.models.user import UserRole
+from app.models.user import UserRole, FINANCE_READ_ROLES
 from app.extensions import db
 from datetime import date, datetime, timedelta
 from sqlalchemy import func, and_, or_
@@ -140,6 +140,7 @@ def get_revenue_report():
 
 @reports_bp.route('/daily', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_daily_report():
     """
     Daily sales report
@@ -225,6 +226,7 @@ def get_daily_report():
 
 @reports_bp.route('/weekly', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_weekly_report():
     """
     Weekly sales report
@@ -289,6 +291,7 @@ def get_weekly_report():
 
 @reports_bp.route('/monthly', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_monthly_report():
     """
     Monthly sales report
@@ -365,6 +368,7 @@ def get_monthly_report():
 
 @reports_bp.route('/revenue-trend', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_revenue_trend():
     """
     Revenue as a time series, for trend charts.
@@ -471,6 +475,7 @@ def get_revenue_trend():
 
 @reports_bp.route('/expenses-by-category', methods=['GET'])
 @jwt_required()
+@role_required(*FINANCE_READ_ROLES)
 def get_expenses_by_category():
     """
     Expense totals grouped by category, for breakdown charts.
