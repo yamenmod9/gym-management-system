@@ -123,11 +123,27 @@ def register_request_cache_reset(app):
                 delattr(g, attr)
 
 
+#: Arbitrary but fixed key for the advisory lock that serialises schema
+#: migration across gunicorn workers. Any constant works as long as every
+#: worker uses the same one.
+_SCHEMA_LOCK_KEY = 8145123301
+
+
+def _schema_lock_supported(db):
+    """Advisory locks are a Postgres feature; SQLite has no equivalent."""
+    try:
+        return db.engine.url.get_backend_name().startswith('postgres')
+    except Exception:
+        return False
+
+
 def _ensure_db_schema(app):
     """Ensure database schema matches model definitions (auto-migration)"""
     with app.app_context():
         from sqlalchemy import text, inspect as sa_inspect
         from app.extensions import db
+
+        lock_held = False
 
         try:
             # Bootstrap a completely empty database (fresh Postgres/MySQL
@@ -144,6 +160,26 @@ def _ensure_db_schema(app):
             # except handler — into an AttributeError, taking down startup on
             # the first boot that actually has a migration to run.
             from app import models  # noqa: F401 registers every model with db.metadata
+
+            # Serialise the whole migration across workers.
+            #
+            # Gunicorn starts two of these at once and they run this block
+            # simultaneously against the same database. That has already cost
+            # one production outage — both workers issued CREATE TYPE for the
+            # userrole enum and the loser crash-looped — and has produced a
+            # duplicate-key warning on most deploys since. A Postgres advisory
+            # lock makes the second worker wait for the first to finish rather
+            # than race it, so the second sees the finished schema and does
+            # nothing. Released in the finally below; if this worker dies while
+            # holding it, Postgres frees it when the connection drops.
+            #
+            # No-op on SQLite, which has no advisory locks and no concurrent
+            # workers to protect against.
+            if _schema_lock_supported(db):
+                db.session.execute(text('SELECT pg_advisory_lock(:key)'),
+                                   {'key': _SCHEMA_LOCK_KEY})
+                lock_held = True
+
             db.create_all()
 
             _sync_enum_values(app)
@@ -416,6 +452,16 @@ def _ensure_db_schema(app):
                     )
         except Exception as e:
             app.logger.warning(f'Schema migration check: {e}')
+        finally:
+            if lock_held:
+                try:
+                    db.session.execute(text('SELECT pg_advisory_unlock(:key)'),
+                                       {'key': _SCHEMA_LOCK_KEY})
+                    db.session.commit()
+                except Exception as unlock_error:
+                    # Not fatal: the lock dies with the connection anyway.
+                    app.logger.warning(
+                        f'Could not release the schema lock: {unlock_error}')
 
 
 def _sync_enum_values(app):

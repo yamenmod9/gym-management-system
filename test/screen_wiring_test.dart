@@ -77,6 +77,8 @@ void main() {
           reason: 'disputed training sessions would have no resolution path');
     });
 
+    _routerParity();
+
     test('the API diagnostics screen is only reachable in a debug build', () {
       // It accepts a username and password and prints the raw response. Being
       // reachable is fine; being reachable from a gym's install is not, and
@@ -96,5 +98,34 @@ void main() {
                 'so it would ship in a release build');
       });
     });
+  });
+}
+
+/// The staff app ships two routers: `lib/routes/app_router.dart` for the
+/// native builds and an inline one in `lib/web_main.dart` for the web build.
+/// They have to be kept in step by hand, and once were not — RoleUtils sent
+/// trainers to `/trainer`, which only the native router knew, so a trainer
+/// logging in on the web got "page not found".
+void _routerParity() {
+  test('every staff route in the native router exists in the web router', () {
+    final path = RegExp(r"""path:\s*'([^']*)'""");
+
+    Set<String> pathsIn(String file) => path
+        .allMatches(File(file).readAsStringSync())
+        .map((m) => m.group(1)!)
+        .toSet();
+
+    final native = pathsIn('lib/routes/app_router.dart');
+    final web = pathsIn('lib/web_main.dart');
+
+    expect(native, isNotEmpty, reason: 'parsed no routes from the native router');
+
+    final missing = native.difference(web).toList()..sort();
+    expect(
+      missing,
+      isEmpty,
+      reason: 'these resolve on mobile and 404 on the web build:\n'
+          '  ${missing.join('\n  ')}',
+    );
   });
 }
