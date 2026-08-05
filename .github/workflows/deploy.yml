@@ -35,7 +35,10 @@ jobs:
         run: flutter pub get
 
       - name: Analyze project
-        run: flutter analyze
+        # See ci.yml for why infos are not fatal: the default exits non-zero on
+        # ~200 pre-existing info-level lints, which failed this job on every
+        # push and meant the build below had never actually run.
+        run: flutter analyze --no-fatal-infos
 
       - name: Run tests if present
         shell: bash

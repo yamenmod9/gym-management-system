@@ -128,7 +128,13 @@ class DashboardService:
         branch_id restricts to one branch; branch_ids to a set (regional
         accountants). Passing neither means gym-wide (central tier).
         """
-        today = date.today()
+        # The gym's day, not the server's — see app/services/business_time.
+        from app.services.business_time import (
+            day_bounds_utc, gym_id_for_branch, gym_today,
+        )
+        gym_id = gym_id_for_branch(
+            branch_id or (branch_ids[0] if branch_ids else None))
+        today = gym_today(gym_id)
         current_month_start = today.replace(day=1)
         last_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
 
@@ -140,8 +146,10 @@ class DashboardService:
             return query
 
         # Daily sales (today)
+        start_utc, end_utc = day_bounds_utc(gym_id, today)
         today_transactions = scoped(Transaction.query.filter(
-            func.date(Transaction.transaction_date) == today
+            Transaction.transaction_date >= start_utc,
+            Transaction.transaction_date < end_utc,
         ), Transaction.branch_id)
         
         today_summary = {

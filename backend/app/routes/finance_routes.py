@@ -6,8 +6,10 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from app.models import Expense, DailyClosing, Transaction
 from app.models.expense import ExpenseStatus, ExpenseCategory
+from app.services.business_time import day_bounds_utc, gym_today
 from app.utils import (
     success_response, error_response, get_current_user, role_required,
+    get_current_gym_id,
     paginate, format_pagination_response, scope_query_to_branches
 )
 from app.models.user import UserRole, FINANCE_READ_ROLES
@@ -201,25 +203,28 @@ def get_daily_sales():
     date_str = request.args.get('date')
     branch_id = request.args.get('branch_id', type=int)
     
+    current_user = get_current_user()
+    gym_id = get_current_gym_id(current_user)
+
     if date_str:
         try:
             report_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
             return error_response('Invalid date format. Use YYYY-MM-DD', 400)
     else:
-        report_date = datetime.utcnow().date()
-    
-    current_user = get_current_user()
+        # The gym's today, not the server's. On a UTC server these differ for
+        # the first hours of the local morning, so "today's sales" silently
+        # meant yesterday's for anyone opening early.
+        report_date = gym_today(gym_id)
     
     # Build query for transactions on this date, on transaction_date so this
     # agrees with the daily closing for the same day.
-    start_datetime = datetime.combine(report_date, datetime.min.time())
-    end_datetime = datetime.combine(report_date, datetime.max.time())
+    start_datetime, end_datetime = day_bounds_utc(gym_id, report_date)
 
     query = Transaction.query.filter(
         and_(
             Transaction.transaction_date >= start_datetime,
-            Transaction.transaction_date <= end_datetime
+            Transaction.transaction_date < end_datetime
         )
     )
 

@@ -27,9 +27,11 @@ class EnumValue(fields.Field):
 
     def __init__(self, enum_cls, **kwargs):
         self.enum_cls = enum_cls
-        kwargs.setdefault(
-            'validate', validate.OneOf([m.value for m in enum_cls])
-        )
+        # No OneOf validator: marshmallow applies `validate` to the *output* of
+        # _deserialize, which is an enum member, and comparing that against a
+        # list of strings rejects every valid value. _deserialize below already
+        # raises ValidationError for anything unrecognised, with the same
+        # message a OneOf would have produced.
         super().__init__(**kwargs)
 
     def _serialize(self, value, attr, obj, **kwargs):
@@ -117,7 +119,12 @@ class CustomerSchema(Schema):
 class ServiceSchema(Schema):
     id = fields.Int(dump_only=True)
     name = fields.Str(required=True, validate=validate.Length(min=2, max=150))
-    service_type = fields.Str(required=True, validate=validate.OneOf([s.value for s in ServiceType]))
+    # EnumValue, not fields.Str: the route does Service(**data), and a plain
+    # string went straight into an Enum column that stores member *names*, so
+    # every attempt to create a service raised "'gym' is not among the defined
+    # enum values" and came back a 500. Creating a package was impossible,
+    # which is why every gym was still sharing the seeded catalogue.
+    service_type = EnumValue(ServiceType, required=True)
     description = fields.Str(allow_none=True)
     price = fields.Decimal(required=True, as_string=True, validate=validate.Range(min=0))
     duration_days = fields.Int(required=True, validate=validate.Range(min=1))

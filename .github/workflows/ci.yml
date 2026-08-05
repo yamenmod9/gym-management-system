@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch makes an in-flight run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'   # matches backend/Dockerfile
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        # `tests/`, not the whole directory: backend/test_register.py is a
+        # manual script that talks to a running server, and collecting it
+        # fails the run before a single real test executes.
+        #
+        # Each test module points DATABASE_URL at its own throwaway SQLite
+        # file, so no service container is needed.
+        run: python -m pytest tests/ -q
+
+  flutter:
+    name: Flutter analyze and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        # --no-fatal-infos is deliberate. `flutter analyze` exits non-zero on
+        # *any* finding, and this repository carries ~200 pre-existing
+        # info-level lints (deprecated withOpacity and friends). With the
+        # default the job failed on every single push, which is why CI had been
+        # red continuously and the tests below had never once run. Errors and
+        # warnings still fail the build; infos are visible in the log without
+        # blocking. Clearing the infos is worth doing separately — this makes
+        # the gate mean something today.
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test

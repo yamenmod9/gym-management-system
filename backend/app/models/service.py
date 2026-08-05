@@ -54,6 +54,17 @@ class Service(db.Model):
     # than having to remember to opt in.
     grants_gym_entry = db.Column(db.Boolean, default=True, nullable=False)
 
+    # The gym that sells this package.
+    #
+    # Nullable, and NULL means "shared": the services that predate this column
+    # are used by subscriptions belonging to several gyms at once, so stamping
+    # them with one gym would either orphan the others' subscriptions or force
+    # rewriting service_id on every historical row. Instead NULL keeps them
+    # visible to everyone exactly as before, while anything created from now on
+    # belongs to its creator's gym and is invisible and uneditable elsewhere.
+    gym_id = db.Column(db.Integer, db.ForeignKey('gyms.id'), nullable=True, index=True)
+    gym = db.relationship('Gym')
+
     # Status
     is_active = db.Column(db.Boolean, default=True, nullable=False)
 

@@ -6,6 +6,7 @@ from flask_jwt_extended import jwt_required
 from datetime import datetime, date
 from sqlalchemy import func, and_
 from sqlalchemy.exc import IntegrityError
+from app.services.business_time import day_bounds_utc, gym_id_for_branch, gym_today
 from app.models.daily_closing import DailyClosing
 from app.models.transaction import Transaction, PaymentMethod
 from app.utils import (
@@ -27,11 +28,19 @@ def _totals_by_payment_method(branch_id, closing_date):
     This module used to total the gross `amount`, so expected cash came out
     high by exactly the discounts given — and the reconciliation then reported
     a cash shortage of that size on every day anyone discounted anything.
+
+    The day is the *gym's* day. Comparing on UTC dates put anything taken after
+    local midnight into the next day's closing, so a branch trading late was
+    reliably short on the night and over the next morning.
     """
+    gym_id = gym_id_for_branch(branch_id)
+    start_utc, end_utc = day_bounds_utc(gym_id, closing_date)
+
     transactions = Transaction.query.filter(
         and_(
             Transaction.branch_id == branch_id,
-            func.date(Transaction.transaction_date) == closing_date
+            Transaction.transaction_date >= start_utc,
+            Transaction.transaction_date < end_utc,
         )
     ).all()
 
@@ -138,7 +147,8 @@ def calculate_expected_cash():
         return error_response("branch_id is required", 400)
     
     branch_id = data['branch_id']
-    closing_date_str = data.get('date', date.today().isoformat())
+    closing_date_str = data.get('date') or gym_today(
+        gym_id_for_branch(data.get('branch_id'))).isoformat()
     
     try:
         closing_date = datetime.strptime(closing_date_str, '%Y-%m-%d').date()
@@ -186,7 +196,8 @@ def create_daily_closing():
     actual_cash, cash_error = parse_actual_cash(data['actual_cash'])
     if cash_error:
         return cash_error
-    closing_date_str = data.get('date', date.today().isoformat())
+    closing_date_str = data.get('date') or gym_today(
+        gym_id_for_branch(data.get('branch_id'))).isoformat()
     notes = data.get('notes', '')
     
     try:
@@ -261,8 +272,8 @@ def get_today_status():
     if not user.branch_id:
         return error_response("User not assigned to a branch", 403)
     
-    today = date.today()
-    
+    today = gym_today(gym_id_for_branch(user.branch_id))
+
     # Check if closing exists for today
     closing = DailyClosing.query.filter(
         and_(

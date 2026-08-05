@@ -74,6 +74,9 @@ def create_app(config_name='default'):
 
     # Per-request caches must not outlive the request
     register_request_cache_reset(app)
+
+    # Carry out due account deletions without needing the member to come back
+    register_retention_sweep(app)
     
     # Register CLI commands
     register_cli_commands(app)
@@ -121,6 +124,50 @@ def register_request_cache_reset(app):
         for attr in _PER_REQUEST_CACHES:
             if hasattr(g, attr):
                 delattr(g, attr)
+
+
+#: How often the opportunistic retention sweep is allowed to run, per worker.
+_RETENTION_SWEEP_INTERVAL_SECONDS = 3600
+
+#: Monotonic timestamp of the last sweep in this worker. Per-process, so two
+#: workers may each run one an hour; the sweep is idempotent, so that is fine.
+_last_retention_sweep = [0.0]
+
+
+def register_retention_sweep(app):
+    """Erase accounts whose 90-day deletion grace period has elapsed.
+
+    Deletion used to be carried out only when the member next logged in or
+    opened their profile — and someone who has asked to be deleted is exactly
+    the person who never comes back, so their data stayed indefinitely.
+
+    There is no worker process in this deployment, so this rides on request
+    traffic instead: at most once an hour per worker, bounded to a couple of
+    hundred rows, and never on the request's critical path — it runs after the
+    response has been sent. `flask purge-deleted-accounts` does the same thing
+    on demand for anyone who wants it deterministic.
+    """
+    import time
+
+    @app.teardown_request
+    def _sweep_due_deletions(exception=None):
+        if exception is not None:
+            return
+
+        now = time.monotonic()
+        if now - _last_retention_sweep[0] < _RETENTION_SWEEP_INTERVAL_SECONDS:
+            return
+        _last_retention_sweep[0] = now
+
+        try:
+            from app.services.retention_service import purge_due_accounts
+            purged = purge_due_accounts()
+            if purged:
+                app.logger.info(
+                    'Retention: erased %s account(s) past the grace period', purged)
+        except Exception as e:
+            # Never let housekeeping affect the response that just went out.
+            app.logger.warning('Retention sweep failed: %s', e)
 
 
 #: Arbitrary but fixed key for the advisory lock that serialises schema
@@ -315,6 +362,18 @@ def _ensure_db_schema(app):
                     ))
                     db.session.commit()
                     app.logger.info('Auto-migration: added grants_gym_entry column to services table')
+
+                # Which gym sells this package. Left NULL for everything that
+                # predates the column: those rows are already referenced by
+                # subscriptions belonging to several gyms, so stamping them
+                # with one would hide them from the others. NULL reads as
+                # "shared" — see Service.gym_id.
+                if 'gym_id' not in columns:
+                    db.session.execute(text(
+                        'ALTER TABLE services ADD COLUMN gym_id INTEGER REFERENCES gyms(id)'
+                    ))
+                    db.session.commit()
+                    app.logger.info('Auto-migration: added gym_id column to services table')
 
             # The captain a member trains with, on private-training subscriptions.
             if 'subscriptions' in existing_tables:
@@ -718,6 +777,17 @@ def register_cli_commands(app):
         from seed import seed_database
         seed_database()
         print('✅ Database seeded successfully!')
+
+    @app.cli.command('purge-deleted-accounts')
+    def purge_deleted_accounts():
+        """Erase members whose 90-day deletion grace period has elapsed.
+
+        The same work the hourly request-time sweep does, on demand — for a
+        cron job, or for anyone who wants to prove it has run.
+        """
+        from app.services.retention_service import purge_due_accounts
+        purged = purge_due_accounts(limit=10000)
+        print(f'✅ Erased {purged} account(s) past the grace period.')
     
     @app.cli.command('reset-db')
     def reset_db():
