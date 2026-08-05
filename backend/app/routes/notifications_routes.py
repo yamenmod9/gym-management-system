@@ -7,6 +7,7 @@ from app.extensions import db
 from app.models.device_token import DeviceToken
 from app.models.user import User, UserRole
 from app.utils import success_response, error_response, role_required
+from app.utils.client_auth import allows_client_token
 
 notifications_bp = Blueprint('notifications', __name__, url_prefix='/api/notifications')
 
@@ -38,6 +39,7 @@ def _identity_from_request():
 
 
 @notifications_bp.route('/register-device', methods=['POST'])
+@allows_client_token
 def register_device():
     """
     Register an FCM device token.
@@ -94,6 +96,7 @@ def register_device():
 
 
 @notifications_bp.route('/unregister-device', methods=['POST'])
+@allows_client_token
 def unregister_device():
     """
     Unregister an FCM device token (on logout).

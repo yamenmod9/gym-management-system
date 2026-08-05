@@ -41,6 +41,22 @@ def client_token_required(fn):
     return wrapper
 
 
+def allows_client_token(fn):
+    """Mark a view that serves staff and members from one route.
+
+    ``client_token_required`` tags the member-only views; this is for the few
+    that accept either kind of token and resolve the identity themselves — the
+    FCM device register/unregister pair. Without the tag the request-level
+    guard rejects a member's token there, which silently turned off push
+    notifications for the whole member app.
+
+    A view carrying this tag must scope by the identity it decodes, not assume
+    the caller is staff.
+    """
+    fn._allows_client_token = True
+    return fn
+
+
 def get_current_client():
     """
     Get current authenticated client (customer)

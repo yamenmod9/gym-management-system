@@ -156,3 +156,55 @@ def test_the_member_api_still_works_for_members(app, member_token_headers):
     response = app.test_client().get('/api/client/me',
                                      headers=member_token_headers)
     assert response.status_code == 200, response.get_json()
+
+
+# ───────────────────── endpoints that serve both audiences ──────────────────
+
+def test_a_member_can_still_register_for_push(app, member_token_headers):
+    """The FCM register/unregister pair takes either kind of token and resolves
+    the identity itself. Locking client tokens out of staff surface caught
+    these two as collateral and silently turned off notifications for the
+    entire member app — no error anywhere, just no pushes."""
+    client = app.test_client()
+
+    registered = client.post(
+        '/api/notifications/register-device',
+        json={'fcm_token': 'member-device-token', 'app_type': 'client'},
+        headers=member_token_headers)
+    assert registered.status_code == 200, registered.get_json()
+
+    unregistered = client.post(
+        '/api/notifications/unregister-device',
+        json={'fcm_token': 'member-device-token'},
+        headers=member_token_headers)
+    assert unregistered.status_code == 200, unregistered.get_json()
+
+
+def test_staff_can_still_register_for_push(app):
+    client = app.test_client()
+    login = client.post('/api/auth/login',
+                        json={'username': 'scope_owner', 'password': 'secret123'})
+    headers = {'Authorization': 'Bearer ' + login.get_json()['data']['access_token']}
+
+    response = client.post(
+        '/api/notifications/register-device',
+        json={'fcm_token': 'staff-device-token', 'app_type': 'staff'},
+        headers=headers)
+    assert response.status_code == 200, response.get_json()
+
+
+def test_a_device_registration_is_tied_to_the_caller(app, member_token_headers):
+    """The tag means 'either audience', not 'no scoping'."""
+    from app.extensions import db
+    from app.models.device_token import DeviceToken
+
+    app.test_client().post(
+        '/api/notifications/register-device',
+        json={'fcm_token': 'scoped-check', 'app_type': 'client'},
+        headers=member_token_headers)
+
+    with app.app_context():
+        row = DeviceToken.query.filter_by(
+            fcm_token='scoped-check', is_active=True).one()
+        assert row.customer_id == IDS['member_customer_id']
+        assert row.user_id is None, 'a member token registered against a staff id'
