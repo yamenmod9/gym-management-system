@@ -126,6 +126,11 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
+
+    # Tokens issued before this moment are refused. Set by logout and by a
+    # password change; NULL means nothing has ever been revoked. See
+    # app/services/session_service.py.
+    sessions_valid_from = db.Column(db.DateTime, nullable=True)
     
     # Relationships
     transactions = db.relationship('Transaction', back_populates='created_by_user', lazy='dynamic')

@@ -48,6 +48,11 @@ class Customer(db.Model):
     temp_password = db.Column(db.String(20), nullable=True)  # Plain temporary password (for first login)
     password_changed = db.Column(db.Boolean, default=False, nullable=False)  # Has client changed password?
 
+    # Tokens issued before this moment are refused. Set by logout, by a
+    # password change or reset, and by account erasure; NULL means nothing has
+    # ever been revoked. See app/services/session_service.py.
+    sessions_valid_from = db.Column(db.DateTime, nullable=True)
+
     # Preferred UI language ('ar' or 'en'). NULL means the client hasn't
     # set one yet — used as the signal to show the first-login language step.
     preferred_language = db.Column(db.String(5), nullable=True)

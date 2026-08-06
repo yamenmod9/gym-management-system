@@ -155,6 +155,36 @@ def test_late_night_takings_land_in_the_right_days_closing(app, owner_r):
     )
 
 
+def test_a_host_with_no_timezone_database_still_closes_the_till(app):
+    """`zoneinfo` reads the operating system's tz database, and Alpine images
+    and bare Windows have none. The fallback used to be
+    ``ZoneInfo(DEFAULT_TIMEZONE)`` — which raises exactly the exception it was
+    the fallback for, so every daily closing, daily sales figure and accountant
+    dashboard would have returned 500. Found by installing this project's
+    requirements into a clean virtualenv.
+    """
+    from datetime import timezone
+    from zoneinfo import ZoneInfoNotFoundError
+
+    from app.services import business_time
+
+    def no_database(name):
+        raise ZoneInfoNotFoundError(f'No time zone found with key {name}')
+
+    original = business_time.ZoneInfo
+    business_time.ZoneInfo = no_database
+    try:
+        with app.app_context():
+            assert business_time.gym_timezone(IDS['R']['gym']) is timezone.utc
+
+            start, end = business_time.day_bounds_utc(
+                IDS['R']['gym'], date(2026, 3, 11))
+            assert end - start == timedelta(days=1)
+            assert business_time.gym_today(IDS['R']['gym']) is not None
+    finally:
+        business_time.ZoneInfo = original
+
+
 def test_an_unusable_timezone_setting_does_not_break_the_till(app):
     """A bad setting must degrade, not take down a reconciliation."""
     from app.services.business_time import DEFAULT_TIMEZONE, gym_timezone

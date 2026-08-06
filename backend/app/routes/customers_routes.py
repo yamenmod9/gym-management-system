@@ -12,6 +12,7 @@ from datetime import datetime
 from app.schemas import CustomerSchema
 from app.models.customer import Customer, Gender
 from app.models.subscription import Subscription
+from app.services.session_service import revoke_sessions
 from app.utils import (
     success_response, error_response, role_required,
     paginate, format_pagination_response, get_current_user,
@@ -382,6 +383,56 @@ def regenerate_customer_qr(customer_id):
             )
 
     return error_response("Could not generate a unique QR code", 500)
+
+
+@customers_bp.route('/<int:customer_id>/reset-password', methods=['POST'])
+@jwt_required()
+@role_required(*_TEMP_PASSWORD_ROLES)
+def reset_customer_password(customer_id):
+    """Issue a member a new temporary password.
+
+    A member who forgets their password had no way back into the app: there was
+    no reset of any kind, and the only credential they were ever given was the
+    temporary password handed out at registration. This is the counterpart to
+    the self-serve flow in client_auth_routes — the one that works with no SMS
+    or email provider configured, because identification happens the way it
+    already does in a gym: the member is standing at the desk.
+
+    Restricted to the roles that already hand out credentials at registration
+    (``_TEMP_PASSWORD_ROLES``). A trainer or accountant issuing a password for
+    a member's account could then sign in as them.
+    """
+    customer = db.session.get(Customer, customer_id)
+
+    if not customer:
+        return error_response("Customer not found", 404)
+
+    user = get_current_user()
+    _accessible = get_accessible_branch_ids(user)
+    if _accessible is not None and customer.branch_id not in _accessible:
+        return error_response("Access denied", 403)
+
+    if not customer.is_active:
+        return error_response(
+            "This member is inactive. Reactivate the account first.", 400
+        )
+
+    temp_password = customer.generate_temp_password()
+    # Whoever was signed in on the old password — including whoever the member
+    # is worried about — loses their session now rather than in seven days.
+    revoke_sessions(customer)
+    db.session.commit()
+
+    return success_response(
+        {
+            'customer_id': customer.id,
+            'phone': customer.phone,
+            'temporary_password': temp_password,
+            'note': 'Give this to the member. They will be asked to set their '
+                    'own password at next sign-in.',
+        },
+        "Temporary password issued",
+    )
 
 
 @customers_bp.route('/search', methods=['GET'])

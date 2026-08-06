@@ -88,6 +88,13 @@ def anonymise(customer):
 
     customer.is_active = False
 
+    # And any token already in the wild must stop working now, rather than
+    # continuing to authenticate a member who no longer exists. Deactivation
+    # alone covers this today, but the two are independent switches and an
+    # erased account should not depend on the other one staying set.
+    from app.services.session_service import revoke_sessions
+    revoke_sessions(customer)
+
     # Any device still holding a push token for them must stop receiving.
     from app.models.device_token import DeviceToken
     DeviceToken.query.filter_by(customer_id=customer.id).update(

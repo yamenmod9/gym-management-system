@@ -77,6 +77,12 @@ def create_app(config_name='default'):
 
     # Carry out due account deletions without needing the member to come back
     register_retention_sweep(app)
+
+    # Pick an SMS/email provider from the environment. Without this the
+    # notification service keeps its development console default, which
+    # reports that it cannot deliver rather than silently swallowing codes.
+    from app.services.notification_service import init_notification_service
+    init_notification_service()
     
     # Register CLI commands
     register_cli_commands(app)
@@ -375,6 +381,22 @@ def _ensure_db_schema(app):
                     db.session.commit()
                     app.logger.info('Auto-migration: added gym_id column to services table')
 
+            # The session revocation cutoff, on both kinds of account. NULL
+            # means nothing has ever been revoked, so every session that is
+            # live at deploy time keeps working — see
+            # app/services/session_service.py.
+            for _table in ('users', 'customers'):
+                if _table in existing_tables:
+                    columns = [col['name'] for col in inspector.get_columns(_table)]
+                    if 'sessions_valid_from' not in columns:
+                        db.session.execute(text(
+                            f'ALTER TABLE {_table} ADD COLUMN sessions_valid_from TIMESTAMP'
+                        ))
+                        db.session.commit()
+                        app.logger.info(
+                            f'Auto-migration: added sessions_valid_from column to {_table} table'
+                        )
+
             # The captain a member trains with, on private-training subscriptions.
             if 'subscriptions' in existing_tables:
                 columns = [col['name'] for col in inspector.get_columns('subscriptions')]
@@ -604,7 +626,11 @@ def _endpoint_allows_client_token(app):
 
 
 def register_active_account_guard(app):
-    """Reject any request whose JWT belongs to a deactivated account.
+    """Reject any request whose JWT belongs to a deactivated or signed-out account.
+
+    Two checks, both answered by one SELECT: the account is still active, and
+    the token was issued after the account's revocation cutoff (set by logout
+    and by password changes — see app/services/session_service.py).
 
     ``role_required`` checks ``is_active``, but roughly half the routes are
     guarded by a bare ``@jwt_required()`` and read the user through
@@ -620,6 +646,7 @@ def register_active_account_guard(app):
     from flask import jsonify, request
     from flask_jwt_extended import get_jwt, verify_jwt_in_request
     from app.extensions import db
+    from app.services.session_service import token_is_revoked
 
     @app.before_request
     def _reject_inactive_accounts():
@@ -670,13 +697,21 @@ def register_active_account_guard(app):
             customer_id = claims.get('customer_id')
             if customer_id is None:
                 return None
-            is_active = db.session.query(Customer.is_active).filter(
-                Customer.id == customer_id
-            ).scalar()
+            row = db.session.query(
+                Customer.is_active, Customer.sessions_valid_from
+            ).filter(Customer.id == customer_id).first()
+            if row is None:
+                return None
+            is_active, valid_from = row
             if is_active is False:
                 return jsonify({
                     'success': False,
                     'error': 'This account is no longer active',
+                }), 401
+            if token_is_revoked(claims.get('iat'), valid_from):
+                return jsonify({
+                    'success': False,
+                    'error': 'This session has ended. Please sign in again.',
                 }), 401
             return None
 
@@ -686,9 +721,12 @@ def register_active_account_guard(app):
         except (TypeError, ValueError):
             return None
 
-        is_active = db.session.query(User.is_active).filter(
-            User.id == user_id
-        ).scalar()
+        row = db.session.query(
+            User.is_active, User.sessions_valid_from
+        ).filter(User.id == user_id).first()
+        if row is None:
+            return None
+        is_active, valid_from = row
         if is_active is False:
             # 401 rather than 403: the session itself is no longer valid, so
             # the client should log out. The Flutter interceptor force-logs-out
@@ -697,6 +735,13 @@ def register_active_account_guard(app):
             return jsonify({
                 'success': False,
                 'error': 'User account is inactive',
+            }), 401
+        if token_is_revoked(claims.get('iat'), valid_from):
+            # Same reasoning as above: 401 so the app clears its stored token
+            # rather than showing a permissions error it can do nothing about.
+            return jsonify({
+                'success': False,
+                'error': 'This session has ended. Please sign in again.',
             }), 401
         return None
 

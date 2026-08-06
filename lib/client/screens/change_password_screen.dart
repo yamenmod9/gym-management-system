@@ -46,10 +46,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       return;
     }
 
-    if (newPassword.length < 6) {
+    // Eight, matching what the backend enforces. This screen checked six, so
+    // a seven-character password passed here and came back as a 400 the member
+    // had no way to interpret.
+    if (newPassword.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(S.newPasswordMin6),
+          content: Text(S.passwordMin8),
           backgroundColor: Colors.orange,
         ),
       );

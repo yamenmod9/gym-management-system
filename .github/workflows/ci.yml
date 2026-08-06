@@ -46,6 +46,42 @@ jobs:
         # file, so no service container is needed.
         run: python -m pytest tests/ -q
 
+  audit:
+    name: Backend dependency audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pip-audit
+
+      - name: Audit installed packages
+        # Audits the environment rather than `-r requirements.txt`, which makes
+        # pip-audit resolve and build every pin from source — slow, and it fails
+        # outright on psycopg2-binary without libpq headers. The installed set
+        # is also the more honest target: it includes transitive packages, which
+        # is where most advisories actually are.
+        #
+        # Blocking, because it currently passes. The set this replaced carried
+        # advisories in five packages on the request path — nine in PyJWT alone,
+        # which verifies every access token here — and the pins in
+        # requirements.txt were raised until this step reported clean. A gate
+        # that is green today is worth failing on tomorrow; Dependabot opens the
+        # PR that fixes it.
+        run: pip-audit --progress-spinner off --desc
+
   flutter:
     name: Flutter analyze and tests
     runs-on: ubuntu-latest

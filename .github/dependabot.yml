@@ -1,0 +1,55 @@
+# Nothing watched this project's dependencies. Flask, PyJWT and cryptography
+# all sit directly in the authentication path, and an advisory against any of
+# them would have gone unnoticed indefinitely — when this file was added, the
+# installed set carried 75 known vulnerabilities, 9 of them in PyJWT alone.
+#
+# Grouped so that routine patch bumps arrive as one reviewable PR a week rather
+# than fifteen. Major versions are deliberately left ungrouped: those are the
+# ones that break things, and they deserve to be looked at one at a time.
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - backend
+    groups:
+      backend-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - flutter
+    groups:
+      flutter-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # The workflows themselves pin third-party actions by tag; those tags move,
+  # and a compromised action runs with access to this repository's secrets.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci

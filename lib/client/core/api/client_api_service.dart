@@ -124,15 +124,7 @@ class ClientApiService {
     String password,
   ) async {
     try {
-      // Normalize phone number if it's a phone
-      String normalizedIdentifier = identifier.trim();
-      if (!identifier.contains('@')) {
-        // It's a phone number - remove spaces, dashes, and plus signs
-        normalizedIdentifier = identifier
-            .replaceAll(' ', '')
-            .replaceAll('-', '')
-            .replaceAll('+', '');
-      }
+      final normalizedIdentifier = _normalizeIdentifier(identifier);
 
       final response = await _dio.post(
         '/client/auth/login',
@@ -159,10 +151,74 @@ class ClientApiService {
           'new_password': newPassword,
         },
       );
+      // Changing the password revokes every token issued to this account,
+      // including the one that authorised this request. The backend returns a
+      // replacement; storing it is what keeps the member signed in on this
+      // phone instead of being bounced to the login screen.
+      final replacement = response.data['data']?['access_token'];
+      if (replacement is String && replacement.isNotEmpty) {
+        await saveToken(replacement);
+      }
       return response.data;
     } on DioException catch (e) {
       throw _handleError(e);
     }
+  }
+
+  /// Asks for a password reset code. The response is deliberately identical
+  /// whether or not the account exists, so this cannot be used to find out
+  /// which numbers belong to members.
+  Future<Map<String, dynamic>> forgotPassword(String identifier) async {
+    try {
+      final response = await _dio.post(
+        '/client/auth/forgot-password',
+        data: {'identifier': _normalizeIdentifier(identifier)},
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> resetPassword(
+    String identifier,
+    String code,
+    String newPassword,
+  ) async {
+    try {
+      final response = await _dio.post(
+        '/client/auth/reset-password',
+        data: {
+          'identifier': _normalizeIdentifier(identifier),
+          'code': code.trim(),
+          'new_password': newPassword,
+        },
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Ends this member's sessions server-side.
+  ///
+  /// Best-effort: a member with no network still expects the app to log them
+  /// out locally, so a failure here must not block clearing the stored token.
+  Future<void> logout() async {
+    try {
+      await _dio.post('/client/auth/logout');
+    } catch (_) {
+      // Ignored on purpose — see above.
+    }
+  }
+
+  /// Phone numbers are typed with spaces, dashes and country prefixes; the
+  /// backend matches them literally. Shared by login and the reset flow so
+  /// that a member who signs in with "0100 123 4567" can also reset with it.
+  String _normalizeIdentifier(String identifier) {
+    final trimmed = identifier.trim();
+    if (trimmed.contains('@')) return trimmed;
+    return trimmed.replaceAll(' ', '').replaceAll('-', '').replaceAll('+', '');
   }
 
   Future<Map<String, dynamic>> requestActivation(String identifier) async {

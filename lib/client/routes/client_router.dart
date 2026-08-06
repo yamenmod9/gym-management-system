@@ -8,6 +8,7 @@ import '../screens/subscription_screen.dart';
 import '../screens/payments_screen.dart';
 import '../screens/entry_history_screen.dart';
 import '../screens/change_password_screen.dart';
+import '../screens/forgot_password_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/language_setup_screen.dart';
 
@@ -25,8 +26,16 @@ class ClientRouter {
 
       print('🔀 Router Redirect: isAuth=$isAuth, currentPath=$currentPath');
 
-      // If not authenticated, redirect to welcome
-      if (!isAuth && currentPath != '/welcome' && !currentPath.startsWith('/activation')) {
+      // If not authenticated, redirect to welcome.
+      //
+      // /forgot-password is in the allowlist for the obvious reason: the member
+      // is there precisely because they cannot authenticate, so redirecting
+      // them to the login screen they just came from would make the feature
+      // unreachable.
+      if (!isAuth &&
+          currentPath != '/welcome' &&
+          currentPath != '/forgot-password' &&
+          !currentPath.startsWith('/activation')) {
         print('➡️ Redirecting to /welcome (not authenticated)');
         return '/welcome';
       }
@@ -61,6 +70,13 @@ class ClientRouter {
           final identifier = state.uri.queryParameters['identifier'] ?? '';
           return ActivationScreen(identifier: identifier);
         },
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgot-password',
+        builder: (context, state) => ForgotPasswordScreen(
+          initialIdentifier: state.uri.queryParameters['identifier'],
+        ),
       ),
       GoRoute(
         path: '/home',

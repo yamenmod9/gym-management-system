@@ -182,7 +182,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                onPressed: _isLoading
+                    ? null
+                    : () => context.goNamed(
+                          'forgot-password',
+                          queryParameters: {
+                            if (_identifierController.text.trim().isNotEmpty)
+                              'identifier': _identifierController.text.trim(),
+                          },
+                        ),
+                child: Text(
+                  S.forgotPassword,
+                  style: const TextStyle(color: kLoginMuted, fontSize: 13),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(

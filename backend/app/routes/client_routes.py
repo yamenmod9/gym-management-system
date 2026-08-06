@@ -9,7 +9,10 @@ from app.models import (
 from app.services.qr_service import QRService
 from app.services.gym_rules import gym_rule
 from app.utils import success_response, error_response, paginate, format_pagination_response
-from app.utils.client_auth import client_token_required, get_current_client
+from app.utils.client_auth import (
+    client_token_required, create_client_token, get_current_client,
+)
+from app.services.session_service import revoke_sessions
 from app.extensions import db
 
 client_bp = Blueprint('client', __name__, url_prefix='/api/client')
@@ -251,38 +254,48 @@ def change_password():
     
     Request body:
         - current_password: Current password
-        - new_password: New password (min 6 characters)
-    
+        - new_password: New password (min 8 characters)
+
     Returns:
         Success message
     """
     customer = get_current_client()
-    
+
     if not customer:
         return error_response('Customer not found', 404)
-    
+
     data = request.get_json()
-    
+
     if not data or 'current_password' not in data or 'new_password' not in data:
         return error_response('Current password and new password are required', 400)
-    
+
     current_password = data['current_password'].strip()
     new_password = data['new_password'].strip()
-    
-    # Validate new password
-    if len(new_password) < 6:
-        return error_response('New password must be at least 6 characters', 400)
-    
+
+    # Eight, matching /api/client/auth/change-password and the reset flow. This
+    # path allowed six, and a member with two ways to set a password gets the
+    # security of the weaker one.
+    if len(new_password) < 8:
+        return error_response('New password must be at least 8 characters', 400)
+
     # Verify current password
     if not customer.check_password(current_password):
         return error_response('Current password is incorrect', 401)
-    
+
     # Set new password
     customer.set_password(new_password)
+    # Evict anyone signed in on the old password — the usual reason to change
+    # one is that somebody else knows it.
+    revoke_sessions(customer)
     db.session.commit()
-    
+
     return success_response(
-        {'password_changed': True},
+        {
+            'password_changed': True,
+            # Replacement for the token this request just revoked, so the
+            # member is not signed out of the phone they changed it on.
+            'access_token': create_client_token(customer.id),
+        },
         'Password changed successfully'
     )
 

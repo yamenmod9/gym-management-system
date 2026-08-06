@@ -5,8 +5,11 @@ from flask import Blueprint, current_app, request
 from datetime import datetime, timedelta
 from app.models import Customer, ActivationCode, ActivationCodeType
 from app.services.notification_service import get_notification_service
+from app.services.session_service import revoke_sessions, revoke_sessions_and_commit
 from app.utils import success_response, error_response
-from app.utils.client_auth import create_client_token
+from app.utils.client_auth import (
+    client_token_required, create_client_token, get_current_client,
+)
 from app.extensions import db, limiter
 
 client_auth_bp = Blueprint('client_auth', __name__, url_prefix='/api/client/auth')
@@ -184,10 +187,13 @@ def request_activation_code():
             delivery_method = 'sms'
             delivery_target = customer.phone
     
-    # Invalidate old codes for this customer
+    # Invalidate this customer's previous login codes. Scoped by type so that
+    # asking for a login code does not quietly cancel a password reset the
+    # member is halfway through.
     old_codes = ActivationCode.query.filter_by(
         customer_id=customer.id,
-        is_used=False
+        is_used=False,
+        code_type=ActivationCodeType.LOGIN,
     ).all()
     for old_code in old_codes:
         old_code.is_used = True
@@ -279,12 +285,18 @@ def verify_activation_code():
     if not customer:
         return error_response('Invalid credentials', 401)
     
-    # Find valid activation code
+    # Find valid activation code.
+    #
+    # Filtered by type: a password-reset code must not double as a login code.
+    # Without this, "I forgot my password" would mint a credential that signs
+    # straight in here — so the reset flow's weaker delivery assumptions would
+    # become a second, quieter way to log in.
     activation_code = ActivationCode.query.filter_by(
         customer_id=customer.id,
-        is_used=False
+        is_used=False,
+        code_type=ActivationCodeType.LOGIN,
     ).order_by(ActivationCode.created_at.desc()).first()
-    
+
     if not activation_code:
         return error_response('No valid activation code found', 401)
     
@@ -399,19 +411,240 @@ def change_password():
     
     # Update password using set_password (which handles hashing and clearing temp_password)
     customer.set_password(new_password)
-    
+    # Evict any other device holding a session on the old password.
+    revoke_sessions(customer)
+
     db.session.commit()
-    
-    return success_response(message='Password changed successfully')
+
+    # Replacement token, so the member who just changed their own password is
+    # not signed out of the phone they changed it on.
+    return success_response(
+        {'access_token': create_client_token(customer.id)},
+        'Password changed successfully',
+    )
+
+
+#: What we tell anyone who asks for a reset, whether or not the account exists.
+#: Identical in both cases so the endpoint cannot be used to discover which
+#: phone numbers belong to members of this gym.
+_RESET_SENT_MESSAGE = (
+    'If an account exists for this contact, a reset code has been sent to it.'
+)
+
+
+@client_auth_bp.route('/forgot-password', methods=['POST'])
+# Same budget as the login-code request: each code allows three guesses, so the
+# thing that has to be capped is how many codes can be minted.
+@limiter.limit('5 per minute;20 per hour')
+def forgot_password():
+    """Start a self-serve password reset.
+
+    Request body:
+        - identifier: phone or email
+        - delivery_method: 'sms' or 'email' (optional, inferred otherwise)
+
+    A member who forgot their password previously had no route back in at all —
+    ``/change-password`` requires the current password, and nothing else set
+    one. Reception can now issue a temporary password
+    (``POST /api/customers/<id>/reset-password``), and this is the path that
+    doesn't require coming in to the gym.
+    """
+    data = request.get_json() or {}
+
+    identifier = (data.get('identifier') or '').strip()
+    if not identifier:
+        return error_response('Identifier (phone or email) is required', 400)
+
+    notification_service = get_notification_service()
+
+    # Checked before the account lookup, and phrased without reference to the
+    # account, so that a gym with no provider configured gives the same answer
+    # to everyone. Doing it afterwards would turn "we can't send" into an
+    # oracle for "this member exists".
+    if not (notification_service.can_deliver('sms')
+            or notification_service.can_deliver('email')):
+        return error_response(
+            'Password reset by code is not available for this gym yet. '
+            'Please ask your gym reception to reset your password.',
+            503,
+        )
+
+    if '@' in identifier:
+        customer = Customer.query.filter_by(email=identifier, is_active=True).first()
+    else:
+        customer = Customer.query.filter_by(phone=identifier, is_active=True).first()
+
+    generic_response = success_response({
+        'message': _RESET_SENT_MESSAGE,
+        'delivery_target': _mask_identifier(
+            identifier, 'email' if '@' in identifier else 'sms'),
+        'expires_in': 900,
+    })
+
+    if not customer:
+        return generic_response
+
+    delivery = _choose_delivery(customer, notification_service,
+                               data.get('delivery_method'))
+    if delivery is None:
+        # The member exists but there is no channel we can actually reach them
+        # on. Saying so would distinguish them from a stranger, so they get the
+        # same answer and reception handles it in person.
+        current_app.logger.warning(
+            'Password reset requested for customer %s but no deliverable '
+            'contact method is configured', customer.id,
+        )
+        return generic_response
+
+    delivery_method, delivery_target = delivery
+
+    # Retire any earlier reset code, so only the newest one works.
+    for old_code in ActivationCode.query.filter_by(
+        customer_id=customer.id,
+        is_used=False,
+        code_type=ActivationCodeType.PASSWORD_RESET,
+    ).all():
+        old_code.is_used = True
+
+    _, plain_code = ActivationCode.create_code(
+        customer_id=customer.id,
+        delivery_method=delivery_method,
+        delivery_target=delivery_target,
+        code_type=ActivationCodeType.PASSWORD_RESET,
+        expiry_minutes=15,
+    )
+    db.session.commit()
+
+    try:
+        notification_service.send_activation_code(
+            delivery_method=delivery_method,
+            target=delivery_target,
+            code=plain_code,
+            customer_name=customer.full_name,
+            purpose='password_reset',
+        )
+    except Exception as e:
+        # The code was committed before sending, so a failure here would leave
+        # a live reset code nobody received. Burn it.
+        current_app.logger.exception('Failed to send password reset code: %s', e)
+        ActivationCode.query.filter_by(
+            customer_id=customer.id,
+            is_used=False,
+            code_type=ActivationCodeType.PASSWORD_RESET,
+        ).update({'is_used': True}, synchronize_session=False)
+        db.session.commit()
+        return error_response(
+            'Could not send the reset code. Please try again, or ask your gym '
+            'reception to reset your password.',
+            500,
+        )
+
+    return generic_response
+
+
+def _choose_delivery(customer, notification_service, requested_method=None):
+    """Pick a channel we can actually reach this member on.
+
+    Returns ``(method, target)`` or None. The member's preference is honoured
+    when the provider supports it; otherwise this falls through to whatever
+    does work, because a gym with only SMTP configured should still be able to
+    reset the password of a member who typed their phone number.
+    """
+    candidates = []
+    if requested_method == 'email' and customer.email:
+        candidates.append(('email', customer.email))
+    elif requested_method == 'sms' and customer.phone:
+        candidates.append(('sms', customer.phone))
+
+    if customer.email:
+        candidates.append(('email', customer.email))
+    if customer.phone:
+        candidates.append(('sms', customer.phone))
+
+    for method, target in candidates:
+        if notification_service.can_deliver(method):
+            return method, target
+    return None
+
+
+@client_auth_bp.route('/reset-password', methods=['POST'])
+# Second line of defence behind the per-code attempt counter, which resets
+# every time a new code is minted.
+@limiter.limit('15 per minute;100 per hour')
+def reset_password():
+    """Finish a self-serve password reset.
+
+    Request body:
+        - identifier: phone or email
+        - code: the 6-digit code from /forgot-password
+        - new_password: at least 8 characters
+    """
+    data = request.get_json() or {}
+
+    identifier = (data.get('identifier') or '').strip()
+    code = (data.get('code') or '').strip()
+    new_password = (data.get('new_password') or '').strip()
+
+    if not identifier or not code or not new_password:
+        return error_response(
+            'Identifier, code and new_password are required', 400)
+
+    if len(new_password) < 8:
+        return error_response('New password must be at least 8 characters', 400)
+
+    if '@' in identifier:
+        customer = Customer.query.filter_by(email=identifier, is_active=True).first()
+    else:
+        customer = Customer.query.filter_by(phone=identifier, is_active=True).first()
+
+    # One message for "no such member" and "wrong code", so this cannot be used
+    # to enumerate members either.
+    invalid = error_response('Invalid or expired reset code', 401)
+
+    if not customer:
+        return invalid
+
+    reset_code = ActivationCode.query.filter_by(
+        customer_id=customer.id,
+        is_used=False,
+        code_type=ActivationCodeType.PASSWORD_RESET,
+    ).order_by(ActivationCode.created_at.desc()).first()
+
+    if not reset_code:
+        return invalid
+
+    if not reset_code.verify_code(code):
+        db.session.commit()  # persist the attempt count
+        return invalid
+
+    customer.set_password(new_password)
+    # The person who prompted this reset may be holding a live session on the
+    # old password. End it.
+    revoke_sessions(customer)
+    db.session.commit()
+
+    return success_response(
+        message='Password reset successfully. Please sign in with your new password.'
+    )
 
 
 @client_auth_bp.route('/logout', methods=['POST'])
+@client_token_required
 def client_logout():
+    """Log out, and mean it.
+
+    Previously a no-op that left the member's token valid for its full 7 days
+    — so "log out" on a phone that was about to be sold or handed on did
+    nothing whatsoever.
+
+    Authenticated now because it has an effect: without a token there is no
+    way to know whose sessions to end, and accepting an unauthenticated
+    identifier would let anyone sign any member out at will.
     """
-    Logout client user
-    Note: Since we're using stateless JWT, this is mainly for client-side cleanup.
-    In production, consider implementing JWT blacklisting.
-    """
+    customer = get_current_client()
+    if customer:
+        revoke_sessions_and_commit(customer)
+
     return success_response(message="Logged out successfully")
 
 

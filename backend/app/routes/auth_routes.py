@@ -6,6 +6,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import ValidationError
 from app.schemas import UserSchema, LoginSchema
 from app.services import AuthService
+from app.services.session_service import revoke_sessions_and_commit
 from app.utils import success_response, error_response, get_current_user, role_required
 from app.models.user import UserRole
 from app.extensions import db, limiter
@@ -68,8 +69,17 @@ def change_password():
     
     if not success:
         return error_response(message, 400)
-    
-    return success_response(message=message)
+
+    # Changing the password revoked every token issued to this account,
+    # including the one that authorised this very request. Hand back a
+    # replacement so the person who just changed their own password stays
+    # signed in on this device while everyone else is evicted.
+    from flask_jwt_extended import create_access_token
+
+    return success_response(
+        {'access_token': create_access_token(identity=str(user_id))},
+        message,
+    )
 
 
 @auth_bp.route('/language', methods=['PATCH'])
@@ -97,9 +107,19 @@ def update_preferred_language():
 @auth_bp.route('/logout', methods=['POST'])
 @jwt_required()
 def logout():
+    """Log out, and mean it.
+
+    This used to return "Logged out successfully" and do nothing at all: the
+    token stayed valid for its full 12 hours. On a shared front-desk terminal
+    that is the whole shift, and the next person to pick up the machine has the
+    previous one's session if they can read it out of storage.
+
+    Revoking is per-account rather than per-token, so it signs out every device
+    — see app/services/session_service.py for why that is the right default
+    here rather than a limitation.
     """
-    Logout current user
-    Note: Since we're using stateless JWT, this is mainly for client-side cleanup.
-    In production, consider implementing JWT blacklisting.
-    """
+    user = get_current_user()
+    if user:
+        revoke_sessions_and_commit(user)
+
     return success_response(message="Logged out successfully")

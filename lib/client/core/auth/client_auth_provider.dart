@@ -199,6 +199,20 @@ class ClientAuthProvider extends ChangeNotifier {
     return await _authService.requestAccountDeletion();
   }
 
+  /// Both halves of the self-serve reset. Neither needs a token — the whole
+  /// point is that the member cannot sign in.
+  Future<Map<String, dynamic>> forgotPassword(String identifier) async {
+    return await _authService.forgotPassword(identifier);
+  }
+
+  Future<Map<String, dynamic>> resetPassword(
+    String identifier,
+    String code,
+    String newPassword,
+  ) async {
+    return await _authService.resetPassword(identifier, code, newPassword);
+  }
+
   Future<void> logout() async {
     // Unregister FCM token
     await FcmNotificationService().unregisterToken(apiService: _apiService);

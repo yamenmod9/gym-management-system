@@ -160,6 +160,22 @@ class ClientAuthService {
   }
 
   Future<void> logout() async {
+    // Tell the server first, while the token is still stored — that call is
+    // what actually ends the session. Clearing the token locally only hides it
+    // from this app; the token itself stayed valid for a further seven days.
+    await _apiService.logout();
     await _apiService.clearTokens();
+  }
+
+  Future<Map<String, dynamic>> forgotPassword(String identifier) async {
+    return await _apiService.forgotPassword(identifier);
+  }
+
+  Future<Map<String, dynamic>> resetPassword(
+    String identifier,
+    String code,
+    String newPassword,
+  ) async {
+    return await _apiService.resetPassword(identifier, code, newPassword);
   }
 }

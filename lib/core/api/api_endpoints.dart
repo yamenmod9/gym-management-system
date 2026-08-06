@@ -15,6 +15,10 @@ class ApiEndpoints {
   static String customerById(int id) => '/api/customers/$id';
   static const String registerCustomer = '/api/customers/register'; // POST to create new customer
   static String regenerateQRCode(int customerId) => '/api/customers/$customerId/regenerate-qr';
+  /// Issues a member a fresh temporary password. The reception-side half of
+  /// password recovery — the half that works with no SMS or email provider,
+  /// because the member is standing at the desk.
+  static String resetCustomerPassword(int customerId) => '/api/customers/$customerId/reset-password';
 
   // Subscription Endpoints
   static const String subscriptions = '/api/subscriptions';

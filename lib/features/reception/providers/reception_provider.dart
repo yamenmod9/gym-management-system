@@ -1034,4 +1034,39 @@ class ReceptionProvider extends ChangeNotifier {
       };
     }
   }
+
+  /// Issue a member a new temporary password.
+  ///
+  /// Returns the plaintext password for reception to read out. It is a live
+  /// credential for that member's account until they change it, so it is
+  /// returned once and never stored.
+  Future<Map<String, dynamic>> resetCustomerPassword(int customerId) async {
+    try {
+      final response = await _apiService.post(
+        ApiEndpoints.resetCustomerPassword(customerId),
+        data: {},
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data?['data'] ?? response.data;
+        final temporaryPassword = data?['temporary_password'];
+        if (temporaryPassword != null) {
+          return {
+            'success': true,
+            'temporary_password': temporaryPassword,
+          };
+        }
+      }
+
+      return {
+        'success': false,
+        'message': response.data?['error'] ??
+            response.data?['message'] ??
+            S.failedToResetPassword,
+      };
+    } catch (e) {
+      debugPrint('❌ Error resetting member password: $e');
+      return {'success': false, 'message': S.failedToResetPassword};
+    }
+  }
 }

@@ -6,6 +6,7 @@ from flask_jwt_extended import create_access_token, create_refresh_token
 from app.extensions import db
 from app.models.user import User, UserRole, BRANCH_GROUP_ROLES
 from app.models.gym import Gym
+from app.services.session_service import revoke_sessions
 
 
 #: Shortest password a staff account may have. Matches what the member-facing
@@ -186,6 +187,12 @@ class AuthService:
             return False, weak
 
         user.set_password(new_password)
+        # Someone changing their password may be doing it precisely because
+        # another person knows the old one. Leaving that person's existing
+        # session alive for up to 12 hours defeats the point of the change.
+        # The caller mints a replacement token so the person doing the changing
+        # isn't signed out of their own device.
+        revoke_sessions(user)
         db.session.commit()
-        
+
         return True, "Password changed successfully"

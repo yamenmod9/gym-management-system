@@ -995,6 +995,29 @@ class S {
   static String get newMember => _t('عضو جديد؟', 'New member?');
   static String get visitReception => _t('يرجى زيارة استقبال النادي للحصول على بيانات الدخول', 'Please visit the gym\'s front desk to get your login credentials');
 
+  // ─── PASSWORD RESET ────────────────────────────────────────
+  static String get forgotPassword => _t('نسيت كلمة المرور؟', 'Forgot your password?');
+  static String get resetPasswordTitle => _t('إعادة تعيين كلمة المرور', 'Reset password');
+  static String get resetPasswordIntro => _t('أدخل رقم هاتفك أو بريدك الإلكتروني وسنرسل لك رمزاً', 'Enter your phone or email and we will send you a code');
+  static String get sendResetCode => _t('إرسال الرمز', 'Send code');
+  static String get resetCodeSent => _t('إذا كان هناك حساب بهذه البيانات، فقد أُرسل إليه رمز', 'If an account exists for this contact, a code has been sent to it');
+  static String get resetCode => _t('رمز التحقق', 'Verification code');
+  static String get enterResetCode => _t('أدخل الرمز المكون من 6 أرقام', 'Enter the 6-digit code');
+  static String get resetCodeRequired => _t('الرمز مطلوب', 'The code is required');
+  static String get passwordMin8 => _t('يجب أن تكون كلمة المرور 8 أحرف على الأقل', 'Password must be at least 8 characters');
+  static String get resetPasswordAction => _t('تعيين كلمة المرور', 'Set password');
+  static String get passwordResetDone => _t('تم تغيير كلمة المرور. سجّل الدخول بكلمة المرور الجديدة', 'Password changed. Sign in with your new password');
+  static String get resetUnavailable => _t('إعادة التعيين الذاتي غير متاحة. يرجى زيارة استقبال النادي', 'Self-service reset is unavailable. Please ask your gym reception');
+  static String get backToLogin => _t('العودة لتسجيل الدخول', 'Back to sign in');
+
+  // ─── STAFF: RESET A MEMBER'S PASSWORD ──────────────────────
+  static String get resetMemberPassword => _t('إعادة تعيين كلمة مرور العضو', 'Reset member password');
+  static String get resetMemberPasswordConfirm => _t('سيتم إنشاء كلمة مرور مؤقتة جديدة وإنهاء جلسات العضو الحالية. متابعة؟', 'This creates a new temporary password and signs the member out everywhere. Continue?');
+  static String get temporaryPasswordIssued => _t('كلمة المرور المؤقتة', 'Temporary password');
+  static String get giveToMember => _t('سلّم هذه الكلمة للعضو — سيُطلب منه تغييرها عند تسجيل الدخول', 'Give this to the member — they will be asked to change it at sign-in');
+  static String get copied => _t('تم النسخ', 'Copied');
+  static String get failedToResetPassword => _t('فشل إعادة تعيين كلمة المرور', 'Failed to reset the password');
+
   // ─── CLIENT HOME ───────────────────────────────────────────
   static String get guest => _t('ضيف', 'Guest');
   static String get subExpiringSoon => _t('الاشتراك ينتهي قريباً', 'Subscription expiring soon');

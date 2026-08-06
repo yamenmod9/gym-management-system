@@ -18,6 +18,7 @@ class CustomerDetailScreen extends StatefulWidget {
 class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   late String _qrData;
   bool _isRegenerating = false;
+  bool _isResettingPassword = false;
 
   @override
   void initState() {
@@ -67,6 +68,107 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         setState(() => _isRegenerating = false);
       }
     }
+  }
+
+  /// Issues the member a fresh temporary password.
+  ///
+  /// Confirmed first because it is destructive in a way that is easy to
+  /// overlook: it invalidates the member's current password and signs them out
+  /// of their phone. Tapping it on the wrong member's record locks that member
+  /// out until someone hands them the new one.
+  Future<void> _resetMemberPassword() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(S.resetMemberPassword),
+        content: Text(S.resetMemberPasswordConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(S.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(S.confirm),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isResettingPassword = true);
+
+    try {
+      final result = await context
+          .read<ReceptionProvider>()
+          .resetCustomerPassword(widget.customer.id!);
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        await _showIssuedPassword(result['temporary_password'] as String);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? S.failedToResetPassword),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isResettingPassword = false);
+    }
+  }
+
+  /// Shown once. The password is a live credential and is deliberately not
+  /// kept anywhere in the app — if reception misses it, they reset again.
+  Future<void> _showIssuedPassword(String password) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(S.temporaryPasswordIssued),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade200, width: 2),
+              ),
+              child: SelectableText(
+                password,
+                textAlign: TextAlign.center,
+                style: Theme.of(dialogContext)
+                    .textTheme
+                    .headlineSmall
+                    ?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      letterSpacing: 6,
+                      color: Colors.orange.shade800,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              S.giveToMember,
+              style: Theme.of(dialogContext).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(S.close),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -261,6 +363,63 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               ),
               const SizedBox(height: 16),
             ],
+
+            // Password recovery. A member who forgets their password and has no
+            // email or SMS provider configured for their gym has no self-serve
+            // way back in — reception is the route, so it needs to be here.
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.lock_reset, color: Color(0xFF6B7590)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            S.resetMemberPassword,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      S.giveToMember,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFF6B7590),
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed:
+                            _isResettingPassword ? null : _resetMemberPassword,
+                        icon: _isResettingPassword
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.lock_reset),
+                        label: Text(S.resetMemberPassword),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // Contact Information Card
             Card(
