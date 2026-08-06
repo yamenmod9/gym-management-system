@@ -9,6 +9,7 @@ import '../screens/payments_screen.dart';
 import '../screens/entry_history_screen.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/forgot_password_screen.dart';
+import '../screens/measurements_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/language_setup_screen.dart';
 
@@ -103,6 +104,11 @@ class ClientRouter {
         path: '/history',
         name: 'history',
         builder: (context, state) => const EntryHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/measurements',
+        name: 'measurements',
+        builder: (context, state) => const MeasurementsScreen(),
       ),
       GoRoute(
         path: '/change-password',

@@ -269,6 +269,20 @@ def _ensure_db_schema(app):
                 Issue.__table__.create(db.engine)
                 app.logger.info('Auto-migration: created issues table')
 
+            # Body composition history. Before this, a member's measurements
+            # were single columns overwritten on every edit — one number, no
+            # past. Those columns stay as the latest reading; this is the trail.
+            if 'body_measurements' not in existing_tables:
+                from app.models.body_measurement import BodyMeasurement
+                BodyMeasurement.__table__.create(db.engine)
+                app.logger.info('Auto-migration: created body_measurements table')
+
+            # Captain-to-member messages.
+            if 'messages' not in existing_tables:
+                from app.models.message import Message
+                Message.__table__.create(db.engine)
+                app.logger.info('Auto-migration: created messages table')
+
             # Add template_hash to fingerprints if missing. The model has
             # declared it for a while, and create_all() only builds whole
             # tables, so databases that predate the column never got it.

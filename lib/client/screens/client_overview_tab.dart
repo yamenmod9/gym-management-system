@@ -7,6 +7,7 @@ import '../core/api/client_api_service.dart';
 import '../core/theme/client_theme.dart';
 import '../models/subscription_model.dart';
 import '../widgets/pending_actions_card.dart';
+import 'measurements_screen.dart';
 
 /// Home tab of the member app, styled to the PowerFit Member App design:
 /// greeting header, a crimson subscription card with the remaining balance
@@ -130,6 +131,8 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
                         ],
                         _buildCheckInButton(),
                         const SizedBox(height: 16),
+                        _buildProgressCard(),
+                        const SizedBox(height: 16),
                         if (_activity != null) ...[
                           _buildBusyCard(_activity!),
                           const SizedBox(height: 16),
@@ -140,6 +143,63 @@ class _ClientOverviewTabState extends State<ClientOverviewTab> {
                         ],
                       ],
                     ),
+        ),
+      ),
+    );
+  }
+
+  /// Entry point to the member's InBody history.
+  ///
+  /// Always shown, even with nothing recorded yet: the empty state explains
+  /// that reception takes the measurement, which is the thing a member who has
+  /// never had one needs to be told.
+  Widget _buildProgressCard() {
+    return Material(
+      color: ClientTheme.mediumGrey,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const MeasurementsScreen()),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: ClientTheme.primaryRed.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.monitor_weight_outlined,
+                    color: ClientTheme.primaryRed),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      S.myProgress,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      S.bodyMeasurements,
+                      style: const TextStyle(
+                          color: Color(0xFF9A9A9A), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Color(0xFF6A6A6A)),
+            ],
+          ),
         ),
       ),
     );

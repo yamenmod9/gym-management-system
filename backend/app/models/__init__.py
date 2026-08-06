@@ -22,8 +22,13 @@ from .gym_class import (
     GymClass, ClassSession, ClassAttendance, ClassFeedback, ClassSessionStatus,
 )
 from .private_session import PrivateSession, PrivateSessionStatus
+from .body_measurement import BodyMeasurement
+from .message import Message, MessageSender
 
 __all__ = [
+    'BodyMeasurement',
+    'Message',
+    'MessageSender',
     'User',
     'UserRole',
     'Branch',

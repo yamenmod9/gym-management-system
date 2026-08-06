@@ -212,6 +212,53 @@ class ClientApiService {
     }
   }
 
+  // ── Body measurements ──────────────────────────────────────────────────
+
+  /// The member's own InBody history, newest first.
+  ///
+  /// Members could not see any of this before: body composition was captured
+  /// at registration and shown only to staff.
+  Future<Map<String, dynamic>> getMeasurements() async {
+    try {
+      final response = await _dio.get('/client/measurements');
+      return Map<String, dynamic>.from(response.data['data'] ?? {});
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ── Messages ───────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getMessageThreads() async {
+    try {
+      final response = await _dio.get('/client/messages/threads');
+      return Map<String, dynamic>.from(response.data['data'] ?? {});
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> getMessages(int trainerId) async {
+    try {
+      final response = await _dio.get('/client/messages/$trainerId');
+      return Map<String, dynamic>.from(response.data['data'] ?? {});
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> sendMessage(int trainerId, String body) async {
+    try {
+      final response = await _dio.post(
+        '/client/messages/$trainerId',
+        data: {'body': body},
+      );
+      return Map<String, dynamic>.from(response.data['data'] ?? {});
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// Phone numbers are typed with spaces, dashes and country prefixes; the
   /// backend matches them literally. Shared by login and the reset flow so
   /// that a member who signs in with "0100 123 4567" can also reset with it.

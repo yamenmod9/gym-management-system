@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import '../../core/localization/app_strings.dart';
 import '../core/theme/client_theme.dart';
 import 'client_overview_tab.dart';
+import 'messages_screen.dart';
 import 'qr_screen.dart';
 import 'entry_history_screen.dart';
 import 'settings_screen.dart';
 
-/// Bottom-tab shell for the member app. Four tabs matching the
-/// PowerFit Member App design: Home, Check-in (QR), History, Profile.
+/// Bottom-tab shell for the member app: Home, Check-in (QR), Messages,
+/// History, Profile.
 /// The full SubscriptionScreen stays reachable from the Home subscription
 /// card and the Profile "manage subscription" row, so no feature is lost.
+/// Body measurements are reached from the Home progress card.
 class ClientMainScreen extends StatefulWidget {
   const ClientMainScreen({super.key});
 
@@ -23,6 +25,7 @@ class _ClientMainScreenState extends State<ClientMainScreen> {
   late final List<Widget> _screens = [
     ClientOverviewTab(onGoToCheckIn: () => _select(1)),
     const QrScreen(),
+    const MessagesScreen(),
     const EntryHistoryScreen(),
     const SettingsScreen(),
   ];
@@ -53,6 +56,7 @@ class _MemberNavBar extends StatelessWidget {
     final items = <_NavItem>[
       _NavItem(Icons.home_rounded, Icons.home_outlined, S.home),
       _NavItem(Icons.qr_code_rounded, Icons.qr_code_outlined, S.checkInNav),
+      _NavItem(Icons.forum_rounded, Icons.forum_outlined, S.messages),
       _NavItem(Icons.history_rounded, Icons.history_outlined, S.history),
       _NavItem(Icons.person_rounded, Icons.person_outline, S.profile),
     ];

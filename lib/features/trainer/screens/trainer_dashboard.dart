@@ -9,6 +9,8 @@ import '../../../shared/widgets/error_display.dart';
 import '../../../shared/widgets/skeleton_loader.dart';
 import '../widgets/class_session_sheet.dart';
 import '../widgets/log_private_session_dialog.dart';
+import 'client_measurements_screen.dart';
+import 'trainer_chat_screen.dart';
 
 /// Console for trainers: the members of their own branch, recent check-ins,
 /// the members who train privately with them, and the classes they run.
@@ -37,6 +39,7 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
   List<Map<String, dynamic>> _entries = const [];
   List<Map<String, dynamic>> _privateClients = const [];
   List<Map<String, dynamic>> _classes = const [];
+  List<Map<String, dynamic>> _threads = const [];
 
   /// Whatever went wrong on the last load, one entry per failed endpoint.
   List<Object> _failures = const [];
@@ -93,6 +96,11 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
         final res = await api.get('/api/classes/mine');
         return _asMapList(res.data?['data']);
       }, empty),
+      attempt(() async {
+        final res = await api.get('/api/private-training/messages/threads');
+        final data = res.data?['data'];
+        return _asMapList(data is Map ? data['items'] : null);
+      }, empty),
     ]);
 
     if (!mounted) return;
@@ -101,6 +109,7 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
       _entries = results[1];
       _privateClients = results[2];
       _classes = results[3];
+      _threads = results[4];
       // Only a total failure is worth replacing the screen with an error.
       _error = _failures.length == results.length
           ? _failures.first.toString()
@@ -119,7 +128,13 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
         S.recentCheckIns,
         S.privateClients,
         S.myClasses,
+        S.messages,
       ];
+
+  int get _totalUnread => _threads.fold<int>(
+        0,
+        (sum, t) => sum + ((t['unread_count'] as num?)?.toInt() ?? 0),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +145,7 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
       _buildEntries,
       _buildPrivateClients,
       _buildClasses,
+      _buildMessages,
     ];
 
     final body = _isLoading
@@ -152,6 +168,10 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
         DashNavItem(Icons.login_rounded, S.recentCheckIns),
         DashNavItem(Icons.fitness_center, S.privateClients),
         DashNavItem(Icons.event_available, S.myClasses),
+        DashNavItem(
+          Icons.forum_outlined,
+          _totalUnread > 0 ? '${S.messages} ($_totalUnread)' : S.messages,
+        ),
       ],
       selectedIndex: _selectedIndex,
       onSelect: (i) => setState(() => _selectedIndex = i),
@@ -237,15 +257,94 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
             if (remaining != null) '$remaining/${total ?? '—'} ${S.sessionsRemaining}',
             if (pending > 0) '$pending ${S.awaitingConfirmation}',
           ].join('  •  '),
-          trailing: TextButton.icon(
-            onPressed: exhausted
-                ? null
-                : () => _logSession(c['subscription_id'], c['customer_name']),
-            icon: const Icon(Icons.add_task, size: 18),
-            label: Text(S.logSession),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: S.viewMeasurements,
+                onPressed: () =>
+                    _openMeasurements(c['customer_id'], c['customer_name']),
+                icon: const Icon(Icons.monitor_weight_outlined, size: 20),
+                color: DashColors.muted,
+              ),
+              IconButton(
+                tooltip: S.messages,
+                onPressed: () =>
+                    _openChat(c['customer_id'], c['customer_name']),
+                icon: const Icon(Icons.forum_outlined, size: 20),
+                color: DashColors.muted,
+              ),
+              TextButton.icon(
+                onPressed: exhausted
+                    ? null
+                    : () =>
+                        _logSession(c['subscription_id'], c['customer_name']),
+                icon: const Icon(Icons.add_task, size: 18),
+                label: Text(S.logSession),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+
+  // ──────────────────────────────  messages  ─────────────────────────────
+
+  Widget _buildMessages() {
+    if (_threads.isEmpty) return _empty(S.noPrivateClientsToMessage);
+    return _list(
+      _threads.length,
+      (i) {
+        final thread = _threads[i];
+        final unread = (thread['unread_count'] as num?)?.toInt() ?? 0;
+        final last = thread['last_message'];
+
+        return _card(
+          leading: CircleAvatar(
+            backgroundColor: DashColors.inner,
+            child: Text(
+              _initial(thread['customer_name']),
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+          title: (thread['customer_name'] ?? '').toString(),
+          subtitle: last is Map
+              ? (last['body'] ?? '').toString()
+              : S.noMessagesYet,
+          trailing: unread > 0
+              ? _pill('$unread', DashColors.emerald)
+              : const Icon(Icons.chevron_right, color: DashColors.subtle),
+          onTap: () => _openChat(thread['customer_id'], thread['customer_name']),
+        );
+      },
+    );
+  }
+
+  Future<void> _openChat(dynamic customerId, dynamic name) async {
+    if (customerId is! int) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TrainerChatScreen(
+          customerId: customerId,
+          customerName: (name ?? '').toString(),
+        ),
+      ),
+    );
+    // Reading a thread clears its unread count.
+    if (mounted) await _load();
+  }
+
+  Future<void> _openMeasurements(dynamic customerId, dynamic name) async {
+    if (customerId is! int) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ClientMeasurementsScreen(
+          customerId: customerId,
+          customerName: (name ?? '').toString(),
+        ),
+      ),
     );
   }
 
@@ -341,8 +440,9 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
     required String title,
     required String subtitle,
     Widget? trailing,
+    VoidCallback? onTap,
   }) {
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: DashColors.card,
@@ -364,9 +464,13 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
                 ),
                 if (subtitle.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(subtitle,
-                      style: const TextStyle(
-                          color: DashColors.muted, fontSize: 12)),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: DashColors.muted, fontSize: 12),
+                  ),
                 ],
               ],
             ),
@@ -374,6 +478,13 @@ class _TrainerDashboardState extends State<TrainerDashboard> {
           ?trailing,
         ],
       ),
+    );
+
+    if (onTap == null) return content;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: content,
     );
   }
 

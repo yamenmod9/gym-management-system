@@ -42,6 +42,24 @@ def _may_see_temp_password(user):
     return bool(user) and user.role in _TEMP_PASSWORD_ROLES
 
 
+def _may_see_health(user, customer_id):
+    """Whether this staff member may see a member's body composition.
+
+    Everyone except a trainer; a trainer only for the members who train
+    privately with them. Body composition and health notes are health data, and
+    working at the same branch is not a reason to hold them.
+
+    This list is branch-scoped but has no role gate, so before this a captain
+    could read the weight, BMI and health notes of every member at their
+    branch — which would have made the same restriction on the measurement
+    history purely decorative.
+    """
+    if not user or user.role != UserRole.TRAINER:
+        return True
+    from app.services.coaching_access import trainer_has_client
+    return trainer_has_client(user.id, customer_id)
+
+
 @customers_bp.route('', methods=['GET'])
 @jwt_required()
 def get_customers():
@@ -76,8 +94,20 @@ def get_customers():
     # of letting each to_dict() run its own EXISTS query.
     active_sub_ids = Customer.batch_has_active_subscription([c.id for c in pagination.items])
     show_temp = _may_see_temp_password(user)
+    # None means "no health restriction"; a set means the caller is a trainer
+    # and may only see the health data of members on their roster. Resolved
+    # once for the page rather than per row.
+    coached = None
+    if user and user.role == UserRole.TRAINER:
+        from app.services.coaching_access import coached_customer_ids
+        coached = coached_customer_ids(user.id)
+
     customers_data = [
-        customer.to_dict(include_temp_password=show_temp, has_active_subscription=customer.id in active_sub_ids)
+        customer.to_dict(
+            include_temp_password=show_temp,
+            has_active_subscription=customer.id in active_sub_ids,
+            include_health=coached is None or customer.id in coached,
+        )
         for customer in pagination.items
     ]
     
@@ -109,7 +139,10 @@ def get_customer(customer_id):
         return error_response("Access denied", 403)
 
     return success_response(
-        customer.to_dict(include_temp_password=_may_see_temp_password(user))
+        customer.to_dict(
+            include_temp_password=_may_see_temp_password(user),
+            include_health=_may_see_health(user, customer.id),
+        )
     )
 
 
@@ -129,7 +162,10 @@ def get_customer_by_phone(phone):
         return error_response("Access denied", 403)
 
     return success_response(
-        customer.to_dict(include_temp_password=_may_see_temp_password(user))
+        customer.to_dict(
+            include_temp_password=_may_see_temp_password(user),
+            include_health=_may_see_health(user, customer.id),
+        )
     )
 
 
@@ -476,10 +512,18 @@ def search_customers():
 
     active_sub_ids = Customer.batch_has_active_subscription([c.id for c in customers])
     show_temp = _may_see_temp_password(current_user)
+    coached = None
+    if current_user and current_user.role == UserRole.TRAINER:
+        from app.services.coaching_access import coached_customer_ids
+        coached = coached_customer_ids(current_user.id)
 
     return success_response({
         'items': [
-            c.to_dict(include_temp_password=show_temp, has_active_subscription=c.id in active_sub_ids)
+            c.to_dict(
+                include_temp_password=show_temp,
+                has_active_subscription=c.id in active_sub_ids,
+                include_health=coached is None or c.id in coached,
+            )
             for c in customers
         ],
         'total': len(customers),

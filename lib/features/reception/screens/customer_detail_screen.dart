@@ -5,6 +5,10 @@ import '../../../shared/models/customer_model.dart';
 import '../widgets/customer_qr_code_widget.dart';
 import '../providers/reception_provider.dart';
 import '../../../core/localization/app_strings.dart';
+// Shared with the trainer app: the same reading, recorded and read back the
+// same way, whichever role is looking at it.
+import '../../trainer/screens/client_measurements_screen.dart';
+import '../../trainer/widgets/record_measurement_dialog.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   final CustomerModel customer;
@@ -68,6 +72,35 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         setState(() => _isRegenerating = false);
       }
     }
+  }
+
+  Future<void> _recordMeasurement() async {
+    final recorded = await showDialog<bool>(
+      context: context,
+      builder: (_) => RecordMeasurementDialog(
+        customerId: widget.customer.id!,
+        customerName: widget.customer.fullName,
+      ),
+    );
+    if (recorded == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(S.measurementRecorded),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  void _openMeasurementHistory() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ClientMeasurementsScreen(
+          customerId: widget.customer.id!,
+          customerName: widget.customer.fullName,
+        ),
+      ),
+    );
   }
 
   /// Issues the member a fresh temporary password.
@@ -364,6 +397,64 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               const SizedBox(height: 16),
             ],
 
+            // Body composition. Reception owns the InBody machine, so this is
+            // where a reading gets recorded and where the trail is read back.
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.monitor_weight_outlined,
+                            color: Color(0xFF6B7590)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            S.bodyMeasurements,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _recordMeasurement,
+                            icon: const Icon(Icons.add),
+                            label: Text(S.recordMeasurement),
+                            style: ElevatedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _openMeasurementHistory,
+                            icon: const Icon(Icons.timeline),
+                            label: Text(S.measurementHistory),
+                            style: OutlinedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // Password recovery. A member who forgets their password and has no
             // email or SMS provider configured for their gym has no self-serve
             // way back in — reception is the route, so it needs to be here.
@@ -504,7 +595,11 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                           child: _buildMetricCard(
                             context,
                             S.height,
-                            S.heightCm(widget.customer.height != null ? (widget.customer.height! * 100).toStringAsFixed(0) : S.na),
+                            // Height is stored and entered in centimetres —
+                            // the registration dialog parses it as cm and the
+                            // BMI helper divides by 100. Multiplying here
+                            // showed a 180cm member as "18000 cm".
+                            S.heightCm(widget.customer.height?.toStringAsFixed(0) ?? S.na),
                             Icons.height,
                           ),
                         ),

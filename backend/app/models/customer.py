@@ -172,7 +172,15 @@ class Customer(db.Model):
         self.password_changed = False
         return temp_pass
 
-    def to_dict(self, include_temp_password=False, has_active_subscription=None):
+    #: Body composition and health notes. Grouped so the one rule about who may
+    #: see them has a single place to be applied.
+    HEALTH_FIELDS = (
+        'height', 'weight', 'bmi', 'bmi_category', 'bmr', 'ideal_weight',
+        'daily_calories', 'health_notes',
+    )
+
+    def to_dict(self, include_temp_password=False, has_active_subscription=None,
+                include_health=True):
         """Convert to dictionary
 
         Args:
@@ -188,6 +196,17 @@ class Customer(db.Model):
                                   per-row EXISTS query when the caller already
                                   batched this check for a page of customers
                                   (see Customer.batch_has_active_subscription).
+            include_health: When False, the body composition fields and health
+                                  notes are omitted entirely (see
+                                  HEALTH_FIELDS). Used to keep a trainer from
+                                  reading the health data of members they do
+                                  not coach — the members list is branch-scoped
+                                  with no role gate, so without this a captain
+                                  sees the weight, BMI and health notes of
+                                  every member at their branch, and gating the
+                                  measurement history alone would achieve
+                                  nothing. Defaults True: every other staff
+                                  role records or acts on these.
         """
         if has_active_subscription is None:
             from app.models.subscription import Subscription, SubscriptionStatus
@@ -236,6 +255,10 @@ class Customer(db.Model):
             'updated_at': self.updated_at.isoformat()
         }
         
+        if not include_health:
+            for field in self.HEALTH_FIELDS:
+                data.pop(field, None)
+
         # Only include temp_password for staff (not customers)
         # Only show if password hasn't been changed yet
         if include_temp_password and not self.password_changed:

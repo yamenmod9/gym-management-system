@@ -1018,6 +1018,40 @@ class S {
   static String get copied => _t('تم النسخ', 'Copied');
   static String get failedToResetPassword => _t('فشل إعادة تعيين كلمة المرور', 'Failed to reset the password');
 
+  // ─── MESSAGES ──────────────────────────────────────────────
+  static String get messages => _t('الرسائل', 'Messages');
+  static String get noMessagesYet => _t('لا توجد رسائل بعد. ابدأ المحادثة', 'No messages yet. Start the conversation');
+  static String get typeAMessage => _t('اكتب رسالة...', 'Type a message...');
+  static String get conversationClosed => _t('انتهى اشتراك التدريب الخاص، لذا لا يمكن إرسال رسائل جديدة', 'The private training package has ended, so no new messages can be sent');
+  static String get noConversations => _t('لا توجد محادثات. المحادثات متاحة مع مدرب التدريب الخاص', 'No conversations. Messaging is available with your private training captain');
+  static String get noPrivateClientsToMessage => _t('لا يوجد متدربون خاصون بعد', 'No private clients yet');
+  static String get failedToSendMessage => _t('تعذر إرسال الرسالة', 'Could not send the message');
+
+  // ─── BODY MEASUREMENTS ─────────────────────────────────────
+  static String get bodyMeasurements => _t('قياسات الجسم', 'Body measurements');
+  static String get myProgress => _t('تقدمي', 'My progress');
+  static String get noMeasurementsYet => _t('لا توجد قياسات مسجلة بعد. اطلب من الاستقبال تسجيل قياس InBody', 'No measurements recorded yet. Ask reception to record an InBody reading');
+  static String get recordMeasurement => _t('تسجيل قياس', 'Record measurement');
+  static String get measurementRecorded => _t('تم تسجيل القياس', 'Measurement recorded');
+  static String get failedToRecordMeasurement => _t('فشل تسجيل القياس', 'Failed to record the measurement');
+  static String get measurementHistory => _t('سجل القياسات', 'Measurement history');
+  static String get weightLabel => _t('الوزن (كجم)', 'Weight (kg)');
+  static String get heightLabel => _t('الطول (سم)', 'Height (cm)');
+  static String get bodyFatPercent => _t('نسبة الدهون (%)', 'Body fat (%)');
+  static String get skeletalMuscleMass => _t('كتلة العضلات (كجم)', 'Muscle mass (kg)');
+  static String get bodyWaterLitres => _t('ماء الجسم (لتر)', 'Body water (L)');
+  static String get visceralFatLevel => _t('مستوى الدهون الحشوية', 'Visceral fat level');
+  static String get boneMineralKg => _t('المعادن العظمية (كجم)', 'Bone mineral (kg)');
+  static String get inbodyScore => _t('نتيجة InBody', 'InBody score');
+  static String get bodyFatMass => _t('كتلة الدهون (كجم)', 'Fat mass (kg)');
+  static String get measuredOn => _t('تاريخ القياس', 'Measured on');
+  static String get sinceFirstMeasurement => _t('منذ أول قياس', 'Since your first measurement');
+  static String get latestReading => _t('آخر قياس', 'Latest reading');
+  static String get weightIsRequired => _t('الوزن مطلوب', 'Weight is required');
+  static String get optionalFields => _t('حقول اختيارية', 'Optional');
+  static String get viewMeasurements => _t('عرض القياسات', 'View measurements');
+  static String get invalidNumber => _t('رقم غير صالح', 'Not a valid number');
+
   // ─── CLIENT HOME ───────────────────────────────────────────
   static String get guest => _t('ضيف', 'Guest');
   static String get subExpiringSoon => _t('الاشتراك ينتهي قريباً', 'Subscription expiring soon');

@@ -54,6 +54,13 @@ Set<String> _backendClientRoutes() {
     'backend/app/routes/client_routes.py': '/client',
     'backend/app/routes/client_auth_routes.py': '/client/auth',
     'backend/app/routes/private_training_routes.py': '/private-training',
+    // These two blueprints serve both audiences from one file and carry the
+    // full path in the decorator, so they take no prefix. They are listed
+    // because a member-facing route added to a *new* blueprint would otherwise
+    // be invisible to this check — which is exactly what happened when the
+    // measurement and message routes were added.
+    'backend/app/routes/measurements_routes.py': '',
+    'backend/app/routes/messages_routes.py': '',
   };
 
   final route = RegExp(r"""\.route\(\s*['"]([^'"]*)['"]""");

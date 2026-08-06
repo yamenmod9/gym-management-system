@@ -100,6 +100,21 @@ def anonymise(customer):
     DeviceToken.query.filter_by(customer_id=customer.id).update(
         {'is_active': False}, synchronize_session=False)
 
+    # Body composition history is health data about a named person and is not
+    # referenced by anything financial, so it is deleted outright rather than
+    # blanked. Clearing the customer's own columns above would otherwise leave
+    # the full trail sitting in body_measurements.
+    from app.models.body_measurement import BodyMeasurement
+    BodyMeasurement.query.filter_by(customer_id=customer.id).delete(
+        synchronize_session=False)
+
+    # Likewise their conversations with a captain. Deleted rather than
+    # anonymised: a message body is free text the member wrote about
+    # themselves, and there is no way to redact that field by field.
+    from app.models.message import Message
+    Message.query.filter_by(customer_id=customer.id).delete(
+        synchronize_session=False)
+
     # And their biometrics are personal data in their own right.
     from app.models.fingerprint import Fingerprint
     for fingerprint in Fingerprint.query.filter_by(customer_id=customer.id).all():
