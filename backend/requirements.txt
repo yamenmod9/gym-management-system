@@ -9,7 +9,7 @@ Flask-Migrate==4.0.5
 Flask-Cors==6.0.5             # PYSEC-2024-71, -260, PYSEC-2026-1383/1384/1385
 Flask-Limiter==3.8.0
 flask-marshmallow==1.2.1
-marshmallow==3.26.2           # PYSEC-2026-1605. Deliberately not 4.x: that is
+marshmallow==4.3.0           # PYSEC-2026-1605. Deliberately not 4.x: that is
                               # a breaking rewrite, and the custom EnumValue
                               # field in app/schemas depends on 3.x behaviour.
 marshmallow-sqlalchemy==0.29.0
